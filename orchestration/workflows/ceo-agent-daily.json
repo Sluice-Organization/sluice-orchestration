@@ -1,0 +1,186 @@
+{
+  "name": "CEO Agent - Daily Review",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Daily 8 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "getMany",
+        "owner": "={{ $env.GITHUB_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPO }}",
+        "filePath": "memory-bank/businesses"
+      },
+      "id": "list-businesses",
+      "name": "List Business Directories",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "notes": "Get list of active businesses from memory bank repo"
+    },
+    {
+      "parameters": {
+        "jsCode": "// For each business directory, read state.md, reports/, and weekly-plan.md\n// This node processes each business sequentially\nconst businesses = $input.all();\nconst results = [];\n\nfor (const biz of businesses) {\n  if (biz.json.name === '_template') continue;\n  results.push({\n    json: {\n      businessId: biz.json.name,\n      businessPath: `memory-bank/businesses/${biz.json.name}`\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "filter-businesses",
+      "name": "Filter Active Businesses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "={{ $env.GITHUB_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPO }}",
+        "filePath": "={{ $json.businessPath }}/state.md"
+      },
+      "id": "read-state",
+      "name": "Read State",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [660, -100]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "={{ $env.GITHUB_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPO }}",
+        "filePath": "={{ $json.businessPath }}/weekly-plan.md"
+      },
+      "id": "read-plan",
+      "name": "Read Weekly Plan",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [660, 100]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "={{ $env.GITHUB_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPO }}",
+        "filePath": "={{ $json.businessPath }}/strategy.md"
+      },
+      "id": "read-strategy",
+      "name": "Read Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge all read files into a single context object\nconst state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\nconst plan = $('Read Weekly Plan').first().json.content || '';\nconst businessId = $('Filter Active Businesses').first().json.businessId;\n\nreturn [{\n  json: {\n    businessId,\n    context: `## Current State\\n${state}\\n\\n## Strategy\\n${strategy}\\n\\n## Current Weekly Plan\\n${plan}`\n  }\n}];"
+      },
+      "id": "merge-context",
+      "name": "Merge Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-opus-4-6",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{ $env.CEO_AGENT_PROMPT }}"
+            },
+            {
+              "role": "user",
+              "content": "Today is {{ $now.format('yyyy-MM-dd') }}. You are the CEO Agent for {{ $json.businessId }}.\n\nHere is the current context:\n\n{{ $json.context }}\n\nPerform your daily review:\n1. Assess the current state and any issues\n2. Check metrics trends\n3. Issue any necessary directives\n4. Generate your daily report in the structured format\n\nOutput your report in markdown."
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 2000,
+          "temperature": 0.3
+        }
+      },
+      "id": "ceo-claude-call",
+      "name": "CEO Agent - Claude Opus",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "notes": "Main CEO Agent reasoning call"
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "={{ $env.GITHUB_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPO }}",
+        "filePath": "={{ $('Filter Active Businesses').first().json.businessPath }}/reports/ceo-{{ $now.format('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $json.message.content }}",
+        "commitMessage": "CEO Agent daily report - {{ $('Filter Active Businesses').first().json.businessId }} - {{ $now.format('yyyy-MM-dd') }}"
+      },
+      "id": "write-report",
+      "name": "Write Daily Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1320, 0]
+    }
+  ],
+  "connections": {
+    "Daily 8 AM Trigger": {
+      "main": [
+        [{ "node": "List Business Directories", "type": "main", "index": 0 }]
+      ]
+    },
+    "List Business Directories": {
+      "main": [
+        [{ "node": "Filter Active Businesses", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Active Businesses": {
+      "main": [
+        [
+          { "node": "Read State", "type": "main", "index": 0 },
+          { "node": "Read Strategy", "type": "main", "index": 0 },
+          { "node": "Read Weekly Plan", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Read State": {
+      "main": [
+        [{ "node": "Merge Context", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Strategy": {
+      "main": [
+        [{ "node": "Merge Context", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Weekly Plan": {
+      "main": [
+        [{ "node": "Merge Context", "type": "main", "index": 0 }]
+      ]
+    },
+    "Merge Context": {
+      "main": [
+        [{ "node": "CEO Agent - Claude Opus", "type": "main", "index": 0 }]
+      ]
+    },
+    "CEO Agent - Claude Opus": {
+      "main": [
+        [{ "node": "Write Daily Report", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

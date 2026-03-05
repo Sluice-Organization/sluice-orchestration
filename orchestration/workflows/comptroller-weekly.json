@@ -1,0 +1,116 @@
+{
+  "name": "Comptroller - Weekly Plan Review",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "weekly-trigger",
+      "name": "Monday 10 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "getMany",
+        "owner": "={{ $env.GITHUB_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPO }}",
+        "filePath": "memory-bank/businesses"
+      },
+      "id": "list-businesses",
+      "name": "List Businesses",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const businesses = $input.all();\nconst results = [];\nfor (const biz of businesses) {\n  if (biz.json.name === '_template') continue;\n  results.push({\n    json: {\n      businessId: biz.json.name,\n      businessPath: `memory-bank/businesses/${biz.json.name}`\n    }\n  });\n}\nreturn results;"
+      },
+      "id": "filter-businesses",
+      "name": "Filter Active Businesses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Read state, strategy, content-strategy, weekly-plan, and latest CEO report\n// In production, these would be separate GitHub read nodes merged together\n// Simplified here as a single context builder\nreturn $input.all();"
+      },
+      "id": "build-context",
+      "name": "Build Review Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-opus-4-6",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{ $env.COMPTROLLER_PROMPT }}"
+            },
+            {
+              "role": "user",
+              "content": "Today is {{ $now.format('yyyy-MM-dd') }}. Review the weekly plan for {{ $json.businessId }}.\n\nContext:\n{{ $json.context }}\n\nPerform your weekly plan review:\n1. Apply the 5 first-principles questions\n2. Apply the 3 content-specific questions\n3. Check all early warning triggers\n4. Issue your assessment: APPROVED / APPROVED WITH CONCERNS / REJECTED\n5. Provide specific recommended changes\n\nOutput your review in the structured report format."
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 2500,
+          "temperature": 0.2
+        }
+      },
+      "id": "comptroller-call",
+      "name": "Comptroller - Claude Opus",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "={{ $env.GITHUB_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPO }}",
+        "filePath": "={{ $json.businessPath }}/comptroller/review-{{ $now.format('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $('Comptroller - Claude Opus').first().json.message.content }}",
+        "commitMessage": "Comptroller weekly review - {{ $json.businessId }} - {{ $now.format('yyyy-MM-dd') }}"
+      },
+      "id": "write-review",
+      "name": "Write Review",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1100, 0]
+    }
+  ],
+  "connections": {
+    "Monday 10 AM Trigger": {
+      "main": [[{ "node": "List Businesses", "type": "main", "index": 0 }]]
+    },
+    "List Businesses": {
+      "main": [[{ "node": "Filter Active Businesses", "type": "main", "index": 0 }]]
+    },
+    "Filter Active Businesses": {
+      "main": [[{ "node": "Build Review Context", "type": "main", "index": 0 }]]
+    },
+    "Build Review Context": {
+      "main": [[{ "node": "Comptroller - Claude Opus", "type": "main", "index": 0 }]]
+    },
+    "Comptroller - Claude Opus": {
+      "main": [[{ "node": "Write Review", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

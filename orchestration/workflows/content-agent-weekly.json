@@ -1,0 +1,129 @@
+{
+  "name": "Content Agent - Weekly Production",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "weekly-trigger",
+      "name": "Monday 9 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Read weekly plan and content strategy for the business\n// Extract content assignments for this week\nreturn $input.all();"
+      },
+      "id": "read-assignments",
+      "name": "Read Content Assignments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{ $env.CONTENT_AGENT_PROMPT }}"
+            },
+            {
+              "role": "user",
+              "content": "Produce this week's content for {{ $json.businessId }}.\n\nContent Strategy:\n{{ $json.contentStrategy }}\n\nWeekly Plan Assignments:\n{{ $json.assignments }}\n\nProduce:\n1. Blog posts (2-4) - full markdown with frontmatter, targeting assigned keywords\n2. Reel scripts (3-5) - short, punchy, result-first\n3. Any email copy assigned\n\nOutput each piece separated by ---PIECE--- markers. Include type (blog/reel/email) and metadata for each."
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 8000,
+          "temperature": 0.7
+        }
+      },
+      "id": "content-generation",
+      "name": "Generate Content - Sonnet",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-haiku-4-5-20251001",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a content quality reviewer. Check the following content for BANNED patterns:\n\nBANNED: Em dashes, \"delve\", \"leverage\" (verb), \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"tapestry\", \"in today's landscape\", \"it's important to note\", \"game-changer\", \"dive in\", \"without further ado\", sentences starting \"In the realm of\", excessive enthusiasm, numbered lists where prose works.\n\nFor each piece, respond with:\n- PASS or FAIL\n- If FAIL, list the specific violations and suggest fixes\n- Check that tone is conversational, uses contractions, and sounds human"
+            },
+            {
+              "role": "user",
+              "content": "Review this content:\n\n{{ $json.message.content }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 2000,
+          "temperature": 0.1
+        }
+      },
+      "id": "quality-review",
+      "name": "Quality Review - Haiku",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse quality review results\n// If any pieces FAIL, route back for revision\n// If all PASS, route to publishing\nconst review = $json.message.content;\nconst hasFails = review.toLowerCase().includes('fail');\n\nreturn [{\n  json: {\n    passed: !hasFails,\n    review,\n    content: $('Generate Content - Sonnet').first().json.message.content\n  }\n}];"
+      },
+      "id": "check-quality",
+      "name": "Check Quality Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "={{ $env.GITHUB_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPO }}",
+        "filePath": "={{ $json.businessPath }}/reports/content-{{ $now.format('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $json.content }}",
+        "commitMessage": "Content Agent weekly output - {{ $json.businessId }} - {{ $now.format('yyyy-MM-dd') }}"
+      },
+      "id": "save-content",
+      "name": "Save Approved Content",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1100, 0]
+    }
+  ],
+  "connections": {
+    "Monday 9 AM Trigger": {
+      "main": [[{ "node": "Read Content Assignments", "type": "main", "index": 0 }]]
+    },
+    "Read Content Assignments": {
+      "main": [[{ "node": "Generate Content - Sonnet", "type": "main", "index": 0 }]]
+    },
+    "Generate Content - Sonnet": {
+      "main": [[{ "node": "Quality Review - Haiku", "type": "main", "index": 0 }]]
+    },
+    "Quality Review - Haiku": {
+      "main": [[{ "node": "Check Quality Results", "type": "main", "index": 0 }]]
+    },
+    "Check Quality Results": {
+      "main": [[{ "node": "Save Approved Content", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

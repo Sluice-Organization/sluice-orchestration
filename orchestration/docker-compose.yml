@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://${N8N_HOST}/
+      - GENERIC_TIMEZONE=America/New_York
+      # GitHub integration
+      - GITHUB_OWNER=${GITHUB_OWNER}
+      - GITHUB_REPO=${GITHUB_REPO}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      # Claude API
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Agent prompts loaded as env vars
+      - CEO_AGENT_PROMPT_FILE=/prompts/ceo-agent.md
+      - COMPTROLLER_PROMPT_FILE=/prompts/comptroller-agent.md
+      - CONTENT_AGENT_PROMPT_FILE=/prompts/content-agent.md
+      - MARKETING_AGENT_PROMPT_FILE=/prompts/marketing-agent.md
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./prompts:/prompts:ro
+
+  huginn:
+    image: ghcr.io/huginn/huginn:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DOMAIN=${HUGINN_HOST}
+      - HUGINN_SEED_USERNAME=${HUGINN_USER}
+      - HUGINN_SEED_PASSWORD=${HUGINN_PASSWORD}
+
+volumes:
+  n8n_data:
