@@ -23,16 +23,12 @@
     },
     {
       "parameters": {
-        "operation": "getMany",
-        "owner": "ShalinPatel670",
-        "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses",
-        "resource": "file"
+        "jsCode": "// Hardcoded business list (replace getMany which doesn't work for file resource)\nreturn [{ json: { name: 'bayflow', path: 'memory-bank/businesses/bayflow' } }];"
       },
       "id": "list-businesses",
       "name": "List Businesses",
-      "type": "n8n-nodes-base.github",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         220,
         0
@@ -148,10 +144,10 @@
     },
     {
       "parameters": {
-        "model": "claude-opus-4-6",
+        "model": "claude-opus-4-20250514",
         "options": {
-          "maxTokensToSample": 2500,
-          "temperature": 0.2
+          "temperature": 0.2,
+          "maxTokens": 2500
         }
       },
       "id": "anthropic-model",
@@ -165,11 +161,11 @@
     },
     {
       "parameters": {
-        "operation": "edit",
+        "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Build Review Context').first().json.businessPath }}/comptroller/review-{{ $now.format('yyyy-MM-dd') }}.md",
-        "fileContent": "={{ $json.response.text }}",
+        "fileContent": "={{ $json.text }}",
         "commitMessage": "Comptroller weekly review - {{ $('Build Review Context').first().json.businessId }} - {{ $now.format('yyyy-MM-dd') }}",
         "resource": "file"
       },
@@ -213,21 +209,6 @@
             "node": "Read State",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Read Strategy",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Read Content Strategy",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Read Weekly Plan",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -236,7 +217,7 @@
       "main": [
         [
           {
-            "node": "Build Review Context",
+            "node": "Read Strategy",
             "type": "main",
             "index": 0
           }
@@ -247,7 +228,7 @@
       "main": [
         [
           {
-            "node": "Build Review Context",
+            "node": "Read Content Strategy",
             "type": "main",
             "index": 0
           }
@@ -258,7 +239,7 @@
       "main": [
         [
           {
-            "node": "Build Review Context",
+            "node": "Read Weekly Plan",
             "type": "main",
             "index": 0
           }

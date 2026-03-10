@@ -84,10 +84,10 @@
     },
     {
       "parameters": {
-        "model": "claude-sonnet-4-6",
+        "model": "claude-sonnet-4-20250514",
         "options": {
-          "maxTokensToSample": 8000,
-          "temperature": 0.7
+          "temperature": 0.7,
+          "maxTokens": 8000
         }
       },
       "id": "sonnet-model",
@@ -102,7 +102,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "You are a content quality reviewer. Check the following content for BANNED patterns:\n\nBANNED: Em dashes, \"delve\", \"leverage\" (verb), \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"tapestry\", \"in today's landscape\", \"it's important to note\", \"game-changer\", \"dive in\", \"without further ado\", sentences starting \"In the realm of\", excessive enthusiasm, numbered lists where prose works.\n\nFor each piece, respond with:\n- PASS or FAIL\n- If FAIL, list the specific violations and suggest fixes\n- Check that tone is conversational, uses contractions, and sounds human\n\nContent to review:\n{{ $json.response.text }}"
+        "text": "You are a content quality reviewer. Check the following content for BANNED patterns:\n\nBANNED: Em dashes, \"delve\", \"leverage\" (verb), \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"tapestry\", \"in today's landscape\", \"it's important to note\", \"game-changer\", \"dive in\", \"without further ado\", sentences starting \"In the realm of\", excessive enthusiasm, numbered lists where prose works.\n\nFor each piece, respond with:\n- PASS or FAIL\n- If FAIL, list the specific violations and suggest fixes\n- Check that tone is conversational, uses contractions, and sounds human\n\nContent to review:\n{{ $json.text }}"
       },
       "id": "review-chain",
       "name": "Quality Review Chain",
@@ -115,10 +115,10 @@
     },
     {
       "parameters": {
-        "model": "claude-haiku-4-5-20251001",
+        "model": "claude-3-5-haiku-20241022",
         "options": {
-          "maxTokensToSample": 2000,
-          "temperature": 0.1
+          "temperature": 0.1,
+          "maxTokens": 2000
         }
       },
       "id": "haiku-model",
@@ -132,7 +132,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const review = $json.response.text;\nconst hasFails = review.toLowerCase().includes('fail');\nconst content = $('Content Generation Chain').first().json.response.text;\n\nreturn [{\n  json: {\n    passed: !hasFails,\n    review,\n    content,\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow'\n  }\n}];"
+        "jsCode": "const review = $json.text;\nconst hasFails = review.toLowerCase().includes('fail');\nconst content = $('Content Generation Chain').first().json.text;\n\nreturn [{\n  json: {\n    passed: !hasFails,\n    review,\n    content,\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow'\n  }\n}];"
       },
       "id": "check-quality",
       "name": "Check Quality Results",
@@ -145,7 +145,7 @@
     },
     {
       "parameters": {
-        "operation": "edit",
+        "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/reports/content-{{ $now.format('yyyy-MM-dd') }}.md",
@@ -171,11 +171,6 @@
             "node": "Read Content Strategy",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Read Weekly Plan",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -184,7 +179,7 @@
       "main": [
         [
           {
-            "node": "Build Content Prompt",
+            "node": "Read Weekly Plan",
             "type": "main",
             "index": 0
           }

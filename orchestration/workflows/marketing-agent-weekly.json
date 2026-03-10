@@ -101,10 +101,10 @@
     },
     {
       "parameters": {
-        "model": "claude-sonnet-4-6",
+        "model": "claude-sonnet-4-20250514",
         "options": {
-          "maxTokensToSample": 3000,
-          "temperature": 0.4
+          "temperature": 0.4,
+          "maxTokens": 3000
         }
       },
       "id": "sonnet-model",
@@ -118,11 +118,11 @@
     },
     {
       "parameters": {
-        "operation": "edit",
+        "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/businesses/bayflow/reports/marketing-{{ $now.format('yyyy-MM-dd') }}.md",
-        "fileContent": "={{ $json.response.text }}",
+        "fileContent": "={{ $json.text }}",
         "commitMessage": "Marketing Agent weekly report - bayflow - {{ $now.format('yyyy-MM-dd') }}",
         "resource": "file"
       },
@@ -144,16 +144,6 @@
             "node": "Read State",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Read Content Strategy",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Read Weekly Plan",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -162,7 +152,7 @@
       "main": [
         [
           {
-            "node": "Build Marketing Prompt",
+            "node": "Read Content Strategy",
             "type": "main",
             "index": 0
           }
@@ -173,7 +163,7 @@
       "main": [
         [
           {
-            "node": "Build Marketing Prompt",
+            "node": "Read Weekly Plan",
             "type": "main",
             "index": 0
           }

@@ -46,10 +46,10 @@
     },
     {
       "parameters": {
-        "model": "claude-haiku-4-5-20251001",
+        "model": "claude-3-5-haiku-20241022",
         "options": {
-          "maxTokensToSample": 1000,
-          "temperature": 0.2
+          "temperature": 0.2,
+          "maxTokens": 1000
         }
       },
       "id": "haiku-model",
@@ -63,7 +63,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const responseText = $json.response.text;\nlet parsed;\ntry {\n  parsed = JSON.parse(responseText);\n} catch (e) {\n  // Try to extract JSON from response\n  const match = responseText.match(/\\{[\\s\\S]*\\}/);\n  if (match) {\n    parsed = JSON.parse(match[0]);\n  } else {\n    parsed = {\n      can_resolve: false,\n      escalation_reason: 'Failed to parse AI response',\n      ticket_tag: 'other',\n      severity: 'medium'\n    };\n  }\n}\n\nconst ticket = $('Parse Ticket').first().json;\n\nreturn [{\n  json: {\n    ...parsed,\n    customerEmail: ticket.customerEmail,\n    subject: ticket.subject,\n    message: ticket.message,\n    businessId: ticket.businessId,\n    receivedAt: ticket.receivedAt,\n    processedAt: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const responseText = $json.text;\nlet parsed;\ntry {\n  parsed = JSON.parse(responseText);\n} catch (e) {\n  // Try to extract JSON from response\n  const match = responseText.match(/\\{[\\s\\S]*\\}/);\n  if (match) {\n    parsed = JSON.parse(match[0]);\n  } else {\n    parsed = {\n      can_resolve: false,\n      escalation_reason: 'Failed to parse AI response',\n      ticket_tag: 'other',\n      severity: 'medium'\n    };\n  }\n}\n\nconst ticket = $('Parse Ticket').first().json;\n\nreturn [{\n  json: {\n    ...parsed,\n    customerEmail: ticket.customerEmail,\n    subject: ticket.subject,\n    message: ticket.message,\n    businessId: ticket.businessId,\n    receivedAt: ticket.receivedAt,\n    processedAt: new Date().toISOString()\n  }\n}];"
       },
       "id": "process-response",
       "name": "Process AI Response",
@@ -142,7 +142,7 @@
     },
     {
       "parameters": {
-        "operation": "edit",
+        "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/businesses/{{ $('Parse Ticket').first().json.businessId }}/reports/support-log.md",

@@ -67,10 +67,10 @@
     },
     {
       "parameters": {
-        "model": "claude-opus-4-6",
+        "model": "claude-opus-4-20250514",
         "options": {
-          "maxTokensToSample": 4000,
-          "temperature": 0.5
+          "temperature": 0.5,
+          "maxTokens": 4000
         }
       },
       "id": "opus-model",
@@ -84,11 +84,11 @@
     },
     {
       "parameters": {
-        "operation": "edit",
+        "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/system/discovery/opportunities-{{ $now.format('yyyy-MM-dd') }}.md",
-        "fileContent": "={{ $json.response.text }}",
+        "fileContent": "={{ $json.text }}",
         "commitMessage": "Discovery Engine daily opportunities - {{ $now.format('yyyy-MM-dd') }}",
         "resource": "file"
       },

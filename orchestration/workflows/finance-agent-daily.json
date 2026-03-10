@@ -4,56 +4,42 @@
     {
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 7 * * *"
-            }
-          ]
+          "interval": [{ "field": "cronExpression", "expression": "0 7 * * *" }]
         }
       },
       "id": "daily-trigger",
       "name": "Daily 7 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, 0]
     },
     {
       "parameters": {
+        "resource": "file",
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/state.md",
-        "resource": "file"
+        "filePath": "memory-bank/businesses/bayflow/state.md"
       },
       "id": "read-state",
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        220,
-        -50
-      ]
+      "position": [220, 0]
     },
     {
       "parameters": {
+        "resource": "file",
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/strategy.md",
-        "resource": "file"
+        "filePath": "memory-bank/businesses/bayflow/strategy.md"
       },
       "id": "read-strategy",
       "name": "Read Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        220,
-        50
-      ]
+      "position": [440, 0]
     },
     {
       "parameters": {
@@ -63,10 +49,7 @@
       "name": "Build Finance Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        440,
-        0
-      ]
+      "position": [660, 0]
     },
     {
       "parameters": {
@@ -77,122 +60,58 @@
       "name": "Finance LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [
-        660,
-        0
-      ]
+      "position": [880, 0]
     },
     {
       "parameters": {
-        "model": "claude-haiku-4-5-20251001",
+        "model": "claude-3-5-haiku-20241022",
         "options": {
-          "maxTokensToSample": 1500,
-          "temperature": 0.2
+          "temperature": 0.2,
+          "maxTokens": 1500
         }
       },
       "id": "haiku-model",
       "name": "Haiku Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [
-        660,
-        220
-      ]
+      "position": [880, 220]
     },
     {
       "parameters": {
-        "operation": "edit",
+        "resource": "file",
+        "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/businesses/bayflow/reports/finance-{{ $now.format('yyyy-MM-dd') }}.md",
-        "fileContent": "={{ $json.response.text }}",
-        "commitMessage": "Finance Agent daily report - bayflow - {{ $now.format('yyyy-MM-dd') }}",
-        "resource": "file"
+        "fileContent": "={{ $json.text }}",
+        "commitMessage": "Finance Agent daily report - bayflow - {{ $now.format('yyyy-MM-dd') }}"
       },
       "id": "write-report",
       "name": "Write Finance Report",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        880,
-        0
-      ]
+      "position": [1100, 0]
     }
   ],
   "connections": {
     "Daily 7 AM Trigger": {
-      "main": [
-        [
-          {
-            "node": "Read State",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Read Strategy",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Read State", "type": "main", "index": 0 }]]
     },
     "Read State": {
-      "main": [
-        [
-          {
-            "node": "Build Finance Prompt",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Read Strategy", "type": "main", "index": 0 }]]
     },
     "Read Strategy": {
-      "main": [
-        [
-          {
-            "node": "Build Finance Prompt",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Build Finance Prompt", "type": "main", "index": 0 }]]
     },
     "Build Finance Prompt": {
-      "main": [
-        [
-          {
-            "node": "Finance LLM Chain",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Finance LLM Chain", "type": "main", "index": 0 }]]
     },
     "Haiku Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Finance LLM Chain",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
+      "ai_languageModel": [[{ "node": "Finance LLM Chain", "type": "ai_languageModel", "index": 0 }]]
     },
     "Finance LLM Chain": {
-      "main": [
-        [
-          {
-            "node": "Write Finance Report",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Write Finance Report", "type": "main", "index": 0 }]]
     }
   },
-  "settings": {
-    "executionOrder": "v1"
-  }
+  "settings": { "executionOrder": "v1" }
 }
