@@ -16,46 +16,61 @@
       "name": "Tuesday 9 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/state.md"
+        "filePath": "memory-bank/businesses/bayflow/state.md",
+        "resource": "file"
       },
       "id": "read-state",
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, -100]
+      "position": [
+        220,
+        -100
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/weekly-plan.md"
+        "filePath": "memory-bank/businesses/bayflow/weekly-plan.md",
+        "resource": "file"
       },
       "id": "read-plan",
       "name": "Read Weekly Plan",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/reports/support-log.md"
+        "filePath": "memory-bank/businesses/bayflow/reports/support-log.md",
+        "resource": "file"
       },
       "id": "read-support-log",
       "name": "Read Support Log",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, 100]
+      "position": [
+        220,
+        100
+      ]
     },
     {
       "parameters": {
@@ -65,7 +80,10 @@
       "name": "Build Product Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -76,7 +94,10 @@
       "name": "Product LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -90,7 +111,10 @@
       "name": "Opus Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [660, 220]
+      "position": [
+        660,
+        220
+      ]
     },
     {
       "parameters": {
@@ -100,7 +124,10 @@
       "name": "Parse GitHub Issues",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -109,13 +136,17 @@
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/reports/product-{{ $now.format('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.report }}",
-        "commitMessage": "Product Agent weekly report - {{ $json.businessId }} - {{ $now.format('yyyy-MM-dd') }}"
+        "commitMessage": "Product Agent weekly report - {{ $json.businessId }} - {{ $now.format('yyyy-MM-dd') }}",
+        "resource": "file"
       },
       "id": "write-report",
       "name": "Write Product Report",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1100, -100]
+      "position": [
+        1100,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -125,7 +156,10 @@
       "name": "Prepare Issues",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 100]
+      "position": [
+        1100,
+        100
+      ]
     },
     {
       "parameters": {
@@ -134,53 +168,133 @@
         "repository": "bayflow",
         "title": "={{ $json.title }}",
         "body": "={{ $json.body }}",
-        "labels": "product-agent"
+        "labels": "product-agent",
+        "resource": "file"
       },
       "id": "create-issue",
       "name": "Create GitHub Issue",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1320, 100]
+      "position": [
+        1320,
+        100
+      ]
     }
   ],
   "connections": {
     "Tuesday 9 AM Trigger": {
       "main": [
         [
-          { "node": "Read State", "type": "main", "index": 0 },
-          { "node": "Read Weekly Plan", "type": "main", "index": 0 },
-          { "node": "Read Support Log", "type": "main", "index": 0 }
+          {
+            "node": "Read State",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Weekly Plan",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Support Log",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Read State": {
-      "main": [[{ "node": "Build Product Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Product Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Weekly Plan": {
-      "main": [[{ "node": "Build Product Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Product Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Support Log": {
-      "main": [[{ "node": "Build Product Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Product Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Product Prompt": {
-      "main": [[{ "node": "Product LLM Chain", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Product LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Opus Model": {
-      "ai_languageModel": [[{ "node": "Product LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "Product LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Product LLM Chain": {
-      "main": [[{ "node": "Parse GitHub Issues", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse GitHub Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse GitHub Issues": {
       "main": [
         [
-          { "node": "Write Product Report", "type": "main", "index": 0 },
-          { "node": "Prepare Issues", "type": "main", "index": 0 }
+          {
+            "node": "Write Product Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Issues",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Prepare Issues": {
-      "main": [[{ "node": "Create GitHub Issue", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Create GitHub Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

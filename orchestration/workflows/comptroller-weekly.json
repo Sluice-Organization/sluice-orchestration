@@ -16,20 +16,27 @@
       "name": "Monday 10 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "getMany",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses"
+        "filePath": "memory-bank/businesses",
+        "resource": "file"
       },
       "id": "list-businesses",
       "name": "List Businesses",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -39,59 +46,78 @@
       "name": "Filter Active Businesses",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "={{ $json.businessPath }}/state.md"
+        "filePath": "={{ $json.businessPath }}/state.md",
+        "resource": "file"
       },
       "id": "read-state",
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [660, -150]
+      "position": [
+        660,
+        -150
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "={{ $json.businessPath }}/strategy.md"
+        "filePath": "={{ $json.businessPath }}/strategy.md",
+        "resource": "file"
       },
       "id": "read-strategy",
       "name": "Read Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [660, -50]
+      "position": [
+        660,
+        -50
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "={{ $json.businessPath }}/content-strategy.md"
+        "filePath": "={{ $json.businessPath }}/content-strategy.md",
+        "resource": "file"
       },
       "id": "read-content-strategy",
       "name": "Read Content Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [660, 50]
+      "position": [
+        660,
+        50
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "={{ $json.businessPath }}/weekly-plan.md"
+        "filePath": "={{ $json.businessPath }}/weekly-plan.md",
+        "resource": "file"
       },
       "id": "read-plan",
       "name": "Read Weekly Plan",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [660, 150]
+      "position": [
+        660,
+        150
+      ]
     },
     {
       "parameters": {
@@ -101,7 +127,10 @@
       "name": "Build Review Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -112,7 +141,10 @@
       "name": "Comptroller LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {
@@ -126,7 +158,10 @@
       "name": "Anthropic Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [1100, 220]
+      "position": [
+        1100,
+        220
+      ]
     },
     {
       "parameters": {
@@ -135,52 +170,144 @@
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Build Review Context').first().json.businessPath }}/comptroller/review-{{ $now.format('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.response.text }}",
-        "commitMessage": "Comptroller weekly review - {{ $('Build Review Context').first().json.businessId }} - {{ $now.format('yyyy-MM-dd') }}"
+        "commitMessage": "Comptroller weekly review - {{ $('Build Review Context').first().json.businessId }} - {{ $now.format('yyyy-MM-dd') }}",
+        "resource": "file"
       },
       "id": "write-review",
       "name": "Write Review",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1320, 0]
+      "position": [
+        1320,
+        0
+      ]
     }
   ],
   "connections": {
     "Monday 10 AM Trigger": {
-      "main": [[{ "node": "List Businesses", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "List Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "List Businesses": {
-      "main": [[{ "node": "Filter Active Businesses", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Filter Active Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Filter Active Businesses": {
       "main": [
         [
-          { "node": "Read State", "type": "main", "index": 0 },
-          { "node": "Read Strategy", "type": "main", "index": 0 },
-          { "node": "Read Content Strategy", "type": "main", "index": 0 },
-          { "node": "Read Weekly Plan", "type": "main", "index": 0 }
+          {
+            "node": "Read State",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Strategy",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Content Strategy",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Weekly Plan",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Read State": {
-      "main": [[{ "node": "Build Review Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Review Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Strategy": {
-      "main": [[{ "node": "Build Review Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Review Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Content Strategy": {
-      "main": [[{ "node": "Build Review Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Review Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Weekly Plan": {
-      "main": [[{ "node": "Build Review Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Review Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Review Context": {
-      "main": [[{ "node": "Comptroller LLM Chain", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Comptroller LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Anthropic Chat Model": {
-      "ai_languageModel": [[{ "node": "Comptroller LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "Comptroller LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Comptroller LLM Chain": {
-      "main": [[{ "node": "Write Review", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Write Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

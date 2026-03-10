@@ -16,20 +16,27 @@
       "name": "Daily 6 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/system/operating-bible-v7.md"
+        "filePath": "memory-bank/system/operating-bible-v7.md",
+        "resource": "file"
       },
       "id": "read-bible",
       "name": "Read Operating Bible",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -39,7 +46,10 @@
       "name": "Build Discovery Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -50,7 +60,10 @@
       "name": "Discovery LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -64,7 +77,10 @@
       "name": "Opus Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [660, 220]
+      "position": [
+        660,
+        220
+      ]
     },
     {
       "parameters": {
@@ -73,30 +89,74 @@
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/system/discovery/opportunities-{{ $now.format('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.response.text }}",
-        "commitMessage": "Discovery Engine daily opportunities - {{ $now.format('yyyy-MM-dd') }}"
+        "commitMessage": "Discovery Engine daily opportunities - {{ $now.format('yyyy-MM-dd') }}",
+        "resource": "file"
       },
       "id": "write-opportunities",
       "name": "Write Opportunities",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     }
   ],
   "connections": {
     "Daily 6 AM Trigger": {
-      "main": [[{ "node": "Read Operating Bible", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Read Operating Bible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Operating Bible": {
-      "main": [[{ "node": "Build Discovery Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Discovery Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Discovery Prompt": {
-      "main": [[{ "node": "Discovery LLM Chain", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Discovery LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Opus Model": {
-      "ai_languageModel": [[{ "node": "Discovery LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "Discovery LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Discovery LLM Chain": {
-      "main": [[{ "node": "Write Opportunities", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Write Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

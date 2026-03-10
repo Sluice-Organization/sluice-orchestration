@@ -16,46 +16,61 @@
       "name": "Monday 11 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/state.md"
+        "filePath": "memory-bank/businesses/bayflow/state.md",
+        "resource": "file"
       },
       "id": "read-state",
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, -100]
+      "position": [
+        220,
+        -100
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/content-strategy.md"
+        "filePath": "memory-bank/businesses/bayflow/content-strategy.md",
+        "resource": "file"
       },
       "id": "read-content-strategy",
       "name": "Read Content Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/weekly-plan.md"
+        "filePath": "memory-bank/businesses/bayflow/weekly-plan.md",
+        "resource": "file"
       },
       "id": "read-plan",
       "name": "Read Weekly Plan",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, 100]
+      "position": [
+        220,
+        100
+      ]
     },
     {
       "parameters": {
@@ -65,7 +80,10 @@
       "name": "Build Marketing Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -76,7 +94,10 @@
       "name": "Marketing LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -90,7 +111,10 @@
       "name": "Sonnet Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [660, 220]
+      "position": [
+        660,
+        220
+      ]
     },
     {
       "parameters": {
@@ -99,42 +123,106 @@
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/businesses/bayflow/reports/marketing-{{ $now.format('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.response.text }}",
-        "commitMessage": "Marketing Agent weekly report - bayflow - {{ $now.format('yyyy-MM-dd') }}"
+        "commitMessage": "Marketing Agent weekly report - bayflow - {{ $now.format('yyyy-MM-dd') }}",
+        "resource": "file"
       },
       "id": "write-report",
       "name": "Write Marketing Report",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     }
   ],
   "connections": {
     "Monday 11 AM Trigger": {
       "main": [
         [
-          { "node": "Read State", "type": "main", "index": 0 },
-          { "node": "Read Content Strategy", "type": "main", "index": 0 },
-          { "node": "Read Weekly Plan", "type": "main", "index": 0 }
+          {
+            "node": "Read State",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Content Strategy",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Weekly Plan",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Read State": {
-      "main": [[{ "node": "Build Marketing Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Marketing Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Content Strategy": {
-      "main": [[{ "node": "Build Marketing Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Marketing Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Weekly Plan": {
-      "main": [[{ "node": "Build Marketing Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Marketing Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Marketing Prompt": {
-      "main": [[{ "node": "Marketing LLM Chain", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Marketing LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Sonnet Model": {
-      "ai_languageModel": [[{ "node": "Marketing LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "Marketing LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Marketing LLM Chain": {
-      "main": [[{ "node": "Write Marketing Report", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Write Marketing Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
