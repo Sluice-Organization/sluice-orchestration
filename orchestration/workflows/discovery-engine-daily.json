@@ -1,0 +1,105 @@
+{
+  "name": "Discovery Engine - Daily Opportunity Scoring",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-trigger",
+      "name": "Daily 6 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/system/operating-bible-v7.md"
+      },
+      "id": "read-bible",
+      "name": "Read Operating Bible",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const bible = $('Read Operating Bible').first().json.content || '';\n\n// Extract just Part II (What We Build) and Part VIII (Identifying New Businesses) sections\n// to keep the prompt focused and within token limits\nconst partII = bible.match(/# Part II:.*?(?=# Part III:)/s)?.[0] || '';\nconst partVIII = bible.match(/# Part VIII:.*?(?=# Part IX:)/s)?.[0] || '';\n\nreturn [{\n  json: {\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Discovery Engine for The Forge (Forge Technologies).\n\nYour job: score new business opportunities across all five sourcing tiers.\n\n## What We Build (from Operating Bible)\n${partII}\n\n## How We Find Ideas (from Operating Bible)\n${partVIII}\n\n## Your Task\nGenerate 5-10 business opportunity ideas that pass the Double Filter (Revenue Ceiling Test + Distribution Test). For each, provide:\n\n1. **Name/Concept:** Brief description\n2. **Category:** SMB Vertical Tool / Prosumer Workflow / PLG Platform\n3. **Sourcing Tier:** Which tier this came from (1-5)\n4. **Target Market:** Who buys this, how many exist\n5. **Pricing Model:** Proposed tiers\n6. **Distribution Viability:** Key SEO keywords + estimated monthly search volume. Reel potential (what would a demo video show?)\n7. **Revenue Ceiling Test:** Can this reach $100K MRR? Show the math.\n8. **Competition:** Who exists, what are their weaknesses (from reviews)\n9. **Score (1-10):** Weighted across: demand evidence, AI build feasibility, monetization clarity, competition gap, distribution viability\n\nOnly surface ideas scoring 6.5+. Be specific about keyword volumes and competition. Use real examples from known markets.\n\nOutput as structured markdown.`\n  }\n}];"
+      },
+      "id": "build-prompt",
+      "name": "Build Discovery Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}"
+      },
+      "id": "llm-chain",
+      "name": "Discovery LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-opus-4-6",
+        "options": {
+          "maxTokensToSample": 4000,
+          "temperature": 0.5
+        }
+      },
+      "id": "opus-model",
+      "name": "Opus Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 220]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/system/discovery/opportunities-{{ $now.format('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $json.response.text }}",
+        "commitMessage": "Discovery Engine daily opportunities - {{ $now.format('yyyy-MM-dd') }}"
+      },
+      "id": "write-opportunities",
+      "name": "Write Opportunities",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Daily 6 AM Trigger": {
+      "main": [[{ "node": "Read Operating Bible", "type": "main", "index": 0 }]]
+    },
+    "Read Operating Bible": {
+      "main": [[{ "node": "Build Discovery Prompt", "type": "main", "index": 0 }]]
+    },
+    "Build Discovery Prompt": {
+      "main": [[{ "node": "Discovery LLM Chain", "type": "main", "index": 0 }]]
+    },
+    "Opus Model": {
+      "ai_languageModel": [[{ "node": "Discovery LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Discovery LLM Chain": {
+      "main": [[{ "node": "Write Opportunities", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

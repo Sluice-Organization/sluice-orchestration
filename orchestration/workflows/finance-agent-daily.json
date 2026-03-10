@@ -1,0 +1,126 @@
+{
+  "name": "Finance Agent - Daily Reconciliation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-trigger",
+      "name": "Daily 7 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/state.md"
+      },
+      "id": "read-state",
+      "name": "Read State",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, -50]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/strategy.md"
+      },
+      "id": "read-strategy",
+      "name": "Read Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, 50]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\n\nreturn [{\n  json: {\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow',\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Finance Agent for BayFlow (auto repair shop software).\n\nYour responsibilities: daily reconciliation, weekly P&L with channel attribution, CAC/LTV/payback tracking, monthly treasury.\n\n## Current State\n${state}\n\n## Strategy (for pricing/budget context)\n${strategy}\n\nPerform your daily financial review:\n\n1. **Revenue Check:** Current MRR, any new subscriptions, any churned customers. Revenue by channel if available (organic, paid, direct, referral).\n\n2. **Expense Tracking:** Current monthly costs breakdown (Supabase, Vercel, Railway, domains, AI API costs, any ad spend). Compare against budget tier allocation.\n\n3. **Budget Compliance:** Are we within the seed stage daily max ($20)? Content/SEO 60%, Product 25%, Reserve 15%. Flag any overspend.\n\n4. **Circuit Breaker Check:** 7-day spend vs 3x trailing revenue. Any campaigns needing ROAS check.\n\n5. **Token Budget:** Estimated AI API costs for this business this cycle. Are we within seed tier (50K tokens/cycle, $30-50/month)?\n\n6. **Metrics:** CAC (if applicable), projected LTV, payback period.\n\nOutput your report in the structured format: Agent name, business, date, status (GREEN/YELLOW/RED), key metrics with trends, actions taken, issues detected, recommendations, needs from CEO Agent.`\n  }\n}];"
+      },
+      "id": "build-prompt",
+      "name": "Build Finance Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}"
+      },
+      "id": "llm-chain",
+      "name": "Finance LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-haiku-4-5-20251001",
+        "options": {
+          "maxTokensToSample": 1500,
+          "temperature": 0.2
+        }
+      },
+      "id": "haiku-model",
+      "name": "Haiku Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 220]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/reports/finance-{{ $now.format('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $json.response.text }}",
+        "commitMessage": "Finance Agent daily report - bayflow - {{ $now.format('yyyy-MM-dd') }}"
+      },
+      "id": "write-report",
+      "name": "Write Finance Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Daily 7 AM Trigger": {
+      "main": [
+        [
+          { "node": "Read State", "type": "main", "index": 0 },
+          { "node": "Read Strategy", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Read State": {
+      "main": [[{ "node": "Build Finance Prompt", "type": "main", "index": 0 }]]
+    },
+    "Read Strategy": {
+      "main": [[{ "node": "Build Finance Prompt", "type": "main", "index": 0 }]]
+    },
+    "Build Finance Prompt": {
+      "main": [[{ "node": "Finance LLM Chain", "type": "main", "index": 0 }]]
+    },
+    "Haiku Model": {
+      "ai_languageModel": [[{ "node": "Finance LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Finance LLM Chain": {
+      "main": [[{ "node": "Write Finance Report", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

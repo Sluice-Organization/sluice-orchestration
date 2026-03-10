@@ -1,0 +1,155 @@
+{
+  "name": "Portfolio Orchestrator - Weekly Review",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 12 * * 5"
+            }
+          ]
+        }
+      },
+      "id": "weekly-trigger",
+      "name": "Friday 12 PM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "getMany",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses"
+      },
+      "id": "list-businesses",
+      "name": "List All Businesses",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const businesses = $input.all();\nconst results = [];\nfor (const biz of businesses) {\n  if (biz.json.name === '_template') continue;\n  results.push({\n    json: {\n      businessId: biz.json.name,\n      businessPath: `memory-bank/businesses/${biz.json.name}`\n    }\n  });\n}\nreturn results;"
+      },
+      "id": "filter-businesses",
+      "name": "Filter Active Businesses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.businessPath }}/state.md"
+      },
+      "id": "read-state",
+      "name": "Read State",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [660, -50]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.businessPath }}/strategy.md"
+      },
+      "id": "read-strategy",
+      "name": "Read Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [660, 50]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\nconst businessId = $('Filter Active Businesses').first().json.businessId;\n\nreturn [{\n  json: {\n    businessId,\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Portfolio Orchestrator for The Forge (Forge Technologies).\n\nYou have cross-portfolio intelligence responsibilities. You read all CEO Agent state files and the Knowledge Graph.\n\nHere is the current portfolio data:\n\n## Business: ${businessId}\n### State\n${state}\n\n### Strategy\n${strategy}\n\nPerform your weekly portfolio review:\n\n1. **Revenue Ceiling Enforcement:** Can each business plausibly reach $100K MRR? If ceiling is $15-30K, flag it (still valuable, but no breakout investment).\n\n2. **Distribution Channel Intelligence:** Which keywords are converting? Which content formats drive signups? Identify cross-portfolio patterns.\n\n3. **Breakout Detection:** Any business showing >30% MoM growth? Flag immediately for budget increase.\n\n4. **Kill/Sell Assessment:** Any business with no revenue after 60 days? Any plateaued at $5-30K MRR (sell candidate on Acquire.com at 3-4x annual)?\n\n5. **Content Reuse:** Can winning content strategies from one business be adapted for others in related verticals?\n\n6. **UGC Graduation:** Any business at $5K+ MRR still running 100% AI content? Flag for UGC transition.\n\n7. **Token Budget Audit:** Are AI costs per business reasonable for the stage? Any businesses hitting token caps without results (kill signal)?\n\nOutput your report in markdown with clear action items for each business.`\n  }\n}];"
+      },
+      "id": "build-prompt",
+      "name": "Build Orchestrator Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}"
+      },
+      "id": "llm-chain",
+      "name": "Orchestrator LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-opus-4-6",
+        "options": {
+          "maxTokensToSample": 3000,
+          "temperature": 0.3
+        }
+      },
+      "id": "opus-model",
+      "name": "Opus Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [1100, 220]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/system/orchestrator-review-{{ $now.format('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $json.response.text }}",
+        "commitMessage": "Portfolio Orchestrator weekly review - {{ $now.format('yyyy-MM-dd') }}"
+      },
+      "id": "write-report",
+      "name": "Write Orchestrator Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1320, 0]
+    }
+  ],
+  "connections": {
+    "Friday 12 PM Trigger": {
+      "main": [[{ "node": "List All Businesses", "type": "main", "index": 0 }]]
+    },
+    "List All Businesses": {
+      "main": [[{ "node": "Filter Active Businesses", "type": "main", "index": 0 }]]
+    },
+    "Filter Active Businesses": {
+      "main": [
+        [
+          { "node": "Read State", "type": "main", "index": 0 },
+          { "node": "Read Strategy", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Read State": {
+      "main": [[{ "node": "Build Orchestrator Prompt", "type": "main", "index": 0 }]]
+    },
+    "Read Strategy": {
+      "main": [[{ "node": "Build Orchestrator Prompt", "type": "main", "index": 0 }]]
+    },
+    "Build Orchestrator Prompt": {
+      "main": [[{ "node": "Orchestrator LLM Chain", "type": "main", "index": 0 }]]
+    },
+    "Opus Model": {
+      "ai_languageModel": [[{ "node": "Orchestrator LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Orchestrator LLM Chain": {
+      "main": [[{ "node": "Write Orchestrator Report", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

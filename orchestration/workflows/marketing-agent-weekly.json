@@ -1,0 +1,143 @@
+{
+  "name": "Marketing Agent - Weekly SEO & Distribution",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 11 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "weekly-trigger",
+      "name": "Monday 11 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/state.md"
+      },
+      "id": "read-state",
+      "name": "Read State",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, -100]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/content-strategy.md"
+      },
+      "id": "read-content-strategy",
+      "name": "Read Content Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/weekly-plan.md"
+      },
+      "id": "read-plan",
+      "name": "Read Weekly Plan",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $('Read State').first().json.content || '';\nconst contentStrategy = $('Read Content Strategy').first().json.content || '';\nconst plan = $('Read Weekly Plan').first().json.content || '';\n\nreturn [{\n  json: {\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow',\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Marketing Agent for BayFlow (auto repair shop software).\n\nYou are the most critical revenue agent. Your job is SEO, distribution, social scheduling, and directory submissions.\n\n## Current State\n${state}\n\n## Content Strategy\n${contentStrategy}\n\n## Weekly Plan\n${plan}\n\nPerform your weekly marketing review:\n\n1. **SEO Assessment:** Review which keywords we're targeting, assess ranking potential, identify new keyword opportunities. Check if published blog posts cover our target keywords.\n\n2. **Content Distribution:** For each published blog post, recommend parasite SEO actions (repurpose to Medium, LinkedIn articles, Reddit posts with backlinks to main site).\n\n3. **Directory Submissions:** Check which directories we should submit to (G2, Capterra, GetApp, Product Hunt upcoming, SaaSHub, AlternativeTo). List specific actions.\n\n4. **Social Media:** Recommend social posting schedule for the week. Which platforms, what content to post, when.\n\n5. **Google Search Console:** Recommend pages to submit for indexing.\n\n6. **Recommendations:** What should the Content Agent produce next week based on SEO gaps?\n\nOutput your report in the structured format: Agent name, business, date, status (GREEN/YELLOW/RED), key metrics with trends, actions taken, issues detected, recommendations, needs from CEO Agent.`\n  }\n}];"
+      },
+      "id": "build-prompt",
+      "name": "Build Marketing Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}"
+      },
+      "id": "llm-chain",
+      "name": "Marketing LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "maxTokensToSample": 3000,
+          "temperature": 0.4
+        }
+      },
+      "id": "sonnet-model",
+      "name": "Sonnet Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 220]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/reports/marketing-{{ $now.format('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $json.response.text }}",
+        "commitMessage": "Marketing Agent weekly report - bayflow - {{ $now.format('yyyy-MM-dd') }}"
+      },
+      "id": "write-report",
+      "name": "Write Marketing Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Monday 11 AM Trigger": {
+      "main": [
+        [
+          { "node": "Read State", "type": "main", "index": 0 },
+          { "node": "Read Content Strategy", "type": "main", "index": 0 },
+          { "node": "Read Weekly Plan", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Read State": {
+      "main": [[{ "node": "Build Marketing Prompt", "type": "main", "index": 0 }]]
+    },
+    "Read Content Strategy": {
+      "main": [[{ "node": "Build Marketing Prompt", "type": "main", "index": 0 }]]
+    },
+    "Read Weekly Plan": {
+      "main": [[{ "node": "Build Marketing Prompt", "type": "main", "index": 0 }]]
+    },
+    "Build Marketing Prompt": {
+      "main": [[{ "node": "Marketing LLM Chain", "type": "main", "index": 0 }]]
+    },
+    "Sonnet Model": {
+      "ai_languageModel": [[{ "node": "Marketing LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Marketing LLM Chain": {
+      "main": [[{ "node": "Write Marketing Report", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

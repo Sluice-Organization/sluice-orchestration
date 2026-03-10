@@ -20,81 +20,105 @@
     },
     {
       "parameters": {
-        "jsCode": "// Read weekly plan and content strategy for the business\n// Extract content assignments for this week\nreturn $input.all();"
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/content-strategy.md"
       },
-      "id": "read-assignments",
-      "name": "Read Content Assignments",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [220, 0]
+      "id": "read-content-strategy",
+      "name": "Read Content Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [220, -50]
     },
     {
       "parameters": {
-        "model": "claude-sonnet-4-6",
-        "messages": {
-          "values": [
-            {
-              "role": "system",
-              "content": "={{ $env.CONTENT_AGENT_PROMPT }}"
-            },
-            {
-              "role": "user",
-              "content": "Produce this week's content for {{ $json.businessId }}.\n\nContent Strategy:\n{{ $json.contentStrategy }}\n\nWeekly Plan Assignments:\n{{ $json.assignments }}\n\nProduce:\n1. Blog posts (2-4) - full markdown with frontmatter, targeting assigned keywords\n2. Reel scripts (3-5) - short, punchy, result-first\n3. Any email copy assigned\n\nOutput each piece separated by ---PIECE--- markers. Include type (blog/reel/email) and metadata for each."
-            }
-          ]
-        },
-        "options": {
-          "maxTokens": 8000,
-          "temperature": 0.7
-        }
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/weekly-plan.md"
       },
-      "id": "content-generation",
-      "name": "Generate Content - Sonnet",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "id": "read-plan",
+      "name": "Read Weekly Plan",
+      "type": "n8n-nodes-base.github",
       "typeVersion": 1,
+      "position": [220, 50]
+    },
+    {
+      "parameters": {
+        "jsCode": "const contentStrategy = $('Read Content Strategy').first().json.content || '';\nconst plan = $('Read Weekly Plan').first().json.content || '';\n\nreturn [{\n  json: {\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow',\n    contentPrompt: `Produce this week's content for BayFlow (auto repair shop software).\n\nContent Strategy:\n${contentStrategy}\n\nWeekly Plan Assignments:\n${plan}\n\nProduce:\n1. Blog posts (2) - full markdown with frontmatter (title, description, date, author, tags), targeting assigned keywords\n2. Reel scripts (2) - short, punchy, result-first\n\nContent Quality Standards:\nBANNED: Em dashes, \"delve\", \"leverage\" (verb), \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"game-changer\". No \"In today's landscape\" or \"It's important to note\".\nREQUIRED: Write like a shop owner talks. Contractions. Specific numbers. Varied sentence length. Direct and practical.\n\nOutput each piece separated by ---PIECE--- markers. Include type (blog/reel) and metadata for each.`\n  }\n}];"
+      },
+      "id": "build-prompt",
+      "name": "Build Content Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [440, 0]
     },
     {
       "parameters": {
-        "model": "claude-haiku-4-5-20251001",
-        "messages": {
-          "values": [
-            {
-              "role": "system",
-              "content": "You are a content quality reviewer. Check the following content for BANNED patterns:\n\nBANNED: Em dashes, \"delve\", \"leverage\" (verb), \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"tapestry\", \"in today's landscape\", \"it's important to note\", \"game-changer\", \"dive in\", \"without further ado\", sentences starting \"In the realm of\", excessive enthusiasm, numbered lists where prose works.\n\nFor each piece, respond with:\n- PASS or FAIL\n- If FAIL, list the specific violations and suggest fixes\n- Check that tone is conversational, uses contractions, and sounds human"
-            },
-            {
-              "role": "user",
-              "content": "Review this content:\n\n{{ $json.message.content }}"
-            }
-          ]
-        },
-        "options": {
-          "maxTokens": 2000,
-          "temperature": 0.1
-        }
+        "promptType": "define",
+        "text": "={{ $json.contentPrompt }}"
       },
-      "id": "quality-review",
-      "name": "Quality Review - Haiku",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1,
+      "id": "content-chain",
+      "name": "Content Generation Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
       "position": [660, 0]
     },
     {
       "parameters": {
-        "jsCode": "// Parse quality review results\n// If any pieces FAIL, route back for revision\n// If all PASS, route to publishing\nconst review = $json.message.content;\nconst hasFails = review.toLowerCase().includes('fail');\n\nreturn [{\n  json: {\n    passed: !hasFails,\n    review,\n    content: $('Generate Content - Sonnet').first().json.message.content\n  }\n}];"
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "maxTokensToSample": 8000,
+          "temperature": 0.7
+        }
+      },
+      "id": "sonnet-model",
+      "name": "Sonnet Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 220]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a content quality reviewer. Check the following content for BANNED patterns:\n\nBANNED: Em dashes, \"delve\", \"leverage\" (verb), \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"tapestry\", \"in today's landscape\", \"it's important to note\", \"game-changer\", \"dive in\", \"without further ado\", sentences starting \"In the realm of\", excessive enthusiasm, numbered lists where prose works.\n\nFor each piece, respond with:\n- PASS or FAIL\n- If FAIL, list the specific violations and suggest fixes\n- Check that tone is conversational, uses contractions, and sounds human\n\nContent to review:\n{{ $json.response.text }}"
+      },
+      "id": "review-chain",
+      "name": "Quality Review Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-haiku-4-5-20251001",
+        "options": {
+          "maxTokensToSample": 2000,
+          "temperature": 0.1
+        }
+      },
+      "id": "haiku-model",
+      "name": "Haiku Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [880, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const review = $json.response.text;\nconst hasFails = review.toLowerCase().includes('fail');\nconst content = $('Content Generation Chain').first().json.response.text;\n\nreturn [{\n  json: {\n    passed: !hasFails,\n    review,\n    content,\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow'\n  }\n}];"
       },
       "id": "check-quality",
       "name": "Check Quality Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [1100, 0]
     },
     {
       "parameters": {
         "operation": "edit",
-        "owner": "={{ $env.GITHUB_OWNER }}",
-        "repository": "={{ $env.GITHUB_REPO }}",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/reports/content-{{ $now.format('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.content }}",
         "commitMessage": "Content Agent weekly output - {{ $json.businessId }} - {{ $now.format('yyyy-MM-dd') }}"
@@ -103,20 +127,37 @@
       "name": "Save Approved Content",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1100, 0]
+      "position": [1320, 0]
     }
   ],
   "connections": {
     "Monday 9 AM Trigger": {
-      "main": [[{ "node": "Read Content Assignments", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          { "node": "Read Content Strategy", "type": "main", "index": 0 },
+          { "node": "Read Weekly Plan", "type": "main", "index": 0 }
+        ]
+      ]
     },
-    "Read Content Assignments": {
-      "main": [[{ "node": "Generate Content - Sonnet", "type": "main", "index": 0 }]]
+    "Read Content Strategy": {
+      "main": [[{ "node": "Build Content Prompt", "type": "main", "index": 0 }]]
     },
-    "Generate Content - Sonnet": {
-      "main": [[{ "node": "Quality Review - Haiku", "type": "main", "index": 0 }]]
+    "Read Weekly Plan": {
+      "main": [[{ "node": "Build Content Prompt", "type": "main", "index": 0 }]]
     },
-    "Quality Review - Haiku": {
+    "Build Content Prompt": {
+      "main": [[{ "node": "Content Generation Chain", "type": "main", "index": 0 }]]
+    },
+    "Sonnet Model": {
+      "ai_languageModel": [[{ "node": "Content Generation Chain", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Content Generation Chain": {
+      "main": [[{ "node": "Quality Review Chain", "type": "main", "index": 0 }]]
+    },
+    "Haiku Model": {
+      "ai_languageModel": [[{ "node": "Quality Review Chain", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Quality Review Chain": {
       "main": [[{ "node": "Check Quality Results", "type": "main", "index": 0 }]]
     },
     "Check Quality Results": {
