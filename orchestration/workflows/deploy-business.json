@@ -253,13 +253,47 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ launched_at: new Date().toISOString(), repo_url: 'https://github.com/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName, repo_name: $('Prepare Payloads').first().json.repoName, status: 'deploying', retell_agent_id: $('Step 4.5c - Parse Retell Response').first().json.retellAgentId || null, retell_voice: $('Step 4.5c - Parse Retell Response').first().json.voiceName || null, site_url: $('Step 4.5c - Parse Retell Response').first().json.siteUrl || null, cal_booking_url: $('Step 4.5c - Parse Retell Response').first().json.bookingLink || 'https://cal.com/shalinp' }) }}",
+        "jsonBody": "={{ JSON.stringify({ launched_at: new Date().toISOString(), repo_url: 'https://github.com/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName, repo_name: $('Prepare Payloads').first().json.repoName, status: 'deploying', retell_agent_id: $json.retellAgentId || $('Step 4.5c - Parse Retell Response').first().json.retellAgentId || null, retell_voice: $('Step 4.5c - Parse Retell Response').first().json.voiceName || null, retell_phone_number: $json.retellPhoneNumber || null, site_url: $('Step 4.5c - Parse Retell Response').first().json.siteUrl || null, cal_booking_url: $('Step 4.5c - Parse Retell Response').first().json.bookingLink || 'https://cal.com/shalinp' }) }}",
         "options": {
           "timeout": 15000
         }
       },
       "id": "update-knowledge-graph",
       "name": "Step 5 - Register in Knowledge Graph",
+      "_note": "Phone number provisioned in step 4.6"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.retellai.com/create-phone-number",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.RETELL_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ area_code: 415, inbound_agent_id: $json.retellAgentId || null, outbound_agent_id: $json.retellAgentId || null }) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "buy-phone-number",
+      "name": "Step 4.6 - Buy Phone Number",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1880, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const phoneResult = $input.first().json;\nconst prevData = $('Step 4.5c - Parse Retell Response').first().json;\n\nconst phoneNumber = phoneResult.phone_number || phoneResult.number || '';\nconst phoneId = phoneResult.phone_number_id || phoneResult.id || '';\n\nreturn [{\n  json: {\n    ...prevData,\n    retellPhoneNumber: phoneNumber,\n    retellPhoneId: phoneId,\n    phoneProvisionError: phoneNumber ? null : 'Failed to provision phone number'\n  }\n}];"
+      },
+      "id": "parse-phone-result",
+      "name": "Step 4.6b - Parse Phone Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 0]
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -376,6 +410,28 @@
       ]
     },
     "Step 4.5c - Parse Retell Response": {
+      "main": [
+        [
+          {
+            "node": "Step 4.6 - Buy Phone Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 4.6 - Buy Phone Number": {
+      "main": [
+        [
+          {
+            "node": "Step 4.6b - Parse Phone Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 4.6b - Parse Phone Result": {
       "main": [
         [
           {
