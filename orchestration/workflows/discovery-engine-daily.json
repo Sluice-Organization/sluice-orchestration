@@ -16,10 +16,30 @@
       "name": "Daily 6 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, -200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "discovery-signal",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Huginn Signal",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={\"status\":\"accepted\",\"signal_id\":\"{{ $('Webhook Huginn Signal').first().json.headers['x-request-id'] || 'unknown' }}\"}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2100, 200]
     },
     {
       "parameters": {
@@ -29,27 +49,79 @@
         "filePath": "memory-bank/system/operating-bible-v7.md",
         "resource": "file"
       },
-      "id": "read-bible",
-      "name": "Read Operating Bible",
+      "id": "read-bible-schedule",
+      "name": "Read Operating Bible (Schedule)",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        220,
-        0
-      ]
+      "position": [250, -300],
+      "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const bible = $('Read Operating Bible').first().json.content || '';\n\n// Extract just Part II (What We Build) and Part VIII (Identifying New Businesses) sections\n// to keep the prompt focused and within token limits\nconst partII = bible.match(/# Part II:.*?(?=# Part III:)/s)?.[0] || '';\nconst partVIII = bible.match(/# Part VIII:.*?(?=# Part IX:)/s)?.[0] || '';\n\nreturn [{\n  json: {\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Discovery Engine for The Forge (Forge Technologies).\n\nYour job: score new business opportunities across all five sourcing tiers.\n\n## What We Build (from Operating Bible)\n${partII}\n\n## How We Find Ideas (from Operating Bible)\n${partVIII}\n\n## Your Task\nGenerate 5-10 business opportunity ideas that pass the Double Filter (Revenue Ceiling Test + Distribution Test). For each, provide:\n\n1. **Name/Concept:** Brief description\n2. **Category:** SMB Vertical Tool / Prosumer Workflow / PLG Platform\n3. **Sourcing Tier:** Which tier this came from (1-5)\n4. **Target Market:** Who buys this, how many exist\n5. **Pricing Model:** Proposed tiers\n6. **Distribution Viability:** Key SEO keywords + estimated monthly search volume. Reel potential (what would a demo video show?)\n7. **Revenue Ceiling Test:** Can this reach $100K MRR? Show the math.\n8. **Competition:** Who exists, what are their weaknesses (from reviews)\n9. **Score (1-10):** Weighted across: demand evidence, AI build feasibility, monetization clarity, competition gap, distribution viability\n\nOnly surface ideas scoring 6.5+. Be specific about keyword volumes and competition. Use real examples from known markets.\n\nOutput as structured markdown.`\n  }\n}];"
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/opportunities",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "eq.raw"
+            },
+            {
+              "name": "created_at",
+              "value": "gte.{{ $now.minus(24, 'hours').toISO() }}"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "build-prompt",
-      "name": "Build Discovery Prompt",
+      "id": "fetch-raw-opportunities",
+      "name": "Fetch Raw Opportunities (KG)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, -100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Schedule path: combine Operating Bible + raw KG opportunities into scoring prompt\nconst bibleNode = $('Read Operating Bible (Schedule)');\nconst rawOppsNode = $('Fetch Raw Opportunities (KG)');\n\nlet bible = '';\ntry {\n  bible = bibleNode.first().json.content || '';\n} catch (e) {\n  bible = '(Operating Bible not available)';\n}\n\nlet rawOpps = [];\ntry {\n  rawOpps = rawOppsNode.all().map(item => item.json);\n  // If the HTTP request returned an array in the response body\n  if (rawOpps.length === 1 && Array.isArray(rawOpps[0])) {\n    rawOpps = rawOpps[0];\n  }\n} catch (e) {\n  rawOpps = [];\n}\n\n// Extract scoring criteria sections from the bible\nconst partII = bible.match(/# Part II:.*?(?=# Part III:)/s)?.[0] || '';\nconst partVIII = bible.match(/# Part VIII:.*?(?=# Part IX:)/s)?.[0] || '';\n\nlet rawOppsText = '';\nif (rawOpps.length > 0) {\n  rawOppsText = '\\n\\n## Raw Opportunities from Knowledge Graph (last 24h)\\nScore each of these:\\n\\n';\n  for (const opp of rawOpps) {\n    rawOppsText += `- **${opp.category || 'Unknown'}** (${opp.source_tier || 'unknown tier'}): ${opp.description || 'No description'}\\n  Source: ${opp.source_url || 'N/A'} | Est. keyword volume: ${opp.estimated_keyword_volume || 'N/A'} | Competition: ${opp.competition_level || 'N/A'}\\n\\n`;\n  }\n} else {\n  rawOppsText = '\\n\\n## No raw opportunities found in Knowledge Graph. Generate 5-10 new ideas from market research.\\n';\n}\n\nconst opportunities = rawOpps.map(o => ({\n  id: o.id,\n  category: o.category,\n  source_tier: o.source_tier\n}));\n\nreturn [{\n  json: {\n    trigger_type: 'schedule',\n    raw_opportunity_ids: opportunities,\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Discovery Engine for The Forge (Forge Technologies).\n\nYour job: score business opportunities across all five sourcing tiers.\n\n## What We Build (from Operating Bible)\n${partII}\n\n## How We Find Ideas (from Operating Bible)\n${partVIII}\n${rawOppsText}\n## Scoring Dimensions (Part VIII)\nFor EACH opportunity, provide scores on these 5 dimensions (1-10 each):\n1. **Demand Evidence** (1-10): Search volume, existing competitors with revenue, marketplace listings\n2. **Feasibility for AI Build** (1-10): Can an AI agent build an MVP in <2 weeks? Standard SaaS patterns?\n3. **Monetization Clarity** (1-10): Obvious pricing model, willingness to pay, clear value prop\n4. **Competition Gap** (1-10): Incumbents have bad UX/reviews, no modern alternative, fragmented market\n5. **Distribution Viability** (1-10): SEO keyword opportunity, demo-able for short-form video, community channels\n6. **Overall Score**: Average of above 5 dimensions. THRESHOLD: 6.5+ to pass.\n\nFor each opportunity also provide:\n- **Name/Concept**: Brief description\n- **Category**: e.g. pet_grooming_scheduling, hvac_dispatch, etc.\n- **Sourcing Tier**: tier1_clone | tier2_smb | tier3_platform | tier4_keyword | tier5_support\n- **Target Market**: Who buys, TAM estimate\n- **Revenue Ceiling Test**: Can this reach $100K MRR? Show math.\n- **Scoring Notes**: Why each dimension got its score\n\nOnly include opportunities scoring 6.5+ overall.\n\nOutput as JSON array:\n[\n  {\n    \"name\": \"...\",\n    \"category\": \"...\",\n    \"source_tier\": \"...\",\n    \"target_market\": \"...\",\n    \"revenue_ceiling_test\": \"...\",\n    \"demand_evidence\": 8,\n    \"feasibility_ai_build\": 7,\n    \"monetization_clarity\": 9,\n    \"competition_gap\": 6,\n    \"distribution_viability\": 7,\n    \"overall_score\": 7.4,\n    \"scoring_notes\": \"...\"\n  }\n]\n\nReturn ONLY the JSON array, no other text.`\n  }\n}];"
+      },
+      "id": "build-prompt-schedule",
+      "name": "Build Prompt (Schedule Path)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        440,
-        0
-      ]
+      "position": [520, -200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Webhook path: build scoring prompt from Huginn signal payload\nconst signal = $('Webhook Huginn Signal').first().json.body;\n\nconst sourceTier = signal.source_tier || 'unknown';\nconst sourceUrl = signal.source_url || 'N/A';\nconst category = signal.category || 'unknown';\nconst description = signal.description || 'No description provided';\nconst keywordVolume = signal.estimated_keyword_volume || 'N/A';\nconst competition = signal.competition_level || 'N/A';\nconst rawData = JSON.stringify(signal.raw_data || {}, null, 2);\n\nreturn [{\n  json: {\n    trigger_type: 'webhook',\n    signal: signal,\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Discovery Engine for The Forge (Forge Technologies).\n\nA real-time signal has arrived from Huginn. Score this opportunity.\n\n## Incoming Signal\n- **Source Tier**: ${sourceTier}\n- **Source URL**: ${sourceUrl}\n- **Category**: ${category}\n- **Description**: ${description}\n- **Estimated Keyword Volume**: ${keywordVolume}\n- **Competition Level**: ${competition}\n- **Raw Data**: ${rawData}\n\n## Scoring Dimensions (Part VIII)\nScore this opportunity on these 5 dimensions (1-10 each):\n1. **Demand Evidence** (1-10): Search volume, existing competitors with revenue, marketplace listings\n2. **Feasibility for AI Build** (1-10): Can an AI agent build an MVP in <2 weeks? Standard SaaS patterns?\n3. **Monetization Clarity** (1-10): Obvious pricing model, willingness to pay, clear value prop\n4. **Competition Gap** (1-10): Incumbents have bad UX/reviews, no modern alternative, fragmented market\n5. **Distribution Viability** (1-10): SEO keyword opportunity, demo-able for short-form video, community channels\n6. **Overall Score**: Average of above 5 dimensions. THRESHOLD: 6.5+ to pass.\n\nAlso provide:\n- **Name/Concept**: Brief description\n- **Target Market**: Who buys, TAM estimate\n- **Revenue Ceiling Test**: Can this reach $100K MRR? Show math.\n- **Scoring Notes**: Why each dimension got its score\n\nOutput as JSON array (even for single item):\n[\n  {\n    \"name\": \"...\",\n    \"category\": \"${category}\",\n    \"source_tier\": \"${sourceTier}\",\n    \"source_url\": \"${sourceUrl}\",\n    \"target_market\": \"...\",\n    \"revenue_ceiling_test\": \"...\",\n    \"demand_evidence\": 8,\n    \"feasibility_ai_build\": 7,\n    \"monetization_clarity\": 9,\n    \"competition_gap\": 6,\n    \"distribution_viability\": 7,\n    \"overall_score\": 7.4,\n    \"scoring_notes\": \"...\"\n  }\n]\n\nReturn ONLY the JSON array, no other text.`\n  }\n}];"
+      },
+      "id": "build-prompt-webhook",
+      "name": "Build Prompt (Webhook Path)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 200]
     },
     {
       "parameters": {
@@ -60,46 +132,222 @@
       "name": "Discovery LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [
-        660,
-        0
-      ]
+      "position": [780, 0]
     },
     {
       "parameters": {
-        "model": "claude-opus-4-20250514",
+        "model": "claude-opus-4-6",
         "options": {
           "temperature": 0.5,
-          "maxTokens": 4000
+          "maxTokensToSample": 4000
         }
       },
       "id": "opus-model",
       "name": "Opus Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [
-        660,
-        220
-      ]
+      "position": [780, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the LLM JSON response and decide next steps\nconst llmOutput = $('Discovery LLM Chain').first().json.text || '';\n\nlet opportunities = [];\ntry {\n  // Try to parse JSON from the response (handle possible markdown fencing)\n  let jsonStr = llmOutput;\n  const fenced = llmOutput.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (fenced) jsonStr = fenced[1];\n  opportunities = JSON.parse(jsonStr.trim());\n} catch (e) {\n  // If parsing fails, wrap the raw text as a single entry\n  opportunities = [{\n    name: 'Parse Error - Raw Output',\n    category: 'unknown',\n    source_tier: 'unknown',\n    overall_score: 0,\n    scoring_notes: llmOutput,\n    demand_evidence: 0,\n    feasibility_ai_build: 0,\n    monetization_clarity: 0,\n    competition_gap: 0,\n    distribution_viability: 0\n  }];\n}\n\n// Determine trigger type from upstream\nlet triggerType = 'schedule';\ntry {\n  triggerType = $('Build Prompt (Webhook Path)').first().json.trigger_type;\n} catch (e) {\n  try {\n    triggerType = $('Build Prompt (Schedule Path)').first().json.trigger_type;\n  } catch (e2) {\n    triggerType = 'schedule';\n  }\n}\n\nconst timestamp = new Date().toISOString();\n\n// Build markdown report\nlet report = `# Discovery Engine Report - ${timestamp.split('T')[0]}\\n`;\nreport += `Trigger: ${triggerType}\\n\\n`;\n\nconst highScorers = [];\n\nfor (const opp of opportunities) {\n  const score = opp.overall_score || 0;\n  const passed = score >= 6.5 ? 'PASS' : 'FAIL';\n  report += `## ${opp.name} [${passed}] (Score: ${score})\\n`;\n  report += `- Category: ${opp.category}\\n`;\n  report += `- Source Tier: ${opp.source_tier}\\n`;\n  report += `- Demand Evidence: ${opp.demand_evidence}/10\\n`;\n  report += `- Feasibility (AI Build): ${opp.feasibility_ai_build}/10\\n`;\n  report += `- Monetization Clarity: ${opp.monetization_clarity}/10\\n`;\n  report += `- Competition Gap: ${opp.competition_gap}/10\\n`;\n  report += `- Distribution Viability: ${opp.distribution_viability}/10\\n`;\n  report += `- Target Market: ${opp.target_market || 'N/A'}\\n`;\n  report += `- Revenue Ceiling: ${opp.revenue_ceiling_test || 'N/A'}\\n`;\n  report += `- Notes: ${opp.scoring_notes || 'N/A'}\\n\\n`;\n\n  if (score >= 6.5) {\n    highScorers.push(opp);\n  }\n}\n\nreturn [{\n  json: {\n    trigger_type: triggerType,\n    timestamp: timestamp,\n    report: report,\n    opportunities: opportunities,\n    high_scorers: highScorers,\n    has_high_scorers: highScorers.length > 0\n  }\n}];"
+      },
+      "id": "parse-scores",
+      "name": "Parse Scores & Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.opportunities.map(o => ({ name: o.name, category: o.category, source_tier: o.source_tier, source_url: o.source_url || null, description: o.scoring_notes, target_market: o.target_market, revenue_ceiling_test: o.revenue_ceiling_test, demand_evidence: o.demand_evidence, feasibility_ai_build: o.feasibility_ai_build, monetization_clarity: o.monetization_clarity, competition_gap: o.competition_gap, distribution_viability: o.distribution_viability, overall_score: o.overall_score, status: o.overall_score >= 6.5 ? 'scored_pass' : 'scored_fail', scored_at: $json.timestamp }))) }}",
+        "options": {}
+      },
+      "id": "write-kg-opportunities",
+      "name": "Write Scores to Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, -100],
+      "continueOnFail": true
     },
     {
       "parameters": {
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/system/discovery/opportunities-{{ $now.format('yyyy-MM-dd') }}.md",
-        "fileContent": "={{ $json.text }}",
-        "commitMessage": "Discovery Engine daily opportunities - {{ $now.format('yyyy-MM-dd') }}",
+        "filePath": "memory-bank/system/discovery/opportunities-{{ $json.timestamp.split('T')[0] }}.md",
+        "fileContent": "={{ $json.report }}",
+        "commitMessage": "Discovery Engine report - {{ $json.timestamp.split('T')[0] }} ({{ $json.trigger_type }})",
         "resource": "file"
       },
-      "id": "write-opportunities",
-      "name": "Write Opportunities",
+      "id": "write-github-report",
+      "name": "Write Report to GitHub",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        880,
-        0
-      ]
+      "position": [1280, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "high-score-check",
+              "leftValue": "={{ $json.has_high_scorers }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-high-scorers",
+      "name": "Has High Scorers?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1540, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Supabase query to fetch post-mortems for categories of high-scoring opportunities\nconst highScorers = $('Parse Scores & Build Report').first().json.high_scorers;\nconst categories = [...new Set(highScorers.map(o => o.category).filter(Boolean))];\n\n// Build OR filter for categories\nconst categoryFilter = categories.map(c => `category.eq.${c}`).join(',');\n\nreturn [{\n  json: {\n    categories: categories,\n    category_filter: categoryFilter,\n    high_scorers: highScorers\n  }\n}];"
+      },
+      "id": "prepare-postmortem-query",
+      "name": "Prepare Post-Mortem Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, -100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/post_mortems",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "or",
+              "value": "=({{ $json.category_filter }})"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-postmortems",
+      "name": "Fetch Related Post-Mortems",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, -100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enrich high-scoring opportunities with post-mortem context\nconst postMortems = $('Fetch Related Post-Mortems').all().map(item => item.json);\nconst highScorers = $('Prepare Post-Mortem Query').first().json.high_scorers;\n\nlet pmData = postMortems;\n// Handle case where response is an array wrapped in a single item\nif (pmData.length === 1 && Array.isArray(pmData[0])) {\n  pmData = pmData[0];\n}\n\n// Build enrichment notes per high scorer\nconst enriched = highScorers.map(opp => {\n  const relatedPMs = pmData.filter(pm => pm.category === opp.category);\n  let pmNotes = '';\n  if (relatedPMs.length > 0) {\n    pmNotes = '\\n### Related Post-Mortems:\\n';\n    for (const pm of relatedPMs) {\n      pmNotes += `- **${pm.title || pm.name || 'Untitled'}**: ${pm.lessons_learned || pm.summary || 'No summary'}\\n`;\n    }\n  } else {\n    pmNotes = '\\nNo related post-mortems found for this category.';\n  }\n  return {\n    ...opp,\n    post_mortem_context: pmNotes\n  };\n});\n\n// Update KG with post-mortem enrichment notes\nconst updatePayloads = enriched.map(opp => ({\n  category: opp.category,\n  name: opp.name,\n  post_mortem_context: opp.post_mortem_context\n}));\n\nreturn [{\n  json: {\n    enriched_opportunities: enriched,\n    update_payloads: updatePayloads,\n    summary: `Enriched ${enriched.length} high-scoring opportunities with ${pmData.length} related post-mortems.`\n  }\n}];"
+      },
+      "id": "enrich-with-postmortems",
+      "name": "Enrich with Post-Mortem Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2100, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const enriched = $('Enrich with Post-Mortem Context').first().json.enriched_opportunities;\n\n// Build one output item per high-scoring opportunity for individual Telegram notifications\nreturn enriched.map(opp => {\n  const businessId = (opp.category || opp.name || 'unknown')\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-|-$/g, '')\n    .substring(0, 40);\n\n  const businessName = (opp.name || 'Unnamed').substring(0, 60);\n  const category = opp.category || 'unknown';\n\n  const message = `\\u2b50 *High-Scoring Opportunity*\\n\\n` +\n    `*${opp.name}*\\n` +\n    `Score: *${opp.overall_score}/10*\\n` +\n    `Category: ${category}\\n` +\n    `Source Tier: ${opp.source_tier}\\n\\n` +\n    `Demand: ${opp.demand_evidence}/10 | Feasibility: ${opp.feasibility_ai_build}/10\\n` +\n    `Monetization: ${opp.monetization_clarity}/10 | Gap: ${opp.competition_gap}/10\\n` +\n    `Distribution: ${opp.distribution_viability}/10\\n\\n` +\n    `Target: ${opp.target_market || 'N/A'}\\n` +\n    `Revenue Ceiling: ${opp.revenue_ceiling_test || 'N/A'}\\n` +\n    `${opp.post_mortem_context || ''}\\n\\n` +\n    `_Tap Approve to trigger the full creation pipeline._`;\n\n  // callback_data: decision|agent|businessId|businessName|description\n  const businessDescription = (opp.scoring_notes || '').substring(0, 100);\n  const approveData = `approve|Discovery Engine|${businessId}|${businessName}|${businessDescription}`;\n  const rejectData = `reject|Discovery Engine|${businessId}|${businessName}|${businessDescription}`;\n\n  return {\n    json: {\n      message,\n      businessId,\n      businessName,\n      category,\n      approveData,\n      rejectData\n    }\n  };\n});"
+      },
+      "id": "build-opportunity-notifications",
+      "name": "Build Opportunity Notifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, -100]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "reply_markup": {
+            "inline_keyboard": [
+              [
+                {
+                  "text": "\u2705 Approve & Build",
+                  "callback_data": "={{ $json.approveData }}"
+                },
+                {
+                  "text": "\u274c Reject",
+                  "callback_data": "={{ $json.rejectData }}"
+                }
+              ]
+            ]
+          }
+        }
+      },
+      "id": "send-opportunity-telegram",
+      "name": "Send Opportunity to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2550, -100],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -107,25 +355,63 @@
       "main": [
         [
           {
-            "node": "Read Operating Bible",
+            "node": "Read Operating Bible (Schedule)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Raw Opportunities (KG)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read Operating Bible": {
+    "Read Operating Bible (Schedule)": {
       "main": [
         [
           {
-            "node": "Build Discovery Prompt",
+            "node": "Build Prompt (Schedule Path)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Build Discovery Prompt": {
+    "Fetch Raw Opportunities (KG)": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt (Schedule Path)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Huginn Signal": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt (Webhook Path)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt (Schedule Path)": {
+      "main": [
+        [
+          {
+            "node": "Discovery LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt (Webhook Path)": {
       "main": [
         [
           {
@@ -151,7 +437,89 @@
       "main": [
         [
           {
-            "node": "Write Opportunities",
+            "node": "Parse Scores & Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Scores & Build Report": {
+      "main": [
+        [
+          {
+            "node": "Write Scores to Knowledge Graph",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write Report to GitHub",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Has High Scorers?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has High Scorers?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Post-Mortem Query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Prepare Post-Mortem Query": {
+      "main": [
+        [
+          {
+            "node": "Fetch Related Post-Mortems",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Related Post-Mortems": {
+      "main": [
+        [
+          {
+            "node": "Enrich with Post-Mortem Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich with Post-Mortem Context": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Opportunity Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Opportunity Notifications": {
+      "main": [
+        [
+          {
+            "node": "Send Opportunity to Telegram",
             "type": "main",
             "index": 0
           }

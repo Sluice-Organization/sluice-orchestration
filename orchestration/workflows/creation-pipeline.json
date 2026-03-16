@@ -1,0 +1,1172 @@
+{
+  "name": "Creation Pipeline - Approved Opportunity to Live Business",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "approve-opportunity",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook: Approve Opportunity",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "approve-opportunity"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst businessId = input.body.businessId;\nconst businessName = input.body.businessName;\nconst businessDescription = input.body.businessDescription || '';\nconst category = input.body.category || 'unknown';\nconst opportunityData = input.body.opportunityData || {};\n\nif (!businessId || !businessName) {\n  throw new Error('Missing required fields: businessId and businessName');\n}\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    businessDescription,\n    category,\n    opportunityData,\n    startedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "extract-payload",
+      "name": "Extract Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\ud83c\udfd7\ufe0f *Creation Pipeline Started*\n\nBusiness: *{{ $json.businessName }}*\nID: `{{ $json.businessId }}`\nCategory: {{ $json.category }}\n\nStep 1/6: Bootstrapping memory-bank files...",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-start",
+      "name": "Notify: Pipeline Started",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [500, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/bootstrap-business",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $('Extract Payload').first().json.businessId, businessName: $('Extract Payload').first().json.businessName, businessDescription: $('Extract Payload').first().json.businessDescription }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "call-bootstrap",
+      "name": "Call Bootstrap",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const bootstrapResult = $input.first().json;\nconst payload = $('Extract Payload').first().json;\n\nconst success = bootstrapResult.status === 'success' || bootstrapResult.status === 'skipped';\nconst message = bootstrapResult.message || 'No message';\n\nreturn [{\n  json: {\n    ...payload,\n    bootstrapStatus: bootstrapResult.status || 'unknown',\n    bootstrapSuccess: success,\n    bootstrapMessage: message\n  }\n}];"
+      },
+      "id": "check-bootstrap",
+      "name": "Check Bootstrap Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u2705 *Bootstrap complete* for *{{ $json.businessName }}*\nStatus: {{ $json.bootstrapStatus }}\n\nStep 2/6: Generating PRD with Opus...",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-bootstrap-done",
+      "name": "Notify: Bootstrap Done",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1250, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/generate-prd",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $('Extract Payload').first().json.businessId, businessName: $('Extract Payload').first().json.businessName, businessDescription: $('Extract Payload').first().json.businessDescription, category: $('Extract Payload').first().json.category, opportunityData: $('Extract Payload').first().json.opportunityData || {} }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "call-generate-prd",
+      "name": "Call Generate PRD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prdResult = $input.first().json;\nconst payload = $('Extract Payload').first().json;\n\nconst approved = prdResult.status === 'approved';\nconst prdContent = prdResult.prdContent || '';\nconst reviewNotes = prdResult.reviewNotes || '';\nconst reviewDecision = prdResult.reviewDecision || 'UNKNOWN';\n\nreturn [{\n  json: {\n    ...payload,\n    prdApproved: approved,\n    prdContent,\n    prdReviewDecision: reviewDecision,\n    prdReviewNotes: reviewNotes\n  }\n}];"
+      },
+      "id": "check-prd-result",
+      "name": "Check PRD Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "prd-approved-check",
+              "leftValue": "={{ $json.prdApproved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "prd-approved-gate",
+      "name": "PRD Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u274c *PRD REJECTED* for *{{ $json.businessName }}*\n\nDecision: {{ $json.prdReviewDecision }}\nNotes: {{ $json.prdReviewNotes }}\n\nPipeline STOPPED. This business will not be built.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-prd-rejected",
+      "name": "Notify: PRD Rejected",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2250, 500],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u2705 *PRD Approved* for *{{ $json.businessName }}*\n\nComptroller says GO.\n\nStep 3/6: Creating repo & triggering Claude Code with PRD...",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-prd-approved",
+      "name": "Notify: PRD Approved",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2250, 150],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/deploy-business",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $('Check PRD Result').first().json.businessId, businessName: $('Check PRD Result').first().json.businessName, repoName: $('Check PRD Result').first().json.businessId, techStack: 'nextjs', prdContent: $('Check PRD Result').first().json.prdContent }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "call-deploy",
+      "name": "Call Deploy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2500, 150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\ud83d\ude80 *Repo created* for *{{ $('Extract Payload').first().json.businessName }}*\n\nClaude Code is now building the MVP from the PRD. This takes ~2 hours.\n\nStep 4/6: Waiting for Claude Code to finish building...",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-deploy-done",
+      "name": "Notify: Repo Created",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2750, 150],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "hours"
+      },
+      "id": "wait-for-build",
+      "name": "Wait for Claude Code (2h)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3000, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Initialize iteration counter\nconst payload = $('Extract Payload').first().json;\nreturn [{\n  json: {\n    ...payload,\n    iterationCount: 0,\n    lastScore: 0,\n    iterationHistory: [],\n    siteUrl: 'https://' + payload.businessId + '.vercel.app'\n  }\n}];"
+      },
+      "id": "init-iteration",
+      "name": "Init Iteration Counter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3250, 150]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/test-app",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $json.businessId, businessName: $json.businessName, siteUrl: $json.siteUrl, repoName: $json.businessId }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "call-app-tester",
+      "name": "Call App Tester",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3500, 150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const testResult = $input.first().json;\nconst prevData = $('Init Iteration Counter').isPresent\n  ? $('Init Iteration Counter').first().json\n  : $('Increment Iteration').first().json;\n\n// Extract score from test result\nconst score = testResult.score || testResult.health_score || testResult.overall_score || 0;\nconst issuesCreated = testResult.issues_created || testResult.issuesCreated || 0;\nconst details = testResult.details || testResult.summary || testResult.message || 'No details';\n\nconst iterationCount = (prevData.iterationCount || 0) + 1;\nconst iterationHistory = [...(prevData.iterationHistory || []), {\n  iteration: iterationCount,\n  score,\n  issuesCreated,\n  timestamp: $now.toFormat('yyyy-MM-dd HH:mm')\n}];\n\nreturn [{\n  json: {\n    businessId: prevData.businessId,\n    businessName: prevData.businessName,\n    businessDescription: prevData.businessDescription || '',\n    category: prevData.category || '',\n    siteUrl: prevData.siteUrl,\n    iterationCount,\n    lastScore: score,\n    issuesCreated,\n    testDetails: typeof details === 'string' ? details : JSON.stringify(details, null, 2),\n    iterationHistory,\n    scorePassThreshold: score >= 80,\n    maxIterationsReached: iterationCount >= 3\n  }\n}];"
+      },
+      "id": "parse-test-result",
+      "name": "Parse Test Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3750, 150]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\ud83e\uddea *App Test - Iteration {{ $json.iterationCount }}/3*\n\n*{{ $json.businessName }}*\nScore: *{{ $json.lastScore }}/100*\nIssues created: {{ $json.issuesCreated }}\n\n{{ $json.lastScore >= 80 ? '\u2705 PASS - Proceeding to quality gate' : ($json.iterationCount >= 3 ? '\u26a0\ufe0f Max iterations reached - proceeding anyway' : '\ud83d\udd27 Waiting for Claude Code to fix issues...') }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-iteration",
+      "name": "Notify: Iteration Result",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [4000, 150],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "score-check",
+              "leftValue": "={{ $json.scorePassThreshold }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-score-pass",
+      "name": "Score >= 80?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4250, 150]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "max-iter-check",
+              "leftValue": "={{ $json.maxIterationsReached }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-max-iterations",
+      "name": "Max Iterations?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4500, 300]
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "hours"
+      },
+      "id": "wait-for-fix",
+      "name": "Wait for Fix (1h)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [4750, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass through data for next iteration\nconst prev = $('Parse Test Result').first().json;\nreturn [{\n  json: {\n    businessId: prev.businessId,\n    businessName: prev.businessName,\n    businessDescription: prev.businessDescription,\n    category: prev.category,\n    siteUrl: prev.siteUrl,\n    iterationCount: prev.iterationCount,\n    lastScore: prev.lastScore,\n    iterationHistory: prev.iterationHistory\n  }\n}];"
+      },
+      "id": "increment-iteration",
+      "name": "Increment Iteration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5000, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/test-app",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $json.businessId, businessName: $json.businessName, siteUrl: $json.siteUrl, repoName: $json.businessId }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "call-app-tester-retry",
+      "name": "Call App Tester (Retry)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5250, 450],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const testResult = $input.first().json;\nconst prevData = $('Increment Iteration').first().json;\n\nconst score = testResult.score || testResult.health_score || testResult.overall_score || 0;\nconst issuesCreated = testResult.issues_created || testResult.issuesCreated || 0;\nconst details = testResult.details || testResult.summary || testResult.message || 'No details';\n\nconst iterationCount = (prevData.iterationCount || 0) + 1;\nconst iterationHistory = [...(prevData.iterationHistory || []), {\n  iteration: iterationCount,\n  score,\n  issuesCreated,\n  timestamp: $now.toFormat('yyyy-MM-dd HH:mm')\n}];\n\nreturn [{\n  json: {\n    businessId: prevData.businessId,\n    businessName: prevData.businessName,\n    businessDescription: prevData.businessDescription || '',\n    category: prevData.category || '',\n    siteUrl: prevData.siteUrl,\n    iterationCount,\n    lastScore: score,\n    issuesCreated,\n    testDetails: typeof details === 'string' ? details : JSON.stringify(details, null, 2),\n    iterationHistory,\n    scorePassThreshold: score >= 80,\n    maxIterationsReached: iterationCount >= 3\n  }\n}];"
+      },
+      "id": "parse-test-result-retry",
+      "name": "Parse Test Result (Retry)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5500, 450]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\ud83e\uddea *App Test - Iteration {{ $json.iterationCount }}/3*\n\n*{{ $json.businessName }}*\nScore: *{{ $json.lastScore }}/100*\nIssues created: {{ $json.issuesCreated }}\n\n{{ $json.lastScore >= 80 ? '\u2705 PASS - Proceeding to quality gate' : ($json.iterationCount >= 3 ? '\u26a0\ufe0f Max iterations reached - proceeding anyway' : '\ud83d\udd27 Waiting for Claude Code to fix issues...') }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-iteration-retry",
+      "name": "Notify: Iteration Result (Retry)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [5750, 450],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "score-check-retry",
+              "leftValue": "={{ $json.scorePassThreshold }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-score-pass-retry",
+      "name": "Score >= 80? (Retry)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [6000, 450]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "max-iter-check-retry",
+              "leftValue": "={{ $json.maxIterationsReached }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-max-iterations-retry",
+      "name": "Max Iterations? (Retry)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [6250, 600]
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "hours"
+      },
+      "id": "wait-for-fix-2",
+      "name": "Wait for Fix 2 (1h)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [6500, 750]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass through data for final iteration\nconst prev = $('Parse Test Result (Retry)').first().json;\nreturn [{\n  json: {\n    businessId: prev.businessId,\n    businessName: prev.businessName,\n    businessDescription: prev.businessDescription,\n    category: prev.category,\n    siteUrl: prev.siteUrl,\n    iterationCount: prev.iterationCount,\n    lastScore: prev.lastScore,\n    iterationHistory: prev.iterationHistory\n  }\n}];"
+      },
+      "id": "increment-iteration-2",
+      "name": "Increment Iteration 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [6750, 750]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/test-app",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $json.businessId, businessName: $json.businessName, siteUrl: $json.siteUrl, repoName: $json.businessId }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "call-app-tester-final",
+      "name": "Call App Tester (Final)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [7000, 750],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const testResult = $input.first().json;\nconst prevData = $('Increment Iteration 2').first().json;\n\nconst score = testResult.score || testResult.health_score || testResult.overall_score || 0;\nconst issuesCreated = testResult.issues_created || testResult.issuesCreated || 0;\n\nconst iterationCount = (prevData.iterationCount || 0) + 1;\nconst iterationHistory = [...(prevData.iterationHistory || []), {\n  iteration: iterationCount,\n  score,\n  issuesCreated,\n  timestamp: $now.toFormat('yyyy-MM-dd HH:mm')\n}];\n\nreturn [{\n  json: {\n    businessId: prevData.businessId,\n    businessName: prevData.businessName,\n    businessDescription: prevData.businessDescription || '',\n    category: prevData.category || '',\n    siteUrl: prevData.siteUrl,\n    iterationCount,\n    lastScore: score,\n    iterationHistory\n  }\n}];"
+      },
+      "id": "parse-test-result-final",
+      "name": "Parse Test Result (Final)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [7250, 750]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\ud83e\uddea *App Test - Final Iteration {{ $json.iterationCount }}/3*\n\n*{{ $json.businessName }}*\nFinal Score: *{{ $json.lastScore }}/100*\n\n{{ $json.lastScore >= 80 ? '\u2705 PASS' : '\u26a0\ufe0f LOW SCORE - Human review recommended' }}\n\nProceeding to quality gate...",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-iteration-final",
+      "name": "Notify: Final Iteration",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [7500, 750],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge iteration data and prepare for quality gate\n// This node collects from whichever path we arrived from\nlet data;\n\n// Try to get data from the various possible paths\ntry { data = $('Parse Test Result').first().json; } catch(e) {}\nif (!data) try { data = $('Parse Test Result (Retry)').first().json; } catch(e) {}\nif (!data) try { data = $('Parse Test Result (Final)').first().json; } catch(e) {}\nif (!data) try { data = $('Notify: Final Iteration').first().json; } catch(e) {}\nif (!data) {\n  // Fallback\n  data = $input.first().json;\n}\n\nconst iterationSummary = (data.iterationHistory || []).map(h =>\n  `Iteration ${h.iteration}: score ${h.score}/100 (${h.timestamp})`\n).join('\\n');\n\nreturn [{\n  json: {\n    businessId: data.businessId,\n    businessName: data.businessName,\n    businessDescription: data.businessDescription || '',\n    category: data.category || '',\n    siteUrl: data.siteUrl || 'https://' + data.businessId + '.vercel.app',\n    finalScore: data.lastScore || 0,\n    totalIterations: data.iterationCount || 0,\n    iterationSummary,\n    iterationHistory: data.iterationHistory || []\n  }\n}];"
+      },
+      "id": "prepare-quality-gate",
+      "name": "Prepare Quality Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4750, 0]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u23f0 *Build iteration complete* for *{{ $json.businessName }}*\n\nFinal app test score: *{{ $json.finalScore }}/100* after {{ $json.totalIterations }} iteration(s)\n\n{{ $json.iterationSummary }}\n\nStep 5/6: Running quality gate checks...",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-wait-done",
+      "name": "Notify: Running Quality Gate",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [5000, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/quality-gate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $('Prepare Quality Gate').first().json.businessId, businessName: $('Prepare Quality Gate').first().json.businessName, siteUrl: $('Prepare Quality Gate').first().json.siteUrl, repoName: $('Prepare Quality Gate').first().json.businessId, appTestScore: $('Prepare Quality Gate').first().json.finalScore, iterationCount: $('Prepare Quality Gate').first().json.totalIterations }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "call-quality-gate",
+      "name": "Call Quality Gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5250, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const qgResult = $input.first().json;\nconst payload = $('Prepare Quality Gate').first().json;\n\nconst passed = qgResult.passed === true || qgResult.status === 'passed' || qgResult.result === 'pass';\nconst score = qgResult.score || qgResult.overall_score || 'N/A';\nconst details = qgResult.details || qgResult.checks || qgResult.message || 'No details';\nconst failures = qgResult.failures || qgResult.failed_checks || [];\n\nreturn [{\n  json: {\n    ...payload,\n    qgPassed: passed,\n    qgScore: score,\n    qgDetails: typeof details === 'string' ? details : JSON.stringify(details, null, 2),\n    qgFailures: Array.isArray(failures) ? failures : []\n  }\n}];"
+      },
+      "id": "parse-quality-gate",
+      "name": "Parse Quality Gate Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5500, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "qg-pass-check",
+              "leftValue": "={{ $json.qgPassed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-qg-passed",
+      "name": "Quality Gate Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [5750, 0]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u2705 *Quality Gate: PASS*\n\n*{{ $json.businessName }}* is LIVE!\n\ud83c\udf10 {{ $json.siteUrl }}\n\nQG Score: {{ $json.qgScore }}\nApp Test Score: {{ $json.finalScore }}/100 ({{ $json.totalIterations }} iterations)\n\nStep 6/6: Submitting to software directories...",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-qg-pass",
+      "name": "Notify: QG PASS",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [6000, -150],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/submit-directories",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $('Parse Quality Gate Result').first().json.businessId, businessName: $('Parse Quality Gate Result').first().json.businessName, siteUrl: $('Parse Quality Gate Result').first().json.siteUrl, category: $('Parse Quality Gate Result').first().json.category, description: $('Parse Quality Gate Result').first().json.businessDescription, pricing: '29' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "call-submit-directories",
+      "name": "Call Submit Directories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [6250, -250],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/expand-lead-gen",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $('Parse Quality Gate Result').first().json.businessId, businessName: $('Parse Quality Gate Result').first().json.businessName, category: $('Parse Quality Gate Result').first().json.category }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "call-expand-lead-gen",
+      "name": "Call Expand Lead Gen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [6250, -100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\ud83c\udf89 *Pipeline Complete* for *{{ $('Parse Quality Gate Result').first().json.businessName }}*\n\nAll done!\n- PRD: APPROVED\n- App Test: {{ $('Prepare Quality Gate').first().json.finalScore }}/100 ({{ $('Prepare Quality Gate').first().json.totalIterations }} iterations)\n- Quality Gate: PASSED\n- Directory submissions: triggered\n- Lead gen expansion: triggered\n\nThe Forge has successfully birthed a new business.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-pipeline-complete",
+      "name": "Notify: Pipeline Complete",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [6500, -200],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u274c *Quality Gate: FAIL*\n\n*{{ $json.businessName }}* did NOT pass quality checks.\n\nQG Score: {{ $json.qgScore }}\nApp Test Score: {{ $json.finalScore }}/100 ({{ $json.totalIterations }} iterations)\n\nDetails:\n{{ $json.qgDetails }}\n\nCreating remediation issues on GitHub...",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-qg-fail",
+      "name": "Notify: QG FAIL",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [6000, 150],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Parse Quality Gate Result').first().json;\nconst failures = data.qgFailures;\nconst businessId = data.businessId;\nconst businessName = data.businessName;\n\nif (failures.length === 0) {\n  return [{\n    json: {\n      owner: 'ShalinPatel670',\n      repo: businessId,\n      title: '@claude [Remediation] Quality gate failed for ' + businessName,\n      body: '@claude The quality gate check failed for ' + businessName + '.\\n\\nDetails:\\n' + data.qgDetails + '\\n\\nPlease investigate and fix all failing checks. Then create a PR with the fixes.'\n    }\n  }];\n}\n\nreturn failures.map((failure, i) => ({\n  json: {\n    owner: 'ShalinPatel670',\n    repo: businessId,\n    title: '@claude [Remediation ' + (i + 1) + '] ' + (typeof failure === 'string' ? failure : (failure.check || failure.name || 'Fix quality issue')),\n    body: '@claude Quality gate check failed:\\n\\n' + (typeof failure === 'string' ? failure : JSON.stringify(failure, null, 2)) + '\\n\\nPlease fix this issue and create a PR with the changes.'\n  }\n}));"
+      },
+      "id": "build-remediation-issues",
+      "name": "Build Remediation Issues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [6250, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $json.owner }}/{{ $json.repo }}/issues",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $json.title, body: $json.body, labels: ['remediation', 'quality-gate'] }) }}",
+        "options": {}
+      },
+      "id": "create-remediation-issues",
+      "name": "Create Remediation Issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [6500, 200],
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'pipeline_started', businessId: $('Extract Payload').first().json.businessId, businessName: $('Extract Payload').first().json.businessName }) }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "respond-accepted",
+      "name": "Respond: Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [500, 550]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u26a0\ufe0f *Build complete after max iterations* for *{{ $json.businessName }}*\n\nFinal app test score: *{{ $json.lastScore }}/100* (below 80 threshold)\n\nProceeding to quality gate anyway. Human review recommended.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-max-iter",
+      "name": "Notify: Max Iterations Reached",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [4750, 150],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u26a0\ufe0f *Build complete after max iterations (retry)* for *{{ $json.businessName }}*\n\nFinal app test score: *{{ $json.lastScore }}/100* (below 80 threshold)\n\nProceeding to quality gate anyway. Human review recommended.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-max-iter-retry",
+      "name": "Notify: Max Iterations (Retry)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [6500, 500],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook: Approve Opportunity": {
+      "main": [
+        [
+          { "node": "Extract Payload", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Extract Payload": {
+      "main": [
+        [
+          { "node": "Notify: Pipeline Started", "type": "main", "index": 0 },
+          { "node": "Respond: Accepted", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: Pipeline Started": {
+      "main": [
+        [
+          { "node": "Call Bootstrap", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call Bootstrap": {
+      "main": [
+        [
+          { "node": "Check Bootstrap Result", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check Bootstrap Result": {
+      "main": [
+        [
+          { "node": "Notify: Bootstrap Done", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: Bootstrap Done": {
+      "main": [
+        [
+          { "node": "Call Generate PRD", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call Generate PRD": {
+      "main": [
+        [
+          { "node": "Check PRD Result", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check PRD Result": {
+      "main": [
+        [
+          { "node": "PRD Approved?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "PRD Approved?": {
+      "main": [
+        [
+          { "node": "Notify: PRD Approved", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Notify: PRD Rejected", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: PRD Approved": {
+      "main": [
+        [
+          { "node": "Call Deploy", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call Deploy": {
+      "main": [
+        [
+          { "node": "Notify: Repo Created", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: Repo Created": {
+      "main": [
+        [
+          { "node": "Wait for Claude Code (2h)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait for Claude Code (2h)": {
+      "main": [
+        [
+          { "node": "Init Iteration Counter", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Init Iteration Counter": {
+      "main": [
+        [
+          { "node": "Call App Tester", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call App Tester": {
+      "main": [
+        [
+          { "node": "Parse Test Result", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse Test Result": {
+      "main": [
+        [
+          { "node": "Notify: Iteration Result", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: Iteration Result": {
+      "main": [
+        [
+          { "node": "Score >= 80?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Score >= 80?": {
+      "main": [
+        [
+          { "node": "Prepare Quality Gate", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Max Iterations?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Max Iterations?": {
+      "main": [
+        [
+          { "node": "Notify: Max Iterations Reached", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Wait for Fix (1h)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: Max Iterations Reached": {
+      "main": [
+        [
+          { "node": "Prepare Quality Gate", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait for Fix (1h)": {
+      "main": [
+        [
+          { "node": "Increment Iteration", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Increment Iteration": {
+      "main": [
+        [
+          { "node": "Call App Tester (Retry)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call App Tester (Retry)": {
+      "main": [
+        [
+          { "node": "Parse Test Result (Retry)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse Test Result (Retry)": {
+      "main": [
+        [
+          { "node": "Notify: Iteration Result (Retry)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: Iteration Result (Retry)": {
+      "main": [
+        [
+          { "node": "Score >= 80? (Retry)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Score >= 80? (Retry)": {
+      "main": [
+        [
+          { "node": "Prepare Quality Gate", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Max Iterations? (Retry)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Max Iterations? (Retry)": {
+      "main": [
+        [
+          { "node": "Notify: Max Iterations (Retry)", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Wait for Fix 2 (1h)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: Max Iterations (Retry)": {
+      "main": [
+        [
+          { "node": "Prepare Quality Gate", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait for Fix 2 (1h)": {
+      "main": [
+        [
+          { "node": "Increment Iteration 2", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Increment Iteration 2": {
+      "main": [
+        [
+          { "node": "Call App Tester (Final)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call App Tester (Final)": {
+      "main": [
+        [
+          { "node": "Parse Test Result (Final)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse Test Result (Final)": {
+      "main": [
+        [
+          { "node": "Notify: Final Iteration", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: Final Iteration": {
+      "main": [
+        [
+          { "node": "Prepare Quality Gate", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Prepare Quality Gate": {
+      "main": [
+        [
+          { "node": "Notify: Running Quality Gate", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: Running Quality Gate": {
+      "main": [
+        [
+          { "node": "Call Quality Gate", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call Quality Gate": {
+      "main": [
+        [
+          { "node": "Parse Quality Gate Result", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse Quality Gate Result": {
+      "main": [
+        [
+          { "node": "Quality Gate Passed?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Quality Gate Passed?": {
+      "main": [
+        [
+          { "node": "Notify: QG PASS", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Notify: QG FAIL", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: QG PASS": {
+      "main": [
+        [
+          { "node": "Call Submit Directories", "type": "main", "index": 0 },
+          { "node": "Call Expand Lead Gen", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call Submit Directories": {
+      "main": [
+        [
+          { "node": "Notify: Pipeline Complete", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Call Expand Lead Gen": {
+      "main": [
+        [
+          { "node": "Notify: Pipeline Complete", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: QG FAIL": {
+      "main": [
+        [
+          { "node": "Build Remediation Issues", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build Remediation Issues": {
+      "main": [
+        [
+          { "node": "Create Remediation Issues", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

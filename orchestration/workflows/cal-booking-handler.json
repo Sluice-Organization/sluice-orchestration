@@ -1,0 +1,805 @@
+{
+  "name": "Cal.com Booking Handler - BayFlow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cal-booking",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-cal-booking",
+      "name": "Webhook: Cal.com Booking",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body || $input.first().json;\n\n// Cal.com webhook payload structure\nconst triggerEvent = payload.triggerEvent || payload.type || '';\nconst bookingPayload = payload.payload || payload;\n\n// Extract attendee info\nconst attendees = bookingPayload.attendees || [];\nconst attendee = attendees[0] || {};\nconst attendeeName = attendee.name || bookingPayload.invitee?.name || '';\nconst attendeeEmail = attendee.email || bookingPayload.invitee?.email || '';\nconst attendeeTimezone = attendee.timeZone || attendee.timezone || bookingPayload.invitee?.timezone || 'America/New_York';\n\n// Extract booking details\nconst startTime = bookingPayload.startTime || bookingPayload.start_time || '';\nconst endTime = bookingPayload.endTime || bookingPayload.end_time || '';\nconst meetingUrl = bookingPayload.metadata?.videoCallUrl || bookingPayload.location || bookingPayload.meetingUrl || '';\nconst eventType = bookingPayload.eventType?.title || bookingPayload.type?.title || bookingPayload.title || 'BayFlow Demo';\nconst rescheduleUrl = bookingPayload.rescheduleUrl || bookingPayload.metadata?.rescheduleUrl || '';\nconst cancelUrl = bookingPayload.cancellationUrl || bookingPayload.metadata?.cancelUrl || '';\nconst uid = bookingPayload.uid || bookingPayload.id || '';\n\n// Extract organizer / business info\nconst organizerName = bookingPayload.organizer?.name || 'Shalin';\n\n// Format date/time in attendee's timezone\nlet formattedDate = '';\nlet formattedTime = '';\ntry {\n  const dt = new Date(startTime);\n  formattedDate = dt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: attendeeTimezone });\n  formattedTime = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: attendeeTimezone, timeZoneName: 'short' });\n} catch (e) {\n  formattedDate = startTime;\n  formattedTime = '';\n}\n\n// Try to extract business name from custom field or email domain\nconst emailDomain = attendeeEmail.split('@')[1] || '';\nconst businessName = bookingPayload.responses?.company || emailDomain.split('.')[0] || '';\n\nreturn [{\n  json: {\n    triggerEvent,\n    attendeeName,\n    attendeeEmail,\n    attendeeTimezone,\n    startTime,\n    endTime,\n    meetingUrl,\n    eventType,\n    rescheduleUrl,\n    cancelUrl,\n    uid,\n    organizerName,\n    formattedDate,\n    formattedTime,\n    businessName\n  }\n}];"
+      },
+      "id": "parse-booking-data",
+      "name": "Parse Booking Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-created",
+              "leftValue": "={{ $json.triggerEvent }}",
+              "rightValue": "BOOKING_CREATED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-booking-created",
+      "name": "BOOKING_CREATED?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, -200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-cancelled",
+              "leftValue": "={{ $json.triggerEvent }}",
+              "rightValue": "BOOKING_CANCELLED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-booking-cancelled",
+      "name": "BOOKING_CANCELLED?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-rescheduled",
+              "leftValue": "={{ $json.triggerEvent }}",
+              "rightValue": "BOOKING_RESCHEDULED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-booking-rescheduled",
+      "name": "BOOKING_RESCHEDULED?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 600]
+    },
+
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($('Parse Booking Data').first().json.attendeeEmail) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'demo_booked', demo_date: $('Parse Booking Data').first().json.startTime }) }}",
+        "options": {}
+      },
+      "id": "update-lead-demo-booked",
+      "name": "Update Lead: demo_booked",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$('Parse Booking Data').first().json.attendeeEmail], subject: 'Your BayFlow demo is confirmed \\u2014 ' + $('Parse Booking Data').first().json.formattedDate, html: '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head><body style=\"margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f9fafb;padding:40px 20px;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);\"><tr><td style=\"background-color:#dc2626;padding:32px 40px;\"><h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;\">BayFlow</h1></td></tr><tr><td style=\"padding:40px;\"><h2 style=\"margin:0 0 8px;color:#111827;font-size:22px;font-weight:600;\">You&#39;re all set, ' + $('Parse Booking Data').first().json.attendeeName.split(' ')[0] + '!</h2><p style=\"margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;\">Your BayFlow demo has been confirmed. Here are the details:</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#fef2f2;border-radius:8px;border-left:4px solid #dc2626;margin-bottom:24px;\"><tr><td style=\"padding:20px;\"><p style=\"margin:0 0 8px;color:#991b1b;font-size:14px;font-weight:600;\">Date</p><p style=\"margin:0 0 16px;color:#111827;font-size:16px;\">' + $('Parse Booking Data').first().json.formattedDate + '</p><p style=\"margin:0 0 8px;color:#991b1b;font-size:14px;font-weight:600;\">Time</p><p style=\"margin:0 0 16px;color:#111827;font-size:16px;\">' + $('Parse Booking Data').first().json.formattedTime + '</p><p style=\"margin:0 0 8px;color:#991b1b;font-size:14px;font-weight:600;\">Meeting Link</p><p style=\"margin:0;color:#111827;font-size:16px;\"><a href=\"' + $('Parse Booking Data').first().json.meetingUrl + '\" style=\"color:#dc2626;text-decoration:underline;\">' + ($('Parse Booking Data').first().json.meetingUrl || 'Link will be sent before the call') + '</a></p></td></tr></table><h3 style=\"margin:0 0 12px;color:#111827;font-size:16px;font-weight:600;\">What to expect</h3><p style=\"margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6;\">A quick 15-minute walkthrough of BayFlow for your shop. We&#39;ll cover how BayFlow handles repair orders, digital inspections, invoicing, and customer communication \\u2014 all built specifically for independent auto repair shops.</p><p style=\"margin:0 0 8px;color:#374151;font-size:15px;line-height:1.6;\">No pressure, no hard sell. Just a look at whether it&#39;s a good fit.</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-top:24px;\"><tr><td align=\"center\"><p style=\"margin:0;color:#6b7280;font-size:13px;\">Need to make changes? <a href=\"' + ($('Parse Booking Data').first().json.rescheduleUrl || '#') + '\" style=\"color:#dc2626;\">Reschedule</a> or <a href=\"' + ($('Parse Booking Data').first().json.cancelUrl || '#') + '\" style=\"color:#dc2626;\">Cancel</a></p></td></tr></table></td></tr><tr><td style=\"padding:24px 40px;background-color:#f9fafb;border-top:1px solid #e5e7eb;\"><p style=\"margin:0;color:#9ca3af;font-size:13px;text-align:center;\">BayFlow \\u2014 Shop management software for independent auto repair shops</p></td></tr></table></td></tr></table></body></html>' }) }}",
+        "options": {}
+      },
+      "id": "send-confirmation-email",
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Cal.com Booking Handler', businessId: 'bayflow', severity: 'info', message: 'Demo booked: ' + $('Parse Booking Data').first().json.attendeeName + ' from ' + $('Parse Booking Data').first().json.businessName + ', ' + $('Parse Booking Data').first().json.formattedDate + ' at ' + $('Parse Booking Data').first().json.formattedTime }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram-created",
+      "name": "Notify Telegram: Booked",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', event: 'BOOKING_CREATED', email: $('Parse Booking Data').first().json.attendeeEmail }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-created",
+      "name": "Respond OK (Created)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1320, -400]
+    },
+
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($('Parse Booking Data').first().json.attendeeEmail) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'replied', demo_date: null }) }}",
+        "options": {}
+      },
+      "id": "update-lead-cancelled",
+      "name": "Update Lead: replied (re-enter)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Cal.com Booking Handler', businessId: 'bayflow', severity: 'warning', message: 'Demo CANCELLED: ' + $('Parse Booking Data').first().json.attendeeName + ' (' + $('Parse Booking Data').first().json.attendeeEmail + ') cancelled their demo. Lead status reverted to replied.' }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram-cancelled",
+      "name": "Notify Telegram: Cancelled",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', event: 'BOOKING_CANCELLED', email: $('Parse Booking Data').first().json.attendeeEmail }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-cancelled",
+      "name": "Respond OK (Cancelled)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1100, 100]
+    },
+
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($('Parse Booking Data').first().json.attendeeEmail) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'demo_booked', demo_date: $('Parse Booking Data').first().json.startTime }) }}",
+        "options": {}
+      },
+      "id": "update-lead-rescheduled",
+      "name": "Update Lead: Rescheduled",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$('Parse Booking Data').first().json.attendeeEmail], subject: 'Your BayFlow demo has been rescheduled \\u2014 ' + $('Parse Booking Data').first().json.formattedDate, html: '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head><body style=\"margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f9fafb;padding:40px 20px;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);\"><tr><td style=\"background-color:#dc2626;padding:32px 40px;\"><h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;\">BayFlow</h1></td></tr><tr><td style=\"padding:40px;\"><h2 style=\"margin:0 0 8px;color:#111827;font-size:22px;font-weight:600;\">Demo rescheduled, ' + $('Parse Booking Data').first().json.attendeeName.split(' ')[0] + '!</h2><p style=\"margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;\">Your BayFlow demo has been moved to a new time. Here are your updated details:</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#fef2f2;border-radius:8px;border-left:4px solid #dc2626;margin-bottom:24px;\"><tr><td style=\"padding:20px;\"><p style=\"margin:0 0 8px;color:#991b1b;font-size:14px;font-weight:600;\">New Date</p><p style=\"margin:0 0 16px;color:#111827;font-size:16px;\">' + $('Parse Booking Data').first().json.formattedDate + '</p><p style=\"margin:0 0 8px;color:#991b1b;font-size:14px;font-weight:600;\">New Time</p><p style=\"margin:0 0 16px;color:#111827;font-size:16px;\">' + $('Parse Booking Data').first().json.formattedTime + '</p><p style=\"margin:0 0 8px;color:#991b1b;font-size:14px;font-weight:600;\">Meeting Link</p><p style=\"margin:0;color:#111827;font-size:16px;\"><a href=\"' + $('Parse Booking Data').first().json.meetingUrl + '\" style=\"color:#dc2626;text-decoration:underline;\">' + ($('Parse Booking Data').first().json.meetingUrl || 'Link will be sent before the call') + '</a></p></td></tr></table><p style=\"margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6;\">Same agenda \\u2014 a quick 15-minute walkthrough of BayFlow for your shop. Looking forward to it!</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-top:24px;\"><tr><td align=\"center\"><p style=\"margin:0;color:#6b7280;font-size:13px;\">Need to make changes again? <a href=\"' + ($('Parse Booking Data').first().json.rescheduleUrl || '#') + '\" style=\"color:#dc2626;\">Reschedule</a> or <a href=\"' + ($('Parse Booking Data').first().json.cancelUrl || '#') + '\" style=\"color:#dc2626;\">Cancel</a></p></td></tr></table></td></tr><tr><td style=\"padding:24px 40px;background-color:#f9fafb;border-top:1px solid #e5e7eb;\"><p style=\"margin:0;color:#9ca3af;font-size:13px;text-align:center;\">BayFlow \\u2014 Shop management software for independent auto repair shops</p></td></tr></table></td></tr></table></body></html>' }) }}",
+        "options": {}
+      },
+      "id": "send-reschedule-email",
+      "name": "Send Reschedule Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Cal.com Booking Handler', businessId: 'bayflow', severity: 'info', message: 'Demo RESCHEDULED: ' + $('Parse Booking Data').first().json.attendeeName + ' from ' + $('Parse Booking Data').first().json.businessName + ' moved to ' + $('Parse Booking Data').first().json.formattedDate + ' at ' + $('Parse Booking Data').first().json.formattedTime }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram-rescheduled",
+      "name": "Notify Telegram: Rescheduled",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', event: 'BOOKING_RESCHEDULED', email: $('Parse Booking Data').first().json.attendeeEmail }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-rescheduled",
+      "name": "Respond OK (Rescheduled)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1320, 500]
+    },
+
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ignored', event: $('Parse Booking Data').first().json.triggerEvent }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-unknown-event",
+      "name": "Respond OK (Unknown Event)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [880, 800]
+    },
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-daily-reminder",
+      "name": "Daily 8AM Demo Reminder Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 1200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build date range for \"today\" in UTC\nconst now = new Date();\nconst todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();\nconst todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();\n\nreturn [{\n  json: {\n    todayStart,\n    todayEnd\n  }\n}];"
+      },
+      "id": "build-today-range",
+      "name": "Build Today Date Range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 1200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?status=eq.demo_booked&demo_date=gte.' + $json.todayStart + '&demo_date=lt.' + $json.todayEnd + '&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-todays-demos",
+      "name": "Fetch Today's Demos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 1200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.all().map(i => i.json);\nconst leads = Array.isArray(response[0]) ? response[0] : response;\n\n// Filter out non-lead responses (error objects, empty markers)\nconst demos = leads.filter(l => l.email && l.demo_date);\n\nif (demos.length === 0) {\n  return [{ json: { _empty: true, count: 0, summary: 'No demos scheduled for today.' } }];\n}\n\nconst demoList = demos.map(d => {\n  const dt = new Date(d.demo_date);\n  const time = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });\n  return {\n    email: d.email,\n    first_name: d.first_name || '',\n    business_name: d.business_name || '',\n    demo_date: d.demo_date,\n    formattedTime: time\n  };\n});\n\nconst summaryLines = demoList.map(d => '- ' + (d.first_name || d.email) + ' (' + (d.business_name || 'N/A') + ') at ' + d.formattedTime);\nconst summary = 'You have ' + demoList.length + ' demo(s) today:\\n' + summaryLines.join('\\n');\n\nreturn [{\n  json: {\n    _empty: false,\n    count: demoList.length,\n    demos: demoList,\n    summary\n  }\n}];"
+      },
+      "id": "process-todays-demos",
+      "name": "Process Today's Demos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 1200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-demos",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-no-demos",
+      "name": "Has Demos Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 1200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst demos = data.demos || [];\nconst results = [];\n\nfor (const demo of demos) {\n  const firstName = demo.first_name || 'there';\n  const time = demo.formattedTime;\n\n  const html = '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head><body style=\"margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f9fafb;padding:40px 20px;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);\"><tr><td style=\"background-color:#dc2626;padding:32px 40px;\"><h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;\">BayFlow</h1></td></tr><tr><td style=\"padding:40px;\"><h2 style=\"margin:0 0 8px;color:#111827;font-size:22px;font-weight:600;\">Your demo is today!</h2><p style=\"margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;\">Hi ' + firstName + ', just a quick reminder that your BayFlow demo is today at <strong>' + time + '</strong>.</p><p style=\"margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6;\">We will walk through how BayFlow can help your shop manage repair orders, digital inspections, invoicing, and customer communication. It should take about 15 minutes.</p><p style=\"margin:0;color:#374151;font-size:15px;line-height:1.6;\">Talk soon!</p><p style=\"margin:16px 0 0;color:#374151;font-size:15px;\">\\u2014 Shalin</p></td></tr><tr><td style=\"padding:24px 40px;background-color:#f9fafb;border-top:1px solid #e5e7eb;\"><p style=\"margin:0;color:#9ca3af;font-size:13px;text-align:center;\">BayFlow \\u2014 Shop management software for independent auto repair shops</p></td></tr></table></td></tr></table></body></html>';\n\n  results.push({\n    json: {\n      email: demo.email,\n      first_name: firstName,\n      business_name: demo.business_name,\n      formattedTime: time,\n      reminderHtml: html\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "build-reminder-emails",
+      "name": "Build Reminder Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 1100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$json.email], subject: 'Reminder: Your BayFlow demo is today at ' + $json.formattedTime, html: $json.reminderHtml }) }}",
+        "options": {}
+      },
+      "id": "send-reminder-email",
+      "name": "Send Reminder Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 1100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Cal.com Booking Handler', businessId: 'bayflow', severity: 'info', message: $json.summary }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram-daily-summary",
+      "name": "Notify Telegram: Daily Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 1300],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook: Cal.com Booking": {
+      "main": [
+        [
+          {
+            "node": "Parse Booking Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Booking Data": {
+      "main": [
+        [
+          {
+            "node": "BOOKING_CREATED?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BOOKING_CREATED?": {
+      "main": [
+        [
+          {
+            "node": "Update Lead: demo_booked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BOOKING_CANCELLED?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead: demo_booked": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation Email": {
+      "main": [
+        [
+          {
+            "node": "Notify Telegram: Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Telegram: Booked": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (Created)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BOOKING_CANCELLED?": {
+      "main": [
+        [
+          {
+            "node": "Update Lead: replied (re-enter)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "BOOKING_RESCHEDULED?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead: replied (re-enter)": {
+      "main": [
+        [
+          {
+            "node": "Notify Telegram: Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Telegram: Cancelled": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (Cancelled)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BOOKING_RESCHEDULED?": {
+      "main": [
+        [
+          {
+            "node": "Update Lead: Rescheduled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK (Unknown Event)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead: Rescheduled": {
+      "main": [
+        [
+          {
+            "node": "Send Reschedule Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reschedule Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Notify Telegram: Rescheduled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Telegram: Rescheduled": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (Rescheduled)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 8AM Demo Reminder Check": {
+      "main": [
+        [
+          {
+            "node": "Build Today Date Range",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Today Date Range": {
+      "main": [
+        [
+          {
+            "node": "Fetch Today's Demos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Today's Demos": {
+      "main": [
+        [
+          {
+            "node": "Process Today's Demos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Today's Demos": {
+      "main": [
+        [
+          {
+            "node": "Has Demos Today?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Demos Today?": {
+      "main": [
+        [
+          {
+            "node": "Build Reminder Emails",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Telegram: Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Reminder Emails": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

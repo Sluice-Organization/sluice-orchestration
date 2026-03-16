@@ -43,7 +43,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\n\nreturn [{\n  json: {\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow',\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Finance Agent for BayFlow (auto repair shop software).\n\nYour responsibilities: daily reconciliation, weekly P&L with channel attribution, CAC/LTV/payback tracking, monthly treasury.\n\n## Current State\n${state}\n\n## Strategy (for pricing/budget context)\n${strategy}\n\nPerform your daily financial review:\n\n1. **Revenue Check:** Current MRR, any new subscriptions, any churned customers. Revenue by channel if available (organic, paid, direct, referral).\n\n2. **Expense Tracking:** Current monthly costs breakdown (Supabase, Vercel, Railway, domains, AI API costs, any ad spend). Compare against budget tier allocation.\n\n3. **Budget Compliance:** Are we within the seed stage daily max ($20)? Content/SEO 60%, Product 25%, Reserve 15%. Flag any overspend.\n\n4. **Circuit Breaker Check:** 7-day spend vs 3x trailing revenue. Any campaigns needing ROAS check.\n\n5. **Token Budget:** Estimated AI API costs for this business this cycle. Are we within seed tier (50K tokens/cycle, $30-50/month)?\n\n6. **Metrics:** CAC (if applicable), projected LTV, payback period.\n\nOutput your report in the structured format: Agent name, business, date, status (GREEN/YELLOW/RED), key metrics with trends, actions taken, issues detected, recommendations, needs from CEO Agent.`\n  }\n}];"
+        "jsCode": "const state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\n\nreturn [{\n  json: {\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow',\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Finance Agent for BayFlow (auto repair shop software).\n\nYour responsibilities: daily reconciliation, weekly P&L with channel attribution, CAC/LTV/payback tracking, monthly treasury.\n\n## Current State\n${state}\n\n## Strategy (for pricing/budget context)\n${strategy}\n\nPerform your daily financial review:\n\n1. **Revenue Check:** Current MRR, any new subscriptions, any churned customers. Revenue by channel if available (organic, paid, direct, referral).\n\n2. **Expense Tracking:** Current monthly costs breakdown (Supabase, Vercel, Railway, domains, AI API costs, any ad spend). Compare against budget tier allocation.\n\n3. **Budget Compliance:** Are we within the seed stage daily max ($20)? Content/SEO 60%, Product 25%, Reserve 15%. Flag any overspend.\n\n4. **Circuit Breaker Check:** 7-day spend vs 3x trailing revenue. Any campaigns needing ROAS check.\n\n5. **Token Budget:** Estimated AI API costs for this business this cycle. Are we within seed tier (50K tokens/cycle, $30-50/month)?\n\n6. **Metrics:** CAC (if applicable), projected LTV, payback period.\n\nOutput your report in the structured format: Agent name, business, date, status (GREEN/YELLOW/RED), key metrics with trends, actions taken, issues detected, recommendations, needs from CEO Agent.\n\nIMPORTANT: At the very end of your response, output a JSON block with today's metrics delimited by special markers. Use exactly this format:\n\n===METRICS_JSON_START===\n{\n  \"mrr\": 0,\n  \"revenue_organic\": 0,\n  \"revenue_paid\": 0,\n  \"revenue_direct\": 0,\n  \"revenue_referral\": 0,\n  \"traffic_total\": 0,\n  \"traffic_organic\": 0,\n  \"traffic_paid\": 0,\n  \"traffic_direct\": 0,\n  \"traffic_referral\": 0,\n  \"signups\": 0,\n  \"trials\": 0,\n  \"conversions\": 0,\n  \"churn_count\": 0,\n  \"churn_mrr\": 0,\n  \"support_tickets\": 0,\n  \"support_auto_resolved\": 0,\n  \"ad_spend\": 0,\n  \"ai_api_cost\": 0\n}\n===METRICS_JSON_END===\n\nFill in all values with real numbers from the data you have. Use 0 for any metric you cannot determine. The JSON must be valid and contain all fields listed above.`\n  }\n}];"
       },
       "id": "build-prompt",
       "name": "Build Finance Prompt",
@@ -64,10 +64,10 @@
     },
     {
       "parameters": {
-        "model": "claude-3-5-haiku-20241022",
+        "model": "claude-haiku-4-5-20251001",
         "options": {
           "temperature": 0.2,
-          "maxTokens": 1500
+          "maxTokensToSample": 1500
         }
       },
       "id": "haiku-model",
@@ -78,19 +78,112 @@
     },
     {
       "parameters": {
+        "jsCode": "const llmOutput = $('Finance LLM Chain').first().json.text || '';\n\n// Extract JSON between markers\nconst startMarker = '===METRICS_JSON_START===';\nconst endMarker = '===METRICS_JSON_END===';\nconst startIdx = llmOutput.indexOf(startMarker);\nconst endIdx = llmOutput.indexOf(endMarker);\n\nlet metrics = {\n  mrr: 0,\n  revenue_organic: 0,\n  revenue_paid: 0,\n  revenue_direct: 0,\n  revenue_referral: 0,\n  traffic_total: 0,\n  traffic_organic: 0,\n  traffic_paid: 0,\n  traffic_direct: 0,\n  traffic_referral: 0,\n  signups: 0,\n  trials: 0,\n  conversions: 0,\n  churn_count: 0,\n  churn_mrr: 0,\n  support_tickets: 0,\n  support_auto_resolved: 0,\n  ad_spend: 0,\n  ai_api_cost: 0\n};\n\nif (startIdx !== -1 && endIdx !== -1) {\n  const jsonStr = llmOutput.substring(startIdx + startMarker.length, endIdx).trim();\n  try {\n    const parsed = JSON.parse(jsonStr);\n    // Merge parsed values over defaults so all keys are present\n    metrics = { ...metrics, ...parsed };\n  } catch (e) {\n    // If parse fails, keep defaults (all zeros)\n  }\n}\n\n// Strip the metrics block from the report text for clean GitHub output\nlet reportText = llmOutput;\nif (startIdx !== -1 && endIdx !== -1) {\n  reportText = llmOutput.substring(0, startIdx).trim();\n}\n\nconst today = new Date().toISOString().split('T')[0];\n\nreturn [{\n  json: {\n    metrics,\n    reportText,\n    date: today\n  }\n}];"
+      },
+      "id": "parse-metrics",
+      "name": "Parse Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "business_id", "value": "eq.bayflow" },
+            { "name": "select", "value": "id" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "lookup-business-id",
+      "name": "Lookup Business ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "resource": "file",
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/reports/finance-{{ $now.format('yyyy-MM-dd') }}.md",
-        "fileContent": "={{ $json.text }}",
-        "commitMessage": "Finance Agent daily report - bayflow - {{ $now.format('yyyy-MM-dd') }}"
+        "filePath": "memory-bank/businesses/bayflow/reports/finance-{{ $now.toFormat('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $('Parse Metrics').first().json.reportText }}",
+        "commitMessage": "Finance Agent daily report - bayflow - {{ $now.toFormat('yyyy-MM-dd') }}"
       },
       "id": "write-report",
       "name": "Write Finance Report",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1100, 0]
+      "position": [1540, -200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/daily_metrics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "resolution=merge-duplicates,return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify(Object.assign({}, $('Parse Metrics').first().json.metrics, { business_id: $json[0].id, date: $('Parse Metrics').first().json.date })) }}",
+        "options": {}
+      },
+      "id": "insert-daily-metrics",
+      "name": "Insert Daily Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "business_id", "value": "eq.bayflow" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ current_mrr: $('Parse Metrics').first().json.metrics.mrr }) }}",
+        "options": {}
+      },
+      "id": "update-business-mrr",
+      "name": "Update Business MRR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 200],
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -110,7 +203,17 @@
       "ai_languageModel": [[{ "node": "Finance LLM Chain", "type": "ai_languageModel", "index": 0 }]]
     },
     "Finance LLM Chain": {
-      "main": [[{ "node": "Write Finance Report", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Parse Metrics", "type": "main", "index": 0 }]]
+    },
+    "Parse Metrics": {
+      "main": [[{ "node": "Lookup Business ID", "type": "main", "index": 0 }]]
+    },
+    "Lookup Business ID": {
+      "main": [[
+        { "node": "Write Finance Report", "type": "main", "index": 0 },
+        { "node": "Insert Daily Metrics", "type": "main", "index": 0 },
+        { "node": "Update Business MRR", "type": "main", "index": 0 }
+      ]]
     }
   },
   "settings": { "executionOrder": "v1" }

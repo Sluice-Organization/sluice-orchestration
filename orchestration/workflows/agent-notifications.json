@@ -1,0 +1,415 @@
+{
+  "name": "Agent Notifications (Telegram)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent-notify",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook: Agent Notify",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "agent-notify"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst agent = input.agent || 'Unknown Agent';\nconst message = input.message || 'No message provided';\nconst severity = input.severity || 'info';\nconst businessId = input.businessId || 'general';\nconst requiresResponse = input.requiresResponse || false;\n\nconst severityMap = {\n  info: '\\u2139\\uFE0F',\n  warning: '\\u26A0\\uFE0F',\n  critical: '\\uD83D\\uDEA8',\n  question: '\\u2753'\n};\n\nconst emoji = severityMap[severity] || '\\u2139\\uFE0F';\nconst timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';\n\nconst telegramMessage = `${emoji} *${agent}* | ${businessId}\\n\\n${message}\\n\\n_${timestamp}_`;\n\nreturn [{\n  json: {\n    agent,\n    message,\n    severity,\n    businessId,\n    requiresResponse,\n    emoji,\n    timestamp,\n    telegramMessage\n  }\n}];"
+      },
+      "id": "format-message",
+      "name": "Format Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "requires-response-check",
+              "leftValue": "={{ $json.requiresResponse }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-response-needed",
+      "name": "Requires Response?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.telegramMessage }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "send-telegram-simple",
+      "name": "Send Telegram (Info)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1000, 450],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.telegramMessage }}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "reply_markup": {
+            "inline_keyboard": [
+              [
+                {
+                  "text": "Approve",
+                  "callback_data": "approve|{{ $json.agent }}|{{ $json.businessId }}"
+                },
+                {
+                  "text": "Reject",
+                  "callback_data": "reject|{{ $json.agent }}|{{ $json.businessId }}"
+                },
+                {
+                  "text": "Discuss",
+                  "callback_data": "discuss|{{ $json.agent }}|{{ $json.businessId }}"
+                }
+              ]
+            ]
+          }
+        }
+      },
+      "id": "send-telegram-with-buttons",
+      "name": "Send Telegram (Decision)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1000, 150],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'sent', timestamp: $json.timestamp }) }}"
+      },
+      "id": "respond-simple",
+      "name": "Respond OK (Info)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 450]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'sent_awaiting_decision', timestamp: $json.timestamp }) }}"
+      },
+      "id": "respond-decision",
+      "name": "Respond OK (Decision)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 150]
+    },
+    {
+      "parameters": {
+        "updates": ["callback_query"],
+        "additionalFields": {}
+      },
+      "id": "telegram-callback-trigger",
+      "name": "Telegram Callback Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 700],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const callback = $input.first().json;\n\nconst callbackData = callback.callback_query?.data || '';\nconst parts = callbackData.split('|');\n\nconst decision = parts[0] || 'unknown';\nconst agent = parts[1] || 'unknown';\nconst businessId = parts[2] || 'general';\nconst businessName = parts[3] || businessId;\nconst businessDescription = parts[4] || '';\nconst category = parts[5] || 'unknown';\n\nconst now = new Date();\nconst dateStr = now.toISOString().substring(0, 10);\nconst timestamp = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';\n\nconst fileName = `${dateStr}-${agent.toLowerCase().replace(/\\s+/g, '-')}.md`;\nconst filePath = `memory-bank/system/human-decisions/${fileName}`;\n\nconst fileContent = `# Human Decision\\n\\n- **Date**: ${timestamp}\\n- **Agent**: ${agent}\\n- **Business**: ${businessId}\\n- **Decision**: ${decision}\\n- **Original Question**: (see Telegram history)\\n`;\n\nconst confirmMessage = `Decision recorded: *${decision.toUpperCase()}* for ${agent} (${businessId})`;\n\n// Check if this is a Discovery Engine approval that should trigger the creation pipeline\nconst isDiscoveryApproval = decision === 'approve' && agent === 'Discovery Engine';\n\nreturn [{\n  json: {\n    decision,\n    agent,\n    businessId,\n    businessName,\n    businessDescription,\n    category,\n    fileName,\n    filePath,\n    fileContent: Buffer.from(fileContent).toString('base64'),\n    fileContentRaw: fileContent,\n    confirmMessage,\n    timestamp,\n    callbackQueryId: callback.callback_query?.id,\n    isDiscoveryApproval\n  }\n}];"
+      },
+      "id": "parse-callback",
+      "name": "Parse Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 700]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.filePath }}",
+        "fileContent": "={{ $json.fileContent }}",
+        "commitMessage": "=Decision: {{ $json.decision }} for {{ $json.agent }} ({{ $json.businessId }})",
+        "additionalParameters": {}
+      },
+      "id": "write-github-decision",
+      "name": "Write Decision to GitHub",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [750, 700],
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.confirmMessage }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "send-confirmation",
+      "name": "Confirm Decision",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1000, 700],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "discovery-approval-check",
+              "leftValue": "={{ $('Parse Callback').first().json.isDiscoveryApproval }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-discovery-approval",
+      "name": "Is Discovery Approval?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 700]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/approve-opportunity",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $('Parse Callback').first().json.businessId, businessName: $('Parse Callback').first().json.businessName, businessDescription: $('Parse Callback').first().json.businessDescription, category: $('Parse Callback').first().json.category }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "trigger-creation-pipeline",
+      "name": "Trigger Creation Pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\ud83d\udd17 *Creation Pipeline triggered* for *{{ $('Parse Callback').first().json.businessName }}*\n\nThe full bootstrap \u2192 deploy \u2192 build \u2192 quality gate pipeline is now running. You'll get updates at each step.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "notify-pipeline-triggered",
+      "name": "Notify: Pipeline Triggered",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1750, 600],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook: Agent Notify": {
+      "main": [
+        [
+          {
+            "node": "Format Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Message": {
+      "main": [
+        [
+          {
+            "node": "Requires Response?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requires Response?": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram (Decision)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Telegram (Info)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram (Info)": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (Info)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram (Decision)": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (Decision)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Callback Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Callback": {
+      "main": [
+        [
+          {
+            "node": "Write Decision to GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Decision to GitHub": {
+      "main": [
+        [
+          {
+            "node": "Confirm Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Decision": {
+      "main": [
+        [
+          {
+            "node": "Is Discovery Approval?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Discovery Approval?": {
+      "main": [
+        [
+          {
+            "node": "Trigger Creation Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Trigger Creation Pipeline": {
+      "main": [
+        [
+          {
+            "node": "Notify: Pipeline Triggered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

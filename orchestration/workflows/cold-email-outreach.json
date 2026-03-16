@@ -1,0 +1,1165 @@
+{
+  "name": "Cold Email Outreach - BayFlow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "schedule-lead-scrape",
+      "name": "Weekly Monday 6AM Lead Scrape",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://serpapi.com/search.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "engine",
+              "value": "google_maps"
+            },
+            {
+              "name": "q",
+              "value": "auto+repair+shop"
+            },
+            {
+              "name": "ll",
+              "value": "@39.8283,-98.5795,4z"
+            },
+            {
+              "name": "type",
+              "value": "search"
+            },
+            {
+              "name": "api_key",
+              "value": "{{ $env.SERPAPI_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "scrape-google-maps",
+      "name": "Scrape Google Maps via SerpAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst results = response.local_results || response.place_results || [];\n\nconst leads = results.map(r => {\n  const name = r.title || r.name || '';\n  const address = r.address || '';\n  const phone = r.phone || '';\n  const website = r.website || '';\n  const city = (address.split(',')[1] || '').trim();\n  const state = (address.split(',')[2] || '').trim().split(' ')[0] || '';\n\n  // Extract domain from website URL\n  let domain = '';\n  if (website) {\n    try {\n      domain = new URL(website.startsWith('http') ? website : 'https://' + website).hostname.replace('www.', '');\n    } catch (e) {\n      domain = website.replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0];\n    }\n  }\n\n  return {\n    json: {\n      business_name: name,\n      address,\n      phone,\n      website,\n      domain,\n      city,\n      state,\n      source: 'google_maps'\n    }\n  };\n}).filter(l => l.json.domain);\n\nif (leads.length === 0) {\n  return [{ json: { _empty: true, reason: 'No leads with websites found' } }];\n}\n\nreturn leads;"
+      },
+      "id": "extract-leads",
+      "name": "Extract Lead Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-domain",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-empty-leads",
+      "name": "Has Leads?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.hunter.io/v2/domain-search?domain=' + $json.domain + '&api_key=' + $env.HUNTER_API_KEY }}",
+        "options": {}
+      },
+      "id": "hunter-email-lookup",
+      "name": "Find Email via Hunter.io",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const hunterResponse = $input.first().json;\nconst leadData = $('Extract Lead Data').first().json;\n\n// Get best email from Hunter response\nconst data = hunterResponse.data || {};\nconst emails = data.emails || [];\n\nlet bestEmail = '';\nlet firstName = '';\nlet lastName = '';\n\nif (emails.length > 0) {\n  // Prefer emails with high confidence, owner/manager type\n  const sorted = emails.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));\n  const best = sorted[0];\n  bestEmail = best.value || '';\n  firstName = best.first_name || '';\n  lastName = best.last_name || '';\n}\n\nif (!bestEmail) {\n  return [{ json: { _skip: true, reason: 'No email found', business_name: leadData.business_name } }];\n}\n\nreturn [{\n  json: {\n    business_name: leadData.business_name,\n    email: bestEmail,\n    first_name: firstName,\n    last_name: lastName,\n    phone: leadData.phone,\n    website: leadData.website,\n    city: leadData.city,\n    state: leadData.state,\n    source: leadData.source\n  }\n}];"
+      },
+      "id": "extract-best-email",
+      "name": "Extract Best Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.millionverifier.com/api/v3/?api=' + $env.MILLIONVERIFIER_API_KEY + '&email=' + encodeURIComponent($json.email) }}",
+        "options": {}
+      },
+      "id": "validate-email-millionverifier",
+      "name": "Validate Email (MillionVerifier)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const verifyResponse = $input.first().json;\nconst leadData = $('Extract Best Email').first().json;\n\n// MillionVerifier returns { result: 'ok' | 'catch_all' | 'invalid' | 'disposable' | 'unknown', ... }\nconst result = (verifyResponse.result || '').toLowerCase();\nconst quality = (verifyResponse.quality || '').toLowerCase();\n\n// Accept 'ok' and 'catch_all', reject everything else\nconst acceptable = ['ok', 'catch_all'];\n\nif (!acceptable.includes(result)) {\n  return [{\n    json: {\n      _skip: true,\n      reason: 'Email validation failed: ' + result,\n      email: leadData.email,\n      business_name: leadData.business_name\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...leadData,\n    email_verified: true,\n    email_verify_result: result\n  }\n}];"
+      },
+      "id": "parse-email-validation",
+      "name": "Parse Email Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const leadData = $input.first().json;\n\n// DNC Check placeholder - flags phone numbers for later DNCScrub API integration\n// For now, we flag leads based on basic phone number heuristics\n\nconst phone = (leadData.phone || '').replace(/[^0-9]/g, '');\n\n// Common US mobile area codes (non-exhaustive, used as a heuristic)\nconst mobileAreaCodes = [\n  '201','202','203','206','207','208','209','210','212','213','214','215',\n  '216','217','218','219','224','225','228','229','231','234','239','240',\n  '248','251','252','253','254','256','260','262','267','269','270','272',\n  '276','281','301','302','303','304','305','307','308','309','310','312',\n  '313','314','315','316','317','318','319','320','321','323','325','330',\n  '331','334','336','337','339','346','347','351','352','360','361','364',\n  '380','385','386','401','402','404','405','406','407','408','409','410',\n  '412','413','414','415','417','419','423','424','425','430','432','434',\n  '435','440','442','443','458','469','470','475','478','479','480','484',\n  '501','502','503','504','505','507','508','509','510','512','513','515',\n  '516','517','518','520','530','531','534','539','540','541','551','559',\n  '561','562','563','567','570','571','573','574','575','580','585','586'\n];\n\nlet phoneType = 'unknown';\nlet dncChecked = false;\n\nif (!phone || phone.length < 10) {\n  phoneType = 'empty_or_invalid';\n} else {\n  const areaCode = phone.length === 11 && phone.startsWith('1') ? phone.substring(1, 4) : phone.substring(0, 3);\n  if (mobileAreaCodes.includes(areaCode)) {\n    phoneType = 'likely_mobile';\n  } else {\n    phoneType = 'likely_landline';\n  }\n}\n\n// TODO: Replace with actual DNCScrub API integration\n// API endpoint: https://api.dncscrub.com/v1/check\n// When configured, set dnc_checked = true and add dnc_status field\n\nreturn [{\n  json: {\n    ...leadData,\n    phone_type: phoneType,\n    dnc_checked: dncChecked\n  }\n}];"
+      },
+      "id": "dnc-check-placeholder",
+      "name": "DNC Check (Placeholder)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-email",
+              "leftValue": "={{ $json._skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-no-email",
+      "name": "Has Valid Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($json.email) + '&select=id' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-duplicate",
+      "name": "Check Duplicate in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const dupeCheck = $input.first().json;\nconst leadData = $('DNC Check (Placeholder)').first().json;\n\n// If Supabase returned an array with results, it's a duplicate\nconst results = Array.isArray(dupeCheck) ? dupeCheck : [];\n\nif (results.length > 0) {\n  return [{ json: { _skip: true, reason: 'Duplicate lead', email: leadData.email } }];\n}\n\nreturn [{ json: { ...leadData, _skip: false } }];"
+      },
+      "id": "deduplicate-check",
+      "name": "Is New Lead?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "not-duplicate",
+              "leftValue": "={{ $json._skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-duplicates",
+      "name": "Not Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_name: $json.business_name, email: $json.email, first_name: $json.first_name, last_name: $json.last_name, phone: $json.phone, website: $json.website, city: $json.city, state: $json.state, source: $json.source, status: 'new', email_verified: $json.email_verified || false, email_verify_result: $json.email_verify_result || null, phone_type: $json.phone_type || null, dnc_checked: $json.dnc_checked || false, created_at: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "save-lead-supabase",
+      "name": "Save Lead to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        0
+      ],
+      "continueOnFail": true
+    },
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 2-5"
+            }
+          ]
+        }
+      },
+      "id": "schedule-email-sender",
+      "name": "Daily 8AM Tue-Fri Email Sender",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?or=(status.eq.new,status.eq.follow_up_1,status.eq.follow_up_2)&select=*&limit=30&order=created_at.asc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-leads-to-email",
+      "name": "Fetch Leads Ready for Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        500
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const leads = $input.all().map(i => i.json);\nconst allLeads = Array.isArray(leads[0]) ? leads[0] : leads;\nconst now = new Date();\nconst results = [];\n\nfor (const lead of allLeads) {\n  if (!lead.email || !lead.status) continue;\n\n  const lastContacted = lead.last_contacted_at ? new Date(lead.last_contacted_at) : null;\n  const daysSinceContact = lastContacted ? Math.floor((now - lastContacted) / (1000 * 60 * 60 * 24)) : 999;\n\n  let emailType = null;\n  let newStatus = null;\n\n  if (lead.status === 'new') {\n    emailType = 'initial';\n    newStatus = 'contacted';\n  } else if (lead.status === 'follow_up_1' && daysSinceContact >= 3) {\n    emailType = 'follow_up_1';\n    newStatus = 'follow_up_2';\n  } else if (lead.status === 'follow_up_2' && daysSinceContact >= 7) {\n    emailType = 'follow_up_2';\n    newStatus = 'completed';\n  }\n\n  if (emailType) {\n    results.push({\n      json: {\n        id: lead.id,\n        business_name: lead.business_name,\n        email: lead.email,\n        first_name: lead.first_name || '',\n        city: lead.city || '',\n        state: lead.state || '',\n        status: lead.status,\n        emailType,\n        newStatus\n      }\n    });\n  }\n}\n\nif (results.length === 0) {\n  return [{ json: { _skip: true, reason: 'No leads ready for email today' } }];\n}\n\n// Enforce 30/day rate limit\nreturn results.slice(0, 30);"
+      },
+      "id": "determine-email-type",
+      "name": "Determine Email to Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-email-to-send",
+              "leftValue": "={{ $json._skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-skip-email",
+      "name": "Has Leads to Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $input.first().json;\nconst { business_name, first_name, city, emailType } = lead;\nconst name = first_name || 'there';\n\nconst signature = 'Best,\\nShalin\\nFounder, BayFlow\\nshalin@bayflow.com';\n\n// CAN-SPAM compliance footer (required on all commercial emails)\nconst canSpamFooter = '\\n\\nBayFlow | [Physical Address TBD] | bayflow.com\\n\\nDon\\'t want to hear from us? Reply \\'unsubscribe\\' and we\\'ll remove you immediately.';\n\nconst templates = {\n  initial: {\n    subject: `Quick question about ${business_name}`,\n    text: `Hi ${name},\\n\\nI noticed ${business_name} is running repairs in ${city}. Are you still using paper tickets or a generic system to track repair orders?\\n\\nWe built BayFlow specifically for independent auto repair shops. It handles scheduling, digital inspections (with photos your customers can see), invoicing, and customer management. Shops using it say they save about 5 hours a week on paperwork.\\n\\nIt's $49/month and you can try it free for 14 days. No credit card needed.\\n\\nWorth a look? Here's a 2-minute demo: https://bayflow.com/demo\\n\\n${signature}${canSpamFooter}`\n  },\n  follow_up_1: {\n    subject: `Re: Quick question about ${business_name}`,\n    text: `Hey ${name},\\n\\nJust bumping this up. Wanted to make sure you saw it.\\n\\nBayFlow's digital inspection feature alone is worth checking out. Your techs snap photos of worn parts, customer gets a text with the photos, and they approve the work right from their phone. Shops see 89% approval rates on recommended services.\\n\\n14-day free trial: https://bayflow.com\\n\\n${signature}${canSpamFooter}`\n  },\n  follow_up_2: {\n    subject: 'Should I close your file?',\n    text: `Hi ${name},\\n\\nI've reached out a couple times about BayFlow for ${business_name}. I don't want to be annoying, so this is my last email.\\n\\nIf you're ever looking for shop management software built specifically for independent repair shops, we're at bayflow.com.\\n\\nGood luck with everything.\\n\\n${signature}${canSpamFooter}`\n  }\n};\n\nconst template = templates[emailType];\n\nreturn [{\n  json: {\n    ...lead,\n    emailSubject: template.subject,\n    emailText: template.text\n  }\n}];"
+      },
+      "id": "build-cold-email",
+      "name": "Build Personalized Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$json.email], subject: $json.emailSubject, text: $json.emailText }) }}",
+        "options": {}
+      },
+      "id": "send-cold-email",
+      "name": "Send Email via Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        500
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const emailData = $('Build Personalized Email').first().json;\nconst resendResponse = $input.first().json;\nconst sent = !!(resendResponse.id);\n\nlet newStatus = emailData.newStatus;\n\n// If it was the initial email and it was sent, set to follow_up_1 (waiting for follow-up)\nif (emailData.emailType === 'initial' && sent) {\n  newStatus = 'follow_up_1';\n} else if (emailData.emailType === 'follow_up_1' && sent) {\n  newStatus = 'follow_up_2';\n} else if (emailData.emailType === 'follow_up_2' && sent) {\n  newStatus = 'completed';\n}\n\nreturn [{\n  json: {\n    id: emailData.id,\n    email: emailData.email,\n    emailType: emailData.emailType,\n    newStatus: sent ? newStatus : emailData.status,\n    sent,\n    resendId: resendResponse.id || null,\n    error: resendResponse.error || null\n  }\n}];"
+      },
+      "id": "process-send-result",
+      "name": "Process Send Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?id=eq.' + $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: $json.newStatus, last_contacted_at: new Date().toISOString(), last_email_type: $json.emailType, last_resend_id: $json.resendId }) }}",
+        "options": {}
+      },
+      "id": "update-lead-status",
+      "name": "Update Lead Status in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        500
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $('Process Send Result').first().json.id, email_type: $('Process Send Result').first().json.emailType, sent: $('Process Send Result').first().json.sent, resend_id: $('Process Send Result').first().json.resendId, sent_at: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "log-to-knowledge-graph",
+      "name": "Log Email to Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        500
+      ],
+      "continueOnFail": true
+    },
+
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cold-email-reply",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-reply",
+      "name": "Reply Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body || $input.first().json;\n\n// Parse inbound email webhook (Resend / generic format)\nconst fromEmail = payload.from || payload.sender || payload.envelope?.from || '';\nconst subject = payload.subject || '';\nconst body = payload.text || payload.plain || payload.html || '';\nconst replyDate = new Date().toISOString();\n\n// Unsubscribe detection (CAN-SPAM compliance)\nconst unsubscribeKeywords = ['unsubscribe', 'remove me', 'stop emailing', 'opt out', 'opt-out', 'take me off', 'remove my email'];\nconst bodyLower = body.toLowerCase();\nconst subjectLower = subject.toLowerCase();\nconst isUnsubscribe = unsubscribeKeywords.some(kw => bodyLower.includes(kw) || subjectLower.includes(kw));\n\nif (isUnsubscribe) {\n  return [{\n    json: {\n      fromEmail: fromEmail.replace(/<|>/g, '').trim(),\n      subject,\n      body: body.substring(0, 2000),\n      sentiment: 'unsubscribe',\n      isUnsubscribe: true,\n      replyDate\n    }\n  }];\n}\n\n// Standard sentiment detection for non-unsubscribe replies\nconst positiveKeywords = ['interested', 'yes', 'sure', 'tell me more', 'demo', 'try', 'sign up', 'pricing', 'sounds good', 'let\\'s talk', 'schedule', 'call me'];\nconst negativeKeywords = ['not interested', 'no thanks', 'no thank', 'pass', 'not for us'];\n\nlet sentiment = 'neutral';\n\nif (positiveKeywords.some(kw => bodyLower.includes(kw))) {\n  sentiment = 'positive';\n} else if (negativeKeywords.some(kw => bodyLower.includes(kw))) {\n  sentiment = 'negative';\n}\n\nreturn [{\n  json: {\n    fromEmail: fromEmail.replace(/<|>/g, '').trim(),\n    subject,\n    body: body.substring(0, 2000),\n    sentiment,\n    isUnsubscribe: false,\n    replyDate\n  }\n}];"
+      },
+      "id": "parse-reply",
+      "name": "Parse Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-unsubscribe",
+              "leftValue": "={{ $json.isUnsubscribe }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-unsubscribe",
+      "name": "Is Unsubscribe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($('Parse Reply').first().json.fromEmail) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'unsubscribed', unsubscribed_at: $('Parse Reply').first().json.replyDate }) }}",
+        "options": {}
+      },
+      "id": "update-lead-unsubscribed",
+      "name": "Mark Lead Unsubscribed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        900
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($('Parse Reply').first().json.fromEmail) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'replied', replied_at: $('Parse Reply').first().json.replyDate, reply_sentiment: $('Parse Reply').first().json.sentiment }) }}",
+        "options": {}
+      },
+      "id": "update-lead-replied",
+      "name": "Update Lead to Replied",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        1100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/sendMessage' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: 'Cold Email Reply\\n\\nFrom: ' + $('Parse Reply').first().json.fromEmail + '\\nSentiment: ' + $('Parse Reply').first().json.sentiment + '\\nSubject: ' + $('Parse Reply').first().json.subject + '\\n\\nPreview: ' + $('Parse Reply').first().json.body.substring(0, 300), parse_mode: 'HTML' }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram",
+      "name": "Notify via Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        1100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-positive",
+              "leftValue": "={{ $('Parse Reply').first().json.sentiment }}",
+              "rightValue": "positive",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-positive-sentiment",
+      "name": "Positive Sentiment?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_tasks",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ email: $('Parse Reply').first().json.fromEmail, task_type: 'follow_up_positive_reply', subject: $('Parse Reply').first().json.subject, reply_preview: $('Parse Reply').first().json.body.substring(0, 500), status: 'pending', created_at: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "create-followup-task",
+      "name": "Create Follow-Up Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        1000
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', email: $('Parse Reply').first().json.fromEmail, sentiment: $('Parse Reply').first().json.sentiment }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-reply-webhook",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', action: 'unsubscribed', email: $('Parse Reply').first().json.fromEmail }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-unsubscribe-webhook",
+      "name": "Respond OK (Unsubscribe)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        880,
+        900
+      ]
+    }
+  ],
+  "connections": {
+    "Weekly Monday 6AM Lead Scrape": {
+      "main": [
+        [
+          {
+            "node": "Scrape Google Maps via SerpAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Google Maps via SerpAPI": {
+      "main": [
+        [
+          {
+            "node": "Extract Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Has Leads?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Leads?": {
+      "main": [
+        [
+          {
+            "node": "Find Email via Hunter.io",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Find Email via Hunter.io": {
+      "main": [
+        [
+          {
+            "node": "Extract Best Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Best Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Email (MillionVerifier)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email (MillionVerifier)": {
+      "main": [
+        [
+          {
+            "node": "Parse Email Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Email Validation": {
+      "main": [
+        [
+          {
+            "node": "DNC Check (Placeholder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DNC Check (Placeholder)": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Email?": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Check Duplicate in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Is New Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Lead?": {
+      "main": [
+        [
+          {
+            "node": "Not Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Save Lead to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+
+    "Daily 8AM Tue-Fri Email Sender": {
+      "main": [
+        [
+          {
+            "node": "Fetch Leads Ready for Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Leads Ready for Email": {
+      "main": [
+        [
+          {
+            "node": "Determine Email to Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Email to Send": {
+      "main": [
+        [
+          {
+            "node": "Has Leads to Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Leads to Email?": {
+      "main": [
+        [
+          {
+            "node": "Build Personalized Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Personalized Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email via Resend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via Resend": {
+      "main": [
+        [
+          {
+            "node": "Process Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Send Result": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Status in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Status in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Log Email to Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+
+    "Reply Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Reply": {
+      "main": [
+        [
+          {
+            "node": "Is Unsubscribe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Unsubscribe?": {
+      "main": [
+        [
+          {
+            "node": "Mark Lead Unsubscribed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Lead to Replied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Lead Unsubscribed": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (Unsubscribe)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead to Replied": {
+      "main": [
+        [
+          {
+            "node": "Notify via Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify via Telegram": {
+      "main": [
+        [
+          {
+            "node": "Positive Sentiment?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Positive Sentiment?": {
+      "main": [
+        [
+          {
+            "node": "Create Follow-Up Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Follow-Up Task": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "notes": "Required environment variables: SERPAPI_API_KEY, HUNTER_API_KEY, SUPABASE_SERVICE_KEY, RESEND_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, MILLIONVERIFIER_API_KEY. DNCScrub API key TBD - see DNC Check (Placeholder) node."
+  }
+}

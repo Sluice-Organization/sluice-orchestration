@@ -1,0 +1,514 @@
+{
+  "name": "PRD Generator - Product Requirements Document",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-prd",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook: Generate PRD",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "generate-prd"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst businessId = input.body.businessId;\nconst businessName = input.body.businessName;\nconst businessDescription = input.body.businessDescription || '';\nconst category = input.body.category || 'unknown';\nconst opportunityData = input.body.opportunityData || {};\n\nif (!businessId || !businessName) {\n  throw new Error('Missing required fields: businessId and businessName');\n}\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    businessDescription,\n    category,\n    opportunityData,\n    startedAt: $now.toFormat('yyyy-MM-dd HH:mm:ss')\n  }\n}];"
+      },
+      "id": "extract-payload",
+      "name": "Extract Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/post_mortems",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "category",
+              "value": "=eq.{{ $('Extract Payload').first().json.category }}"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            },
+            {
+              "name": "limit",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-post-mortems",
+      "name": "Fetch Post Mortems",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/content_performance",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "category",
+              "value": "=eq.{{ $('Extract Payload').first().json.category }}"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-content-performance",
+      "name": "Fetch Content Performance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $('Extract Payload').first().json;\nconst postMortemsRaw = $('Fetch Post Mortems').first().json;\nconst contentPerfRaw = $('Fetch Content Performance').first().json;\n\nconst postMortems = Array.isArray(postMortemsRaw) ? postMortemsRaw : (postMortemsRaw?.data || []);\nconst contentPerf = Array.isArray(contentPerfRaw) ? contentPerfRaw : (contentPerfRaw?.data || []);\n\nconst opportunityData = payload.opportunityData || {};\nconst keywordVolumes = opportunityData.keywordVolumes || 'Not available';\nconst competitorInfo = opportunityData.competitorInfo || 'Not available';\nconst reviewComplaints = opportunityData.reviewComplaints || 'Not available';\nconst tamEstimate = opportunityData.tamEstimate || 'Not available';\n\nconst postMortemContext = postMortems.length > 0\n  ? '\\n\\nPrevious post-mortems in this category (learn from these):\\n' + JSON.stringify(postMortems, null, 2)\n  : '\\n\\nNo previous post-mortems in this category.';\n\nconst contentContext = contentPerf.length > 0\n  ? '\\n\\nContent performance data from similar businesses:\\n' + JSON.stringify(contentPerf, null, 2)\n  : '\\n\\nNo content performance data from similar businesses.';\n\nconst prompt = 'You are the CEO of The Forge, an autonomous AI business operating system. Generate a comprehensive Product Requirements Document (PRD) for a new SaaS business.\\n\\n## Business Information\\n- **Business Name**: ' + payload.businessName + '\\n- **Business ID**: ' + payload.businessId + '\\n- **Description**: ' + payload.businessDescription + '\\n- **Category**: ' + payload.category + '\\n\\n## Market Intelligence\\n- **Keyword Volumes**: ' + (typeof keywordVolumes === 'object' ? JSON.stringify(keywordVolumes) : keywordVolumes) + '\\n- **Competitor Info**: ' + (typeof competitorInfo === 'object' ? JSON.stringify(competitorInfo) : competitorInfo) + '\\n- **Review Complaints (competitor weaknesses)**: ' + (typeof reviewComplaints === 'object' ? JSON.stringify(reviewComplaints) : reviewComplaints) + '\\n- **TAM Estimate**: ' + (typeof tamEstimate === 'object' ? JSON.stringify(tamEstimate) : tamEstimate) + postMortemContext + contentContext + '\\n\\n## Your Task\\nGenerate a COMPLETE PRD with ALL of the following sections. Be specific and detailed - this PRD will be used directly by Claude Code to build the entire product.\\n\\n# ' + payload.businessName + ' - Product Requirements Document\\n\\n## 1. Product Overview\\n- One-paragraph description\\n- Problem being solved\\n- Target market size\\n\\n## 2. Target Persona\\n- Who they are (job title, business size, tech comfort)\\n- Daily workflow and pain points\\n- Current tools they use\\n- What would make them switch\\n\\n## 3. Core Features (MVP)\\nFor each feature:\\n- Feature name\\n- User story: \"As a [persona], I want to [action] so that [benefit]\"\\n- Acceptance criteria (3-5 bullet points)\\n- Priority: Must-have / Nice-to-have\\n\\n## 4. Data Model\\n- Entity list with key fields\\n- Relationships between entities\\n- Example: customers (name, email, phone, vehicles[]), repair_orders (customer_id, status, line_items[], total), etc.\\n\\n## 5. Pages & Routes\\n- Exact list: /, /login, /signup, /dashboard, /dashboard/[entity]/new, etc.\\n- What each page shows and does\\n- Navigation structure\\n\\n## 6. Design System\\n- Primary color (hex) - chosen to match the vertical\\'s aesthetic\\n- Secondary color\\n- Accent color\\n- Heading font (from Google Fonts)\\n- Body font\\n- Design aesthetic description (e.g., \"clean, professional, trustworthy\" or \"bold, modern, energetic\")\\n\\n## 7. Pricing Tiers\\n- Tier 1: $99/mo - [features]\\n- Tier 2: $149/mo - [features]\\n- Tier 3: $199/mo - [features]\\n- 14-day free trial on all tiers\\n- What\\'s gated behind each tier\\n\\n## 8. Required Integrations\\n- Supabase Auth (email + password)\\n- Stripe Checkout (3 products/prices, 14-day trial)\\n- Stripe webhook -> forward to n8n at ${N8N_URL}/webhook/stripe-events\\n- Signup webhook -> POST to ${N8N_URL}/webhook/user-signup\\n- Contact form -> POST to ${N8N_URL}/webhook/support-ticket\\n- /demo route -> redirect to cal.com/shalinp\\n- Plausible analytics script (data-domain from env var)\\n- All n8n URLs via NEXT_PUBLIC_N8N_URL env var\\n\\n## 9. SEO Plan\\n- 10 target keywords with estimated search volume\\n- 5 initial blog post titles targeting those keywords\\n- Meta title and description for the landing page\\n- Structured data (JSON-LD) for the business type\\n\\n## 10. Competitive Weaknesses to Exploit\\n- Based on G2/Capterra 1-2 star reviews of competitors\\n- Specific UX issues, missing features, or pricing complaints\\n- How our product addresses each one\\n\\n## 11. Content Quality Standards\\nBANNED WORDS (never use these): \"delve\", \"leverage\", \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"game-changer\", \"revolutionize\", \"transform\", \"innovative\", \"best-in-class\", \"world-class\", \"state-of-the-art\", \"paradigm\", \"synergy\", \"holistic\"\\nBANNED PUNCTUATION: em dashes (use regular dashes instead)\\nWriting style: Direct, practical, conversational. Write like a real person talking to a friend who runs a business. No corporate speak.\\n\\n## 12. Launch Checklist\\n- [ ] All pages render on mobile\\n- [ ] Stripe checkout works end-to-end\\n- [ ] Signup fires n8n webhook\\n- [ ] Contact form posts to support webhook\\n- [ ] /demo redirects to cal.com\\n- [ ] Plausible script loads\\n- [ ] 5 blog posts published\\n- [ ] Meta tags and OG image on all pages\\n- [ ] Sitemap.xml and robots.txt present\\n- [ ] Lighthouse performance > 50, accessibility > 80, SEO > 80\\n\\nIMPORTANT: Output ONLY the PRD content. Do not wrap in code blocks. Start directly with the \"# ' + payload.businessName + ' - Product Requirements Document\" heading.';\n\nreturn [{\n  json: {\n    ...payload,\n    prdPrompt: prompt\n  }\n}];"
+      },
+      "id": "build-prd-prompt",
+      "name": "Build PRD Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prdPrompt }}"
+      },
+      "id": "ceo-llm-chain",
+      "name": "CEO: Generate PRD",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-opus-4-20250514",
+        "options": {
+          "maxTokensToSample": 8000,
+          "temperature": 0.4
+        }
+      },
+      "id": "opus-model-prd",
+      "name": "Opus (PRD Generation)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [1000, 500],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic-cred",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prdContent = $('CEO: Generate PRD').first().json.response || $('CEO: Generate PRD').first().json.text || '';\nconst payload = $('Build PRD Prompt').first().json;\n\nreturn [{\n  json: {\n    ...payload,\n    prdContent,\n    prdGeneratedAt: $now.toFormat('yyyy-MM-dd HH:mm:ss')\n  }\n}];"
+      },
+      "id": "extract-prd",
+      "name": "Extract PRD Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are the Comptroller of The Forge, an autonomous AI business operating system. Your job is to review PRDs before they go to build.\n\nReview this PRD for the business \"{{ $json.businessName }}\" (category: {{ $json.category }}):\n\n{{ $json.prdContent }}\n\n## Your Review Criteria\n\n1. **Revenue Ceiling**: Can this business plausibly reach $100K MRR within 2 years? Consider the pricing tiers, target market size, and conversion rates.\n\n2. **Distribution Viability**: Are the target keywords actually rankable for a new site? Are there realistic distribution channels beyond SEO? Consider the competition level.\n\n3. **Competitive Gap**: Is there a real opportunity here? Are the competitive weaknesses real and exploitable? Or is this a crowded market with no differentiation?\n\n4. **PRD Quality**: Is the PRD specific enough for an AI to build the product? Are there missing sections, vague acceptance criteria, or unrealistic features?\n\n5. **Integration Completeness**: Does the PRD include all required integrations (Supabase Auth, Stripe, n8n webhooks, Plausible, cal.com)?\n\n## Output Format\nRespond with EXACTLY this JSON format (no markdown, no code blocks, just raw JSON):\n{\"decision\": \"APPROVED or REJECTED\", \"confidence\": 0.0-1.0, \"revenueCeiling\": \"your assessment\", \"distributionViability\": \"your assessment\", \"competitiveGap\": \"your assessment\", \"prdQuality\": \"your assessment\", \"integrationCompleteness\": \"your assessment\", \"notes\": \"any additional notes or concerns\"}\n\nOnly REJECT if there is a fundamental problem. If the PRD is solid and the opportunity is real, APPROVE it."
+      },
+      "id": "comptroller-chain",
+      "name": "Comptroller: Review PRD",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-20250514",
+        "options": {
+          "maxTokensToSample": 2000,
+          "temperature": 0.2
+        }
+      },
+      "id": "sonnet-model-review",
+      "name": "Sonnet (Comptroller Review)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [1500, 500],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic-cred",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const reviewRaw = $('Comptroller: Review PRD').first().json.response || $('Comptroller: Review PRD').first().json.text || '{}';\nconst payload = $('Extract PRD Content').first().json;\n\nlet review;\ntry {\n  review = JSON.parse(reviewRaw);\n} catch (e) {\n  const jsonMatch = reviewRaw.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    try {\n      review = JSON.parse(jsonMatch[0]);\n    } catch (e2) {\n      review = { decision: 'APPROVED', notes: 'Could not parse review, defaulting to APPROVED', raw: reviewRaw };\n    }\n  } else {\n    review = { decision: 'APPROVED', notes: 'Could not parse review, defaulting to APPROVED', raw: reviewRaw };\n  }\n}\n\nconst approved = review.decision === 'APPROVED';\n\nreturn [{\n  json: {\n    ...payload,\n    reviewDecision: review.decision || 'UNKNOWN',\n    reviewApproved: approved,\n    reviewConfidence: review.confidence || 0,\n    reviewNotes: review.notes || '',\n    reviewRevenueCeiling: review.revenueCeiling || '',\n    reviewDistribution: review.distributionViability || '',\n    reviewCompetitiveGap: review.competitiveGap || '',\n    reviewPrdQuality: review.prdQuality || '',\n    reviewIntegrations: review.integrationCompleteness || ''\n  }\n}];"
+      },
+      "id": "parse-review",
+      "name": "Parse Comptroller Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "prd-approved-check",
+              "leftValue": "={{ $json.reviewApproved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-approved",
+      "name": "PRD Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/sluice/contents/memory-bank/businesses/' + $json.businessId + '/prd.md' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'Add PRD for ' + $json.businessName, content: Buffer.from($json.prdContent).toString('base64') }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "save-prd-github",
+      "name": "Save PRD to GitHub",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2250, 150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/opportunities?business_id=eq.' + $('Parse Comptroller Review').first().json.businessId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prd_status: 'approved', prd_generated_at: $now.toFormat('yyyy-MM-dd HH:mm:ss'), prd_github_path: 'memory-bank/businesses/' + $('Parse Comptroller Review').first().json.businessId + '/prd.md' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "update-opportunity",
+      "name": "Update Opportunity with PRD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2250, 350],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'approved', businessId: $('Parse Comptroller Review').first().json.businessId, businessName: $('Parse Comptroller Review').first().json.businessName, prdContent: $('Parse Comptroller Review').first().json.prdContent, reviewDecision: $('Parse Comptroller Review').first().json.reviewDecision, reviewConfidence: $('Parse Comptroller Review').first().json.reviewConfidence, reviewNotes: $('Parse Comptroller Review').first().json.reviewNotes }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-approved",
+      "name": "Respond: PRD Approved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2500, 250]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'PRD REJECTED for ' + $json.businessName + '\\n\\nDecision: ' + $json.reviewDecision + '\\nConfidence: ' + $json.reviewConfidence + '\\n\\nRevenue Ceiling: ' + $json.reviewRevenueCeiling + '\\nDistribution: ' + $json.reviewDistribution + '\\nCompetitive Gap: ' + $json.reviewCompetitiveGap + '\\n\\nNotes: ' + $json.reviewNotes, priority: 'high' }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "notify-rejection",
+      "name": "Notify: PRD Rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2250, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'rejected', businessId: $('Parse Comptroller Review').first().json.businessId, businessName: $('Parse Comptroller Review').first().json.businessName, reviewDecision: $('Parse Comptroller Review').first().json.reviewDecision, reviewConfidence: $('Parse Comptroller Review').first().json.reviewConfidence, reviewNotes: $('Parse Comptroller Review').first().json.reviewNotes, reviewRevenueCeiling: $('Parse Comptroller Review').first().json.reviewRevenueCeiling, reviewDistribution: $('Parse Comptroller Review').first().json.reviewDistribution }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-rejected",
+      "name": "Respond: PRD Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2500, 500]
+    }
+  ],
+  "connections": {
+    "Webhook: Generate PRD": {
+      "main": [
+        [
+          {
+            "node": "Extract Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Payload": {
+      "main": [
+        [
+          {
+            "node": "Fetch Post Mortems",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Content Performance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Post Mortems": {
+      "main": [
+        [
+          {
+            "node": "Build PRD Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Content Performance": {
+      "main": [
+        [
+          {
+            "node": "Build PRD Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build PRD Prompt": {
+      "main": [
+        [
+          {
+            "node": "CEO: Generate PRD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CEO: Generate PRD": {
+      "main": [
+        [
+          {
+            "node": "Extract PRD Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PRD Content": {
+      "main": [
+        [
+          {
+            "node": "Comptroller: Review PRD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comptroller: Review PRD": {
+      "main": [
+        [
+          {
+            "node": "Parse Comptroller Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Comptroller Review": {
+      "main": [
+        [
+          {
+            "node": "PRD Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PRD Approved?": {
+      "main": [
+        [
+          {
+            "node": "Save PRD to GitHub",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Opportunity with PRD",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify: PRD Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save PRD to GitHub": {
+      "main": [
+        [
+          {
+            "node": "Respond: PRD Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify: PRD Rejected": {
+      "main": [
+        [
+          {
+            "node": "Respond: PRD Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null,
+  "tags": []
+}

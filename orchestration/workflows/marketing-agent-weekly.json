@@ -35,7 +35,7 @@
       "typeVersion": 1,
       "position": [
         220,
-        -100
+        0
       ]
     },
     {
@@ -51,7 +51,7 @@
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
       "position": [
-        220,
+        440,
         0
       ]
     },
@@ -68,20 +68,20 @@
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
       "position": [
-        220,
-        100
+        660,
+        0
       ]
     },
     {
       "parameters": {
-        "jsCode": "const state = $('Read State').first().json.content || '';\nconst contentStrategy = $('Read Content Strategy').first().json.content || '';\nconst plan = $('Read Weekly Plan').first().json.content || '';\n\nreturn [{\n  json: {\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow',\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Marketing Agent for BayFlow (auto repair shop software).\n\nYou are the most critical revenue agent. Your job is SEO, distribution, social scheduling, and directory submissions.\n\n## Current State\n${state}\n\n## Content Strategy\n${contentStrategy}\n\n## Weekly Plan\n${plan}\n\nPerform your weekly marketing review:\n\n1. **SEO Assessment:** Review which keywords we're targeting, assess ranking potential, identify new keyword opportunities. Check if published blog posts cover our target keywords.\n\n2. **Content Distribution:** For each published blog post, recommend parasite SEO actions (repurpose to Medium, LinkedIn articles, Reddit posts with backlinks to main site).\n\n3. **Directory Submissions:** Check which directories we should submit to (G2, Capterra, GetApp, Product Hunt upcoming, SaaSHub, AlternativeTo). List specific actions.\n\n4. **Social Media:** Recommend social posting schedule for the week. Which platforms, what content to post, when.\n\n5. **Google Search Console:** Recommend pages to submit for indexing.\n\n6. **Recommendations:** What should the Content Agent produce next week based on SEO gaps?\n\nOutput your report in the structured format: Agent name, business, date, status (GREEN/YELLOW/RED), key metrics with trends, actions taken, issues detected, recommendations, needs from CEO Agent.`\n  }\n}];"
+        "jsCode": "const state = $('Read State').first().json.content || '';\nconst contentStrategy = $('Read Content Strategy').first().json.content || '';\nconst contentStrategySha = $('Read Content Strategy').first().json.sha || '';\nconst plan = $('Read Weekly Plan').first().json.content || '';\n\nreturn [{\n  json: {\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow',\n    contentStrategySha: contentStrategySha,\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Marketing Agent for BayFlow (auto repair shop software).\n\nYou are the most critical revenue agent. Your job is SEO, distribution, social scheduling, and directory submissions.\n\n## Current State\n${state}\n\n## Content Strategy\n${contentStrategy}\n\n## Weekly Plan\n${plan}\n\nPerform your weekly marketing review:\n\n1. **SEO Assessment:** Review which keywords we're targeting, assess ranking potential, identify new keyword opportunities. Check if published blog posts cover our target keywords.\n\n2. **Content Distribution:** For each published blog post, recommend parasite SEO actions (repurpose to Medium, LinkedIn articles, Reddit posts with backlinks to main site).\n\n3. **Directory Submissions:** Check which directories we should submit to (G2, Capterra, GetApp, Product Hunt upcoming, SaaSHub, AlternativeTo). List specific actions.\n\n4. **Social Media:** Recommend social posting schedule for the week. Which platforms, what content to post, when.\n\n5. **Google Search Console:** Recommend pages to submit for indexing.\n\n6. **Recommendations:** What should the Content Agent produce next week based on SEO gaps?\n\nOutput your report in the structured format: Agent name, business, date, status (GREEN/YELLOW/RED), key metrics with trends, actions taken, issues detected, recommendations, needs from CEO Agent.\n\nAFTER your main report, you MUST output an updated version of the content-strategy.md file. This updated version should incorporate your recommendations, update keyword priorities, adjust the editorial calendar, and reflect any new SEO insights from this week's analysis. Output it between these exact delimiters:\n\n===CONTENT_STRATEGY_UPDATE_START===\n(full updated content-strategy.md content here)\n===CONTENT_STRATEGY_UPDATE_END===`\n  }\n}];"
       },
       "id": "build-prompt",
       "name": "Build Marketing Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        440,
+        880,
         0
       ]
     },
@@ -95,16 +95,16 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
       "position": [
-        660,
+        1100,
         0
       ]
     },
     {
       "parameters": {
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-sonnet-4-6",
         "options": {
           "temperature": 0.4,
-          "maxTokens": 3000
+          "maxTokensToSample": 3000
         }
       },
       "id": "sonnet-model",
@@ -112,8 +112,21 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
       "position": [
-        660,
+        1100,
         220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const llmOutput = $('Marketing LLM Chain').first().json.text || '';\nconst contentStrategySha = $('Build Marketing Prompt').first().json.contentStrategySha || '';\nconst today = new Date().toISOString().split('T')[0];\n\n// Extract content strategy update\nlet contentStrategyUpdate = '';\nconst startDelimiter = '===CONTENT_STRATEGY_UPDATE_START===';\nconst endDelimiter = '===CONTENT_STRATEGY_UPDATE_END===';\nconst startIdx = llmOutput.indexOf(startDelimiter);\nconst endIdx = llmOutput.indexOf(endDelimiter);\n\nif (startIdx !== -1 && endIdx !== -1) {\n  contentStrategyUpdate = llmOutput.substring(startIdx + startDelimiter.length, endIdx).trim();\n}\n\n// Extract marketing report (everything before the content strategy delimiter)\nlet marketingReport = llmOutput;\nif (startIdx !== -1) {\n  marketingReport = llmOutput.substring(0, startIdx).trim();\n}\n\nreturn [{\n  json: {\n    marketingReport: marketingReport,\n    contentStrategyUpdate: contentStrategyUpdate,\n    contentStrategySha: contentStrategySha,\n    reportDate: today\n  }\n}];"
+      },
+      "id": "parse-output",
+      "name": "Parse Marketing Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
       ]
     },
     {
@@ -121,9 +134,9 @@
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/reports/marketing-{{ $now.format('yyyy-MM-dd') }}.md",
-        "fileContent": "={{ $json.text }}",
-        "commitMessage": "Marketing Agent weekly report - bayflow - {{ $now.format('yyyy-MM-dd') }}",
+        "filePath": "=memory-bank/businesses/bayflow/reports/marketing-{{ $json.reportDate }}.md",
+        "fileContent": "={{ $json.marketingReport }}",
+        "commitMessage": "=Marketing Agent weekly report - bayflow - {{ $json.reportDate }}",
         "resource": "file"
       },
       "id": "write-report",
@@ -131,8 +144,30 @@
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
       "position": [
-        880,
-        0
+        1540,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/businesses/bayflow/content-strategy.md",
+        "fileContent": "={{ $json.contentStrategyUpdate }}",
+        "commitMessage": "=Marketing Agent updates content-strategy.md - bayflow - {{ $json.reportDate }}",
+        "additionalParameters": {
+          "sha": "={{ $json.contentStrategySha }}"
+        },
+        "resource": "file"
+      },
+      "id": "update-content-strategy",
+      "name": "Update Content Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        100
       ]
     }
   ],
@@ -207,7 +242,23 @@
       "main": [
         [
           {
+            "node": "Parse Marketing Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Marketing Output": {
+      "main": [
+        [
+          {
             "node": "Write Marketing Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Content Strategy",
             "type": "main",
             "index": 0
           }

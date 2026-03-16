@@ -1,0 +1,449 @@
+{
+  "name": "Weekly Plan Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 22 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "sunday-trigger",
+      "name": "Sunday 10 PM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\n\n// Find last Monday (the start of the reporting week)\nconst dayOfWeek = now.getDay(); // Sunday = 0\n// Today is Sunday, so last Monday is 6 days ago\nconst lastMonday = new Date(now);\nlastMonday.setDate(now.getDate() - 6);\nconst lastMondayStr = lastMonday.toISOString().split('T')[0];\n\n// Last Tuesday\nconst lastTuesday = new Date(lastMonday);\nlastTuesday.setDate(lastMonday.getDate() + 1);\nconst lastTuesdayStr = lastTuesday.toISOString().split('T')[0];\n\n// Last Friday\nconst lastFriday = new Date(lastMonday);\nlastFriday.setDate(lastMonday.getDate() + 4);\nconst lastFridayStr = lastFriday.toISOString().split('T')[0];\n\n// Last Saturday\nconst lastSaturday = new Date(lastMonday);\nlastSaturday.setDate(lastMonday.getDate() + 5);\nconst lastSaturdayStr = lastSaturday.toISOString().split('T')[0];\n\nconst today = now.toISOString().split('T')[0];\n\nreturn [{\n  json: {\n    today,\n    lastMonday: lastMondayStr,\n    lastTuesday: lastTuesdayStr,\n    lastFriday: lastFridayStr,\n    lastSaturday: lastSaturdayStr,\n    businessPath: 'memory-bank/businesses/bayflow'\n  }\n}];"
+      },
+      "id": "compute-dates",
+      "name": "Compute Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.businessPath }}/state.md",
+        "resource": "file"
+      },
+      "id": "read-state",
+      "name": "Read State",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Dates').first().json.businessPath }}/strategy.md",
+        "resource": "file"
+      },
+      "id": "read-strategy",
+      "name": "Read Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Dates').first().json.businessPath }}/content-strategy.md",
+        "resource": "file"
+      },
+      "id": "read-content-strategy",
+      "name": "Read Content Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Dates').first().json.businessPath }}/reports/ceo-{{ $('Compute Dates').first().json.lastFriday }}.md",
+        "resource": "file"
+      },
+      "id": "read-ceo-report",
+      "name": "Read CEO Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Dates').first().json.businessPath }}/reports/finance-{{ $('Compute Dates').first().json.lastFriday }}.md",
+        "resource": "file"
+      },
+      "id": "read-finance-report",
+      "name": "Read Finance Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1320, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Dates').first().json.businessPath }}/comptroller/review-{{ $('Compute Dates').first().json.lastMonday }}.md",
+        "resource": "file"
+      },
+      "id": "read-comptroller-review",
+      "name": "Read Comptroller Review",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1540, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Dates').first().json.businessPath }}/reports/marketing-{{ $('Compute Dates').first().json.lastMonday }}.md",
+        "resource": "file"
+      },
+      "id": "read-marketing-report",
+      "name": "Read Marketing Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1760, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Dates').first().json.businessPath }}/reports/product-{{ $('Compute Dates').first().json.lastTuesday }}.md",
+        "resource": "file"
+      },
+      "id": "read-product-report",
+      "name": "Read Product Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1980, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/system/orchestrator-review-{{ $('Compute Dates').first().json.lastFriday }}.md",
+        "resource": "file"
+      },
+      "id": "read-orchestrator-review",
+      "name": "Read Orchestrator Review",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2200, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/system/discovery/opportunities-{{ $('Compute Dates').first().json.lastFriday }}.md",
+        "resource": "file"
+      },
+      "id": "read-discovery-report",
+      "name": "Read Discovery Opportunities",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2420, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Dates').first().json.businessPath }}/weekly-plan.md",
+        "resource": "file"
+      },
+      "id": "read-current-plan",
+      "name": "Read Current Weekly Plan",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2640, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dates = $('Compute Dates').first().json;\n\n// Core context (always exist)\nconst state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\nconst contentStrategy = $('Read Content Strategy').first().json.content || '';\n\n// Current plan + SHA for update\nconst currentPlan = $('Read Current Weekly Plan').first().json.content || '';\nconst planSha = $('Read Current Weekly Plan').first().json.sha || '';\n\n// Agent reports (may not exist)\nfunction safeContent(nodeName) {\n  try {\n    const node = $(nodeName).first();\n    if (node && !node.json.error) return node.json.content || '';\n    return '[Report not available]';\n  } catch (e) {\n    return '[Report not available]';\n  }\n}\n\nconst ceoReport = safeContent('Read CEO Report');\nconst financeReport = safeContent('Read Finance Report');\nconst comptrollerReview = safeContent('Read Comptroller Review');\nconst marketingReport = safeContent('Read Marketing Report');\nconst productReport = safeContent('Read Product Report');\nconst orchestratorReview = safeContent('Read Orchestrator Review');\nconst discoveryReport = safeContent('Read Discovery Opportunities');\n\nconst prompt = `You are the Weekly Plan Generator for The Forge. Today is ${dates.today}. You are creating next week's operational plan based on all agent reports from this past week.\n\n## Current State\n${state}\n\n## Current Strategy\n${strategy}\n\n## Content Strategy\n${contentStrategy}\n\n## This Week's Agent Reports\n### CEO Reports\n${ceoReport}\n\n### Finance Reports\n${financeReport}\n\n### Comptroller Review\n${comptrollerReview}\n\n### Marketing Report\n${marketingReport}\n\n### Product Report\n${productReport}\n\n### Portfolio Orchestrator Review\n${orchestratorReview}\n\n### Discovery Opportunities\n${discoveryReport}\n\n## Current Weekly Plan\n${currentPlan}\n\nBased on all of the above, generate next week's operational plan. Include:\n\n1. **Priority Tasks** for each agent (CEO, Finance, Content, Marketing, Product, Support)\n2. **Key Metrics to Track** this week\n3. **Blockers & Risks** identified from reports\n4. **Strategic Pivots** if any agent flagged issues\n5. **Content Calendar** for the week (what to publish, when, where)\n6. **Product Roadmap Items** to tackle\n7. **Revenue/Growth Targets** for the week\n\nOutput the complete weekly-plan.md content.`;\n\nreturn [{\n  json: {\n    prompt,\n    planSha,\n    businessPath: dates.businessPath\n  }\n}];"
+      },
+      "id": "merge-context",
+      "name": "Merge All Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2860, 0]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}"
+      },
+      "id": "llm-chain",
+      "name": "Weekly Plan LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [3080, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-opus-4-6",
+        "options": {
+          "temperature": 0.3,
+          "maxTokensToSample": 4000
+        }
+      },
+      "id": "anthropic-model",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [3080, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const llmOutput = $('Weekly Plan LLM Chain').first().json.text || '';\nconst planSha = $('Merge All Context').first().json.planSha;\nconst businessPath = $('Merge All Context').first().json.businessPath;\n\nreturn [{\n  json: {\n    planContent: llmOutput,\n    planSha,\n    businessPath\n  }\n}];"
+      },
+      "id": "parse-output",
+      "name": "Parse Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3300, 0]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.businessPath }}/weekly-plan.md",
+        "fileContent": "={{ $json.planContent }}",
+        "commitMessage": "Weekly Plan Generator - update weekly plan - {{ $now.toFormat('yyyy-MM-dd') }}",
+        "additionalParameters": {
+          "sha": "={{ $json.planSha }}"
+        },
+        "resource": "file"
+      },
+      "id": "update-weekly-plan",
+      "name": "Update Weekly Plan",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [3520, 0]
+    }
+  ],
+  "connections": {
+    "Sunday 10 PM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Compute Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Dates": {
+      "main": [
+        [
+          {
+            "node": "Read State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read State": {
+      "main": [
+        [
+          {
+            "node": "Read Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Strategy": {
+      "main": [
+        [
+          {
+            "node": "Read Content Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Content Strategy": {
+      "main": [
+        [
+          {
+            "node": "Read CEO Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read CEO Report": {
+      "main": [
+        [
+          {
+            "node": "Read Finance Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Finance Report": {
+      "main": [
+        [
+          {
+            "node": "Read Comptroller Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Comptroller Review": {
+      "main": [
+        [
+          {
+            "node": "Read Marketing Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Marketing Report": {
+      "main": [
+        [
+          {
+            "node": "Read Product Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Product Report": {
+      "main": [
+        [
+          {
+            "node": "Read Orchestrator Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Orchestrator Review": {
+      "main": [
+        [
+          {
+            "node": "Read Discovery Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Discovery Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Read Current Weekly Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Current Weekly Plan": {
+      "main": [
+        [
+          {
+            "node": "Merge All Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Context": {
+      "main": [
+        [
+          {
+            "node": "Weekly Plan LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Weekly Plan LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Plan LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Parse Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Output": {
+      "main": [
+        [
+          {
+            "node": "Update Weekly Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

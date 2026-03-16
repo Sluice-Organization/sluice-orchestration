@@ -1,0 +1,649 @@
+{
+  "name": "Social Media Publisher - Weekly Reels",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 14 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Monday 2 PM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "=memory-bank/businesses/bayflow/reports/content-{{ $now.toFormat('yyyy-MM-dd') }}.md",
+        "resource": "file"
+      },
+      "id": "read-content-report",
+      "name": "Read Content Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Try today's report first, fall back to checking if we got content\nconst input = $('Read Content Report').first().json;\nconst rawContent = input.content || '';\n\nif (!rawContent) {\n  return [{ json: { error: 'No content report found for today', reels: [], hasReels: false } }];\n}\n\n// Decode base64 if needed (GitHub API returns base64)\nlet content = rawContent;\ntry {\n  if (rawContent.match(/^[A-Za-z0-9+/=\\s]+$/) && rawContent.length > 50) {\n    content = Buffer.from(rawContent, 'base64').toString('utf-8');\n  }\n} catch (e) {\n  // Already plaintext\n}\n\n// Parse reel scripts from content report\n// Content Agent uses ---PIECE--- separators with type indicators\nconst pieces = content.split('---PIECE---').map(p => p.trim()).filter(Boolean);\nconst reels = [];\n\nfor (const piece of pieces) {\n  const typeMatch = piece.match(/type:\\s*reel/i);\n  if (!typeMatch) continue;\n\n  // Extract hook, body, CTA from reel script\n  const hookMatch = piece.match(/hook:\\s*(.+?)(?:\\n|$)/i) || piece.match(/\\*\\*hook\\*\\*:\\s*(.+?)(?:\\n|$)/i);\n  const ctaMatch = piece.match(/cta:\\s*(.+?)(?:\\n|$)/i) || piece.match(/\\*\\*cta\\*\\*:\\s*(.+?)(?:\\n|$)/i);\n  \n  // Get the body: everything between hook/body markers and CTA\n  let body = '';\n  const bodyMatch = piece.match(/body:\\s*([\\s\\S]*?)(?=cta:|\\*\\*cta\\*\\*:|$)/i);\n  if (bodyMatch) {\n    body = bodyMatch[1].trim();\n  }\n\n  // If structured parsing fails, use the whole piece as script text\n  const hook = hookMatch ? hookMatch[1].trim() : '';\n  const cta = ctaMatch ? ctaMatch[1].trim() : '';\n  const fullScript = hook ? `${hook}\\n\\n${body}\\n\\n${cta}` : piece.replace(/type:\\s*reel\\s*/i, '').trim();\n\n  // Extract title if present\n  const titleMatch = piece.match(/title:\\s*(.+?)(?:\\n|$)/i);\n  const title = titleMatch ? titleMatch[1].trim() : `BayFlow Reel ${reels.length + 1}`;\n\n  reels.push({\n    title,\n    hook,\n    body,\n    cta,\n    fullScript,\n    index: reels.length\n  });\n}\n\n// If no structured reels found, try to find reel-like sections by headers\nif (reels.length === 0) {\n  const reelSections = content.match(/##\\s*reel[\\s\\S]*?(?=##\\s|$)/gi) || [];\n  for (const section of reelSections) {\n    const titleMatch = section.match(/##\\s*reel\\s*\\d*:?\\s*(.+?)(?:\\n|$)/i);\n    reels.push({\n      title: titleMatch ? titleMatch[1].trim() : `BayFlow Reel ${reels.length + 1}`,\n      hook: '',\n      body: '',\n      cta: '',\n      fullScript: section.replace(/##\\s*reel\\s*\\d*:?\\s*.+?\\n/i, '').trim(),\n      index: reels.length\n    });\n  }\n}\n\nreturn [{\n  json: {\n    reels,\n    hasReels: reels.length > 0,\n    reelCount: reels.length,\n    reportDate: $now.toFormat('yyyy-MM-dd')\n  }\n}];"
+      },
+      "id": "parse-reel-scripts",
+      "name": "Parse Reel Scripts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.hasReels }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-reels-check",
+      "name": "Has Reels?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split reels array into individual items for processing\nconst data = $('Parse Reel Scripts').first().json;\nconst reels = data.reels || [];\nconst reportDate = data.reportDate;\n\nreturn reels.map(reel => ({\n  json: {\n    ...reel,\n    reportDate\n  }\n}));"
+      },
+      "id": "split-reels",
+      "name": "Split Into Individual Reels",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.revid.ai/v2/generate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"script\": {{ JSON.stringify($json.fullScript) }},\n  \"title\": {{ JSON.stringify($json.title) }},\n  \"style\": \"modern_minimal\",\n  \"duration\": 25,\n  \"aspect_ratio\": \"9:16\",\n  \"voice\": \"professional_male\",\n  \"captions\": true,\n  \"branding\": {\n    \"logo_url\": \"\",\n    \"color_primary\": \"#dc2626\",\n    \"font\": \"Space Grotesk\"\n  }\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "revid-generate",
+      "name": "Revid.ai - Generate Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -100
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REVID_API_KEY",
+          "name": "Revid.ai API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if Revid.ai generation was submitted successfully\nconst input = $input.first().json;\nconst reelData = $('Split Into Individual Reels').item;\nconst hasError = input.error || input.statusCode >= 400 || !input.id;\n\nif (hasError) {\n  // Revid.ai not configured or failed - continue with text-only posting\n  return [{\n    json: {\n      ...reelData.json,\n      videoGenerated: false,\n      videoId: null,\n      videoUrl: null,\n      videoStatus: 'skipped',\n      reason: input.error || input.message || 'Revid.ai not configured or returned error'\n    }\n  }];\n}\n\n// Revid.ai is async - store the generation ID for polling\nreturn [{\n  json: {\n    ...reelData.json,\n    videoGenerated: true,\n    videoId: input.id || input.generation_id || null,\n    videoUrl: input.video_url || null,\n    videoStatus: input.status || 'processing',\n    reason: null\n  }\n}];"
+      },
+      "id": "check-revid-response",
+      "name": "Check Revid Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "id": "video-processing",
+            "leftValue": "={{ $json.videoStatus }}",
+            "rightValue": "processing",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
+        }
+      },
+      "id": "needs-polling-check",
+      "name": "Needs Polling?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "wait-for-video",
+      "name": "Wait 30s for Render",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.revid.ai/v2/status/{{ $('Check Revid Response').item.json.videoId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "revid-poll-status",
+      "name": "Revid.ai - Poll Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        -200
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REVID_API_KEY",
+          "name": "Revid.ai API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge poll results with reel data\nconst pollResult = $input.first().json;\nconst reelData = $('Check Revid Response').item.json;\n\nconst videoUrl = pollResult.video_url || pollResult.download_url || null;\nconst isComplete = pollResult.status === 'completed' || pollResult.status === 'done' || !!videoUrl;\n\nreturn [{\n  json: {\n    ...reelData,\n    videoUrl: videoUrl,\n    videoStatus: isComplete ? 'completed' : (pollResult.status || 'unknown'),\n    videoGenerated: isComplete && !!videoUrl\n  }\n}];"
+      },
+      "id": "merge-poll-result",
+      "name": "Merge Poll Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare the social media post payload\n// Works whether video was generated or not (text-only fallback)\nconst reel = $input.first().json;\n\nconst hasVideo = reel.videoGenerated && reel.videoUrl;\nconst caption = reel.hook \n  ? `${reel.hook}\\n\\n${reel.body ? reel.body.substring(0, 200) : ''}\\n\\n${reel.cta || 'Try BayFlow free today!'}\\n\\n#autorepair #shopmanagement #bayflow #autoshop #mechaniclife`\n  : `${reel.fullScript.substring(0, 300)}\\n\\n#autorepair #shopmanagement #bayflow #autoshop #mechaniclife`;\n\nreturn [{\n  json: {\n    ...reel,\n    caption,\n    hasVideo,\n    mediaUrl: hasVideo ? reel.videoUrl : null,\n    postType: hasVideo ? 'video' : 'text'\n  }\n}];"
+      },
+      "id": "prepare-social-post",
+      "name": "Prepare Social Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MIXPOST_URL || 'https://mixpost.example.com' }}/api/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"body\": {{ JSON.stringify($json.caption) }},\n  \"media\": {{ $json.hasVideo ? JSON.stringify([{ \"url\": $json.mediaUrl, \"type\": \"video\" }]) : '[]' }},\n  \"accounts\": [\"tiktok\", \"instagram\", \"youtube_shorts\"],\n  \"schedule_at\": null,\n  \"status\": \"draft\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "post-mixpost",
+      "name": "Post via Mixpost",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        -100
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MIXPOST_API_KEY",
+          "name": "Mixpost API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.tiktokapis.com/v2/post/publish/video/init/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"post_info\": {\n    \"title\": {{ JSON.stringify($json.title) }},\n    \"description\": {{ JSON.stringify($json.caption) }},\n    \"privacy_level\": \"PUBLIC_TO_EVERYONE\",\n    \"disable_duet\": false,\n    \"disable_comment\": false,\n    \"disable_stitch\": false\n  },\n  \"source_info\": {\n    \"source\": \"PULL_FROM_URL\",\n    \"video_url\": {{ JSON.stringify($json.mediaUrl || '') }}\n  }\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "post-tiktok-direct",
+      "name": "Post to TikTok (Direct)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        100
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TIKTOK_ACCESS_TOKEN",
+          "name": "TikTok Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all posting results and build a summary per reel\nconst reel = $('Prepare Social Post').item.json;\nconst mixpostResult = $('Post via Mixpost').item.json;\nconst tiktokResult = $('Post to TikTok (Direct)').item.json;\n\nconst mixpostOk = !(mixpostResult.error || mixpostResult.statusCode >= 400);\nconst tiktokOk = !(tiktokResult.error || tiktokResult.statusCode >= 400);\n\nconst platforms = [];\nif (mixpostOk) platforms.push('Mixpost (draft)');\nif (tiktokOk) platforms.push('TikTok');\n\nreturn [{\n  json: {\n    title: reel.title,\n    index: reel.index,\n    caption: reel.caption,\n    postType: reel.postType,\n    hasVideo: reel.hasVideo,\n    videoUrl: reel.videoUrl || null,\n    videoStatus: reel.videoStatus || 'skipped',\n    mixpostPosted: mixpostOk,\n    tiktokPosted: tiktokOk,\n    platformsPosted: platforms,\n    mixpostError: mixpostOk ? null : (mixpostResult.error || mixpostResult.message || 'Not configured'),\n    tiktokError: tiktokOk ? null : (tiktokResult.error || tiktokResult.message || 'Not configured'),\n    reportDate: reel.reportDate\n  }\n}];"
+      },
+      "id": "collect-posting-results",
+      "name": "Collect Posting Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all reel results into a single report\nconst items = $input.all();\nconst reportDate = items[0]?.json?.reportDate || new Date().toISOString().split('T')[0];\n\nlet report = `# Social Media Publisher Report - ${reportDate}\\n\\n`;\nreport += `## Summary\\n`;\nreport += `- Reels processed: ${items.length}\\n`;\nreport += `- Videos generated: ${items.filter(i => i.json.hasVideo).length}\\n`;\nreport += `- Successfully posted: ${items.filter(i => i.json.platformsPosted.length > 0).length}\\n\\n`;\n\nfor (const item of items) {\n  const r = item.json;\n  report += `## Reel ${r.index + 1}: ${r.title}\\n`;\n  report += `- Type: ${r.postType}\\n`;\n  report += `- Video status: ${r.videoStatus}\\n`;\n  if (r.videoUrl) report += `- Video URL: ${r.videoUrl}\\n`;\n  report += `- Platforms posted: ${r.platformsPosted.length > 0 ? r.platformsPosted.join(', ') : 'None (services not configured)'}\\n`;\n  if (r.mixpostError) report += `- Mixpost: ${r.mixpostError}\\n`;\n  if (r.tiktokError) report += `- TikTok: ${r.tiktokError}\\n`;\n  report += `\\n`;\n}\n\nreport += `## Next Steps\\n`;\nreport += `- Configure REVID_API_KEY for video generation\\n`;\nreport += `- Configure MIXPOST_URL and MIXPOST_API_KEY for social scheduling\\n`;\nreport += `- Configure TIKTOK_ACCESS_TOKEN for direct TikTok posting\\n`;\n\n// Build Supabase row for knowledge graph\nconst performanceRows = items.map(item => ({\n  business_id: 'bayflow',\n  content_type: 'reel',\n  title: item.json.title,\n  platform: item.json.platformsPosted.join(',') || 'none',\n  published_at: reportDate,\n  video_url: item.json.videoUrl || null,\n  status: item.json.platformsPosted.length > 0 ? 'published' : 'draft'\n}));\n\nreturn [{\n  json: {\n    report,\n    reportDate,\n    performanceRows,\n    totalReels: items.length,\n    videosGenerated: items.filter(i => i.json.hasVideo).length,\n    postsPublished: items.filter(i => i.json.platformsPosted.length > 0).length\n  }\n}];"
+      },
+      "id": "build-report",
+      "name": "Build Publishing Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "=memory-bank/businesses/bayflow/reports/social-publish-{{ $json.reportDate }}.md",
+        "fileContent": "={{ $json.report }}",
+        "commitMessage": "Social Media Publisher report - bayflow - {{ $json.reportDate }}",
+        "resource": "file"
+      },
+      "id": "save-publish-report",
+      "name": "Save Publishing Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        3300,
+        -100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/content_performance",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.performanceRows) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "log-to-supabase",
+      "name": "Log to Knowledge Graph (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3300,
+        100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// No reels found - log a skip report\nconst now = new Date().toISOString().split('T')[0];\nreturn [{\n  json: {\n    report: `# Social Media Publisher Report - ${now}\\n\\nNo reel scripts found in today's content report.\\nCheck that Content Agent has run and produced reel scripts in the content report.\\n`,\n    reportDate: now\n  }\n}];"
+      },
+      "id": "no-reels-log",
+      "name": "Log No Reels Found",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "=memory-bank/businesses/bayflow/reports/social-publish-{{ $json.reportDate }}.md",
+        "fileContent": "={{ $json.report }}",
+        "commitMessage": "Social Media Publisher - no reels found - {{ $json.reportDate }}",
+        "resource": "file"
+      },
+      "id": "save-skip-report",
+      "name": "Save Skip Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        100
+      ],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Monday 2 PM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Content Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Content Report": {
+      "main": [
+        [
+          {
+            "node": "Parse Reel Scripts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Reel Scripts": {
+      "main": [
+        [
+          {
+            "node": "Has Reels?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Reels?": {
+      "main": [
+        [
+          {
+            "node": "Split Into Individual Reels",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log No Reels Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Individual Reels": {
+      "main": [
+        [
+          {
+            "node": "Revid.ai - Generate Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Revid.ai - Generate Video": {
+      "main": [
+        [
+          {
+            "node": "Check Revid Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Revid Response": {
+      "main": [
+        [
+          {
+            "node": "Needs Polling?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Polling?": {
+      "main": [
+        [
+          {
+            "node": "Wait 30s for Render",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Social Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30s for Render": {
+      "main": [
+        [
+          {
+            "node": "Revid.ai - Poll Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Revid.ai - Poll Status": {
+      "main": [
+        [
+          {
+            "node": "Merge Poll Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Poll Result": {
+      "main": [
+        [
+          {
+            "node": "Prepare Social Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Social Post": {
+      "main": [
+        [
+          {
+            "node": "Post via Mixpost",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to TikTok (Direct)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post via Mixpost": {
+      "main": [
+        [
+          {
+            "node": "Collect Posting Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to TikTok (Direct)": {
+      "main": [
+        [
+          {
+            "node": "Collect Posting Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Posting Results": {
+      "main": [
+        [
+          {
+            "node": "Build Publishing Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Publishing Report": {
+      "main": [
+        [
+          {
+            "node": "Save Publishing Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Knowledge Graph (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log No Reels Found": {
+      "main": [
+        [
+          {
+            "node": "Save Skip Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

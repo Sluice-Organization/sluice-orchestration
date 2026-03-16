@@ -1,0 +1,299 @@
+{
+  "name": "Churn Prevention - Daily At-Risk Scanner",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-trigger",
+      "name": "Daily 9 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "churn-cancellation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Cancellation Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 800],
+      "webhookId": "churn-cancellation"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/drip_queue",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "*" },
+            { "name": "or", "value": "(status.eq.trial_ending,status.eq.onboarded_not_paying,status.eq.inactive)" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-drip-queue",
+      "name": "Fetch At-Risk Users",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const users = $input.all().map(i => i.json);\nconst flat = Array.isArray(users[0]) ? users[0] : users;\nconst now = new Date();\nconst atRisk = [];\n\nfor (const user of flat) {\n  if (!user.email) continue;\n  const createdAt = new Date(user.created_at || user.trial_start);\n  const daysSinceCreation = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));\n  const lastActive = user.last_active_at ? new Date(user.last_active_at) : null;\n  const daysSinceActive = lastActive ? Math.floor((now - lastActive) / (1000 * 60 * 60 * 24)) : 999;\n\n  let riskType = null;\n  let emailSubject = '';\n  let emailBody = '';\n\n  // Trial ending in 1-2 days (day 12-13 of 14-day trial)\n  if (user.status === 'trial_ending' || (daysSinceCreation >= 12 && daysSinceCreation <= 13 && !user.is_paying)) {\n    riskType = 'trial_ending';\n    emailSubject = 'Your BayFlow trial ends soon - don\\'t lose your data';\n    emailBody = `Hi ${user.name || 'there'},\\n\\nYour BayFlow trial ends in ${14 - daysSinceCreation} day(s). All your repair orders, customer data, and inspection reports are ready to keep working for you.\\n\\nUpgrade now to keep everything intact:\\nhttps://app.bayflow.com/billing\\n\\nQuestions? Just reply to this email.\\n\\n- The BayFlow Team`;\n  }\n  // Onboarded but not paying\n  else if (user.status === 'onboarded_not_paying' && daysSinceCreation > 14) {\n    riskType = 'onboarded_not_paying';\n    emailSubject = 'We noticed you haven\\'t upgraded BayFlow yet';\n    emailBody = `Hi ${user.name || 'there'},\\n\\nYou set up your shop in BayFlow, which is great. We noticed you haven\\'t activated a paid plan yet.\\n\\nIs something holding you back? We\\'d love to help. Reply to this email and we\\'ll sort it out personally.\\n\\nOr if you\\'re ready: https://app.bayflow.com/billing\\n\\n- The BayFlow Team`;\n  }\n  // Inactive 7+ days\n  else if (daysSinceActive >= 7 || user.status === 'inactive') {\n    riskType = 'inactive_7d';\n    emailSubject = 'We miss you at BayFlow';\n    emailBody = `Hi ${user.name || 'there'},\\n\\nIt\\'s been a while since you logged into BayFlow. Your shop data is safe and waiting for you.\\n\\nHere are some things other shops are doing this week:\\n- Running digital inspections with photo documentation\\n- Tracking parts margins on repair orders\\n- Sending professional invoices to customers\\n\\nLog back in: https://app.bayflow.com\\n\\n- The BayFlow Team`;\n  }\n\n  if (riskType) {\n    atRisk.push({\n      email: user.email,\n      name: user.name || '',\n      user_id: user.user_id || user.id,\n      riskType,\n      emailSubject,\n      emailBody,\n      daysSinceCreation,\n      daysSinceActive\n    });\n  }\n}\n\nreturn atRisk.length > 0 ? atRisk.map(u => ({ json: u })) : [{ json: { _empty: true, count: 0 } }];"
+      },
+      "id": "classify-risk",
+      "name": "Classify Risk Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "no-empty",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notTrue" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-has-users",
+      "name": "Has At-Risk Users?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'BayFlow <noreply@bayflow.com>', to: [$json.email], subject: $json.emailSubject, text: $json.emailBody }) }}",
+        "options": {}
+      },
+      "id": "send-churn-email",
+      "name": "Send Churn Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: 'bayflow', activity_type: 'churn_prevention', description: 'Sent ' + $json.riskType + ' email to ' + $json.email, metadata: { risk_type: $json.riskType, user_email: $json.email } }) }}",
+        "options": {}
+      },
+      "id": "log-activity",
+      "name": "Log to Activities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'Churn Prevention: Processed at-risk users. Emails sent for ' + $('Classify Risk Type').all().filter(i => !i.json._empty).length + ' users.', source: 'churn-prevention' }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram-daily",
+      "name": "Notify Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Cancellation Webhook').first().json;\nconst email = body.email || body.user_email || 'unknown';\nconst reason = body.reason || body.cancellation_reason || 'No reason given';\nconst userId = body.user_id || body.id || 'unknown';\n\nconst emailBody = `Hi ${body.name || 'there'},\\n\\nWe\\'re sorry to see you go. We\\'ve cancelled your BayFlow subscription as requested.\\n\\nYour data will be available for 30 days if you change your mind. Just log back in and reactivate.\\n\\nIf you have a moment, we\\'d love to know what we could do better. Just reply to this email.\\n\\nWishing your shop all the best,\\n- The BayFlow Team`;\n\nreturn [{ json: { email, reason, userId, name: body.name || '', emailBody } }];"
+      },
+      "id": "process-cancellation",
+      "name": "Process Cancellation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 800]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'BayFlow <noreply@bayflow.com>', to: [$json.email], subject: 'Your BayFlow subscription has been cancelled', text: $json.emailBody }) }}",
+        "options": {}
+      },
+      "id": "send-cancel-email",
+      "name": "Send Cancel Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 700],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: 'bayflow', activity_type: 'cancellation', description: 'User cancelled: ' + $json.email + '. Reason: ' + $json.reason, metadata: { user_email: $json.email, reason: $json.reason } }) }}",
+        "options": {}
+      },
+      "id": "log-cancellation",
+      "name": "Log Cancellation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'Cancellation: ' + $json.email + ' cancelled. Reason: ' + $json.reason, source: 'churn-prevention' }) }}",
+        "options": {}
+      },
+      "id": "notify-cancel-telegram",
+      "name": "Notify Cancel Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 800],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', message: 'Cancellation processed' }) }}",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [780, 950]
+    }
+  ],
+  "connections": {
+    "Daily 9 AM Trigger": {
+      "main": [[{ "node": "Fetch At-Risk Users", "type": "main", "index": 0 }]]
+    },
+    "Fetch At-Risk Users": {
+      "main": [[{ "node": "Classify Risk Type", "type": "main", "index": 0 }]]
+    },
+    "Classify Risk Type": {
+      "main": [[{ "node": "Has At-Risk Users?", "type": "main", "index": 0 }]]
+    },
+    "Has At-Risk Users?": {
+      "main": [
+        [
+          { "node": "Send Churn Email", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Notify Telegram", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Send Churn Email": {
+      "main": [[
+        { "node": "Log to Activities", "type": "main", "index": 0 }
+      ]]
+    },
+    "Log to Activities": {
+      "main": [[{ "node": "Notify Telegram", "type": "main", "index": 0 }]]
+    },
+    "Cancellation Webhook": {
+      "main": [[{ "node": "Process Cancellation", "type": "main", "index": 0 }]]
+    },
+    "Process Cancellation": {
+      "main": [[
+        { "node": "Send Cancel Email", "type": "main", "index": 0 },
+        { "node": "Log Cancellation", "type": "main", "index": 0 }
+      ]]
+    },
+    "Log Cancellation": {
+      "main": [[
+        { "node": "Notify Cancel Telegram", "type": "main", "index": 0 },
+        { "node": "Webhook Response", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

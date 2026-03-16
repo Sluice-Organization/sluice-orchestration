@@ -1,0 +1,311 @@
+{
+  "name": "Birth Protocol - Deploy Business Infrastructure",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "deploy-business",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Deploy Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhook = $('Deploy Webhook').first().json;\nconst businessId = webhook.body.businessId;\nconst businessName = webhook.body.businessName;\nconst repoName = webhook.body.repoName;\nconst techStack = webhook.body.techStack || 'nextjs';\nconst prdContent = webhook.body.prdContent || '';\n\n// Claude Code GitHub Action YAML (same template as bayflow)\nconst claudeYml = `name: Claude Code\n\non:\n  issue_comment:\n    types: [created]\n  pull_request_review_comment:\n    types: [created]\n  issues:\n    types: [opened, assigned]\n  pull_request_review:\n    types: [submitted]\n\njobs:\n  claude:\n    if: |\n      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||\n      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||\n      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    permissions:\n      contents: write\n      pull-requests: write\n      issues: write\n      id-token: write\n      actions: read\n    steps:\n      - name: Checkout repository\n        uses: actions/checkout@v6\n        with:\n          fetch-depth: 1\n\n      - name: Run Claude Code\n        id: claude\n        uses: anthropics/claude-code-action@v1\n        with:\n          anthropic_api_key: \\${{ secrets.ANTHROPIC_API_KEY }}\n          claude_args: |\n            --model claude-opus-4-6\n            --max-turns 25\n`;\n\n// Parse design system from PRD if available\nlet primaryColor = '#2563EB';\nlet secondaryColor = '#1E40AF';\nlet accentColor = '#F59E0B';\nlet headingFont = 'Space Grotesk';\nlet bodyFont = 'Inter';\nlet designAesthetic = 'Clean, modern, professional. Trustworthy.';\nlet dataModel = '';\nlet features = '';\nlet pagesRoutes = '';\nlet pricingTiers = '';\nlet integrations = '';\nlet seoKeywords = '';\nlet launchChecklist = '';\nlet competitiveWeaknesses = '';\nlet targetPersona = '';\n\nif (prdContent) {\n  // Extract design system section\n  const designMatch = prdContent.match(/## 6\\.\\s*Design System[\\s\\S]*?(?=## 7\\.|$)/);\n  if (designMatch) {\n    const ds = designMatch[0];\n    const colorMatch = ds.match(/Primary color[^#]*(#[0-9a-fA-F]{6})/);\n    if (colorMatch) primaryColor = colorMatch[1];\n    const secMatch = ds.match(/Secondary color[^#]*(#[0-9a-fA-F]{6})/);\n    if (secMatch) secondaryColor = secMatch[1];\n    const accMatch = ds.match(/Accent color[^#]*(#[0-9a-fA-F]{6})/);\n    if (accMatch) accentColor = accMatch[1];\n    const headMatch = ds.match(/Heading font[^:]*:\\s*([^\\n]+)/);\n    if (headMatch) headingFont = headMatch[1].trim();\n    const bodyMatch = ds.match(/Body font[^:]*:\\s*([^\\n]+)/);\n    if (bodyMatch) bodyFont = bodyMatch[1].trim();\n    const aestheticMatch = ds.match(/Design aesthetic[^:]*:\\s*([^\\n]+)/);\n    if (aestheticMatch) designAesthetic = aestheticMatch[1].trim();\n  }\n\n  // Extract other sections\n  const dataModelMatch = prdContent.match(/## 4\\.\\s*Data Model[\\s\\S]*?(?=## 5\\.|$)/);\n  if (dataModelMatch) dataModel = dataModelMatch[0].trim();\n\n  const featuresMatch = prdContent.match(/## 3\\.\\s*Core Features[\\s\\S]*?(?=## 4\\.|$)/);\n  if (featuresMatch) features = featuresMatch[0].trim();\n\n  const pagesMatch = prdContent.match(/## 5\\.\\s*Pages & Routes[\\s\\S]*?(?=## 6\\.|$)/);\n  if (pagesMatch) pagesRoutes = pagesMatch[0].trim();\n\n  const pricingMatch = prdContent.match(/## 7\\.\\s*Pricing Tiers[\\s\\S]*?(?=## 8\\.|$)/);\n  if (pricingMatch) pricingTiers = pricingMatch[0].trim();\n\n  const integrationsMatch = prdContent.match(/## 8\\.\\s*Required Integrations[\\s\\S]*?(?=## 9\\.|$)/);\n  if (integrationsMatch) integrations = integrationsMatch[0].trim();\n\n  const seoMatch = prdContent.match(/## 9\\.\\s*SEO Plan[\\s\\S]*?(?=## 10\\.|$)/);\n  if (seoMatch) seoKeywords = seoMatch[0].trim();\n\n  const competitiveMatch = prdContent.match(/## 10\\.\\s*Competitive Weaknesses[\\s\\S]*?(?=## 11\\.|$)/);\n  if (competitiveMatch) competitiveWeaknesses = competitiveMatch[0].trim();\n\n  const personaMatch = prdContent.match(/## 2\\.\\s*Target Persona[\\s\\S]*?(?=## 3\\.|$)/);\n  if (personaMatch) targetPersona = personaMatch[0].trim();\n\n  const launchMatch = prdContent.match(/## 12\\.\\s*Launch Checklist[\\s\\S]*$/);\n  if (launchMatch) launchChecklist = launchMatch[0].trim();\n}\n\n// Build a comprehensive CLAUDE.md from PRD data\nlet claudeMd = `# ${businessName}\\n\\n`;\n\nif (prdContent) {\n  claudeMd += `## Product Overview\\n`;\n  const overviewMatch = prdContent.match(/## 1\\.\\s*Product Overview[\\s\\S]*?(?=## 2\\.|$)/);\n  if (overviewMatch) {\n    claudeMd += overviewMatch[0].replace(/## 1\\.\\s*Product Overview\\s*/, '').trim() + '\\n\\n';\n  }\n} else {\n  claudeMd += `## Product Overview\\nA SaaS product built by The Forge.\\n\\n`;\n}\n\nclaudeMd += `## Stack\\n- Next.js 15 (App Router) + TypeScript + Tailwind CSS v4\\n- Supabase (auth, database, storage)\\n- Stripe (subscriptions with 14-day trial)\\n- Deployed on Vercel\\n\\n`;\n\nclaudeMd += `## Design System\\n- **Heading font**: ${headingFont} (from Google Fonts)\\n- **Body font**: ${bodyFont} (from Google Fonts)\\n- **Primary color**: ${primaryColor}\\n- **Secondary color**: ${secondaryColor}\\n- **Accent color**: ${accentColor}\\n- **Aesthetic**: ${designAesthetic}\\n\\n`;\n\nif (targetPersona) {\n  claudeMd += targetPersona + '\\n\\n';\n}\n\nif (features) {\n  claudeMd += features + '\\n\\n';\n}\n\nif (dataModel) {\n  claudeMd += dataModel + '\\n\\n';\n}\n\nif (pagesRoutes) {\n  claudeMd += pagesRoutes + '\\n\\n';\n}\n\nif (pricingTiers) {\n  claudeMd += pricingTiers + '\\n\\n';\n}\n\nif (integrations) {\n  claudeMd += integrations + '\\n\\n';\n} else {\n  claudeMd += `## Required Integrations\\n- Supabase Auth (email + password)\\n- Stripe Checkout (3 products/prices, 14-day trial)\\n- Stripe webhook -> forward to n8n at \\${NEXT_PUBLIC_N8N_URL}/webhook/stripe-events\\n- Signup webhook -> POST to \\${NEXT_PUBLIC_N8N_URL}/webhook/user-signup\\n- Contact form -> POST to \\${NEXT_PUBLIC_N8N_URL}/webhook/support-ticket\\n- /demo route -> redirect to cal.com/shalinp\\n- Plausible analytics script (data-domain from NEXT_PUBLIC_PLAUSIBLE_DOMAIN env var)\\n- All n8n URLs via NEXT_PUBLIC_N8N_URL env var\\n\\n`;\n}\n\nif (seoKeywords) {\n  claudeMd += seoKeywords + '\\n\\n';\n}\n\nif (competitiveWeaknesses) {\n  claudeMd += competitiveWeaknesses + '\\n\\n';\n}\n\nclaudeMd += `## Content Quality Standards (MANDATORY)\\nBANNED WORDS: \"delve\", \"leverage\", \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"game-changer\", \"revolutionize\", \"transform\", \"innovative\", \"best-in-class\", \"world-class\", \"state-of-the-art\", \"paradigm\", \"synergy\", \"holistic\"\\nBANNED PUNCTUATION: em dashes (use regular dashes instead)\\nWrite like a real person. Direct, practical, no BS. Conversational tone.\\n\\n`;\n\nclaudeMd += `## Development Rules\\n- Always use App Router (app/ directory)\\n- Use TypeScript strict mode\\n- Use Tailwind CSS v4 for all styling\\n- Use Supabase client from @supabase/ssr\\n- All pages must be responsive (mobile-first)\\n- Use Server Components by default, Client Components only when needed\\n- Follow the design system defined above for ALL UI elements\\n- Include sitemap.xml and robots.txt\\n- Add JSON-LD structured data to landing page\\n- Include OG image meta tags on all pages\\n- Lighthouse targets: performance > 50, accessibility > 80, SEO > 80\\n\\n`;\n\nclaudeMd += `## Environment Variables (.env.example)\\nNEXT_PUBLIC_SUPABASE_URL=\\nNEXT_PUBLIC_SUPABASE_ANON_KEY=\\nSUPABASE_SERVICE_ROLE_KEY=\\nSTRIPE_SECRET_KEY=\\nSTRIPE_WEBHOOK_SECRET=\\nNEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=\\nNEXT_PUBLIC_N8N_URL=\\nNEXT_PUBLIC_PLAUSIBLE_DOMAIN=\\nNEXT_PUBLIC_SITE_URL=\\n`;\n\nif (launchChecklist) {\n  claudeMd += '\\n\\n' + launchChecklist;\n}\n\n// Build the issue body - if we have a PRD, reference it heavily\nlet issueBody;\nif (prdContent) {\n  issueBody = `@claude Build the complete MVP for ${businessName} following the PRD and CLAUDE.md specifications exactly.\\n\\n## Full PRD\\n\\n${prdContent}\\n\\n## Build Instructions\\n\\n1. **Read CLAUDE.md first** - it contains the full design system, data model, features, routes, and integration requirements.\\n\\n2. **Initialize the project**:\\n   - Next.js 15 with App Router, TypeScript, Tailwind CSS v4\\n   - Install: @supabase/ssr, @supabase/supabase-js, stripe, @stripe/stripe-js\\n\\n3. **Build every page listed in the PRD** (Section 5 - Pages & Routes):\\n   - Each page must match the exact routes specified\\n   - Landing page needs: hero, features, pricing, testimonials, CTA, footer\\n   - Dashboard must be a protected route with the full feature set\\n\\n4. **Implement the data model** (Section 4):\\n   - Create Supabase migration SQL for all entities\\n   - Include RLS policies for multi-tenant data isolation\\n   - Create TypeScript types matching the schema\\n\\n5. **Wire up all integrations** (Section 8):\\n   - Supabase Auth with email/password\\n   - Stripe Checkout with 3 pricing tiers and 14-day trial\\n   - Stripe webhook handler at /api/webhooks/stripe\\n   - Signup webhook POST to NEXT_PUBLIC_N8N_URL/webhook/user-signup\\n   - Contact form POST to NEXT_PUBLIC_N8N_URL/webhook/support-ticket\\n   - /demo route redirects to cal.com/shalinp\\n   - Plausible analytics script with NEXT_PUBLIC_PLAUSIBLE_DOMAIN\\n\\n6. **Apply the design system exactly**:\\n   - Use the exact fonts from Google Fonts specified in CLAUDE.md\\n   - Use the exact color palette specified\\n   - Match the aesthetic description\\n   - Mobile-first responsive design\\n\\n7. **SEO requirements**:\\n   - Meta titles and descriptions on all pages\\n   - OG image tags\\n   - sitemap.xml and robots.txt\\n   - JSON-LD structured data on landing page\\n\\n8. **Content standards**:\\n   - NO banned words (see CLAUDE.md)\\n   - NO em dashes\\n   - Write like a real person\\n\\n9. **Create .env.example** with all required environment variables.\\n\\n10. **Quality gates** - the app MUST:\\n    - Build without errors (npm run build)\\n    - Have zero TypeScript errors\\n    - Be fully mobile responsive\\n    - Pass Lighthouse: performance > 50, accessibility > 80, SEO > 80\\n\\nCreate a PR with all changes when done.`;\n} else {\n  issueBody = `@claude Build the initial MVP for ${businessName}.\\n\\n## Instructions\\n1. Read the CLAUDE.md file for design system and stack requirements.\\n2. Initialize a Next.js project with TypeScript and Tailwind CSS v4.\\n3. Set up the app/ directory structure with:\\n   - Landing page with hero, features, pricing, CTA sections\\n   - Login and signup pages (Supabase Auth)\\n   - Dashboard page (protected route)\\n4. Install and configure Supabase client (@supabase/ssr).\\n5. Create a shared layout with navigation and footer.\\n6. Apply the design system from CLAUDE.md (fonts, colors, aesthetic).\\n7. Ensure all pages are mobile-responsive.\\n8. Add a .env.example with all required environment variables.\\n\\n## Quality Gates\\n- The app must build without errors (npm run build)\\n- No TypeScript errors\\n- All pages render correctly\\n- Mobile responsive\\n\\nCreate a PR with all changes when done.`;\n}\n\n// Base64 encode the file contents for GitHub API\nconst claudeYmlB64 = Buffer.from(claudeYml).toString('base64');\nconst claudeMdB64 = Buffer.from(claudeMd).toString('base64');\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    repoName,\n    techStack,\n    claudeYmlB64,\n    claudeMdB64,\n    issueBody,\n    issueTitle: '@claude Build initial MVP for ' + businessName,\n    hasPrd: prdContent ? true : false\n  }\n}];"
+      },
+      "id": "prepare-payloads",
+      "name": "Prepare Payloads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.github.com/user/repos",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $json.repoName, private: false, auto_init: true, description: $json.businessName + ' - Built by The Forge' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "create-repo",
+      "name": "Step 1 - Create GitHub Repo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName + '/contents/.github/workflows/claude.yml' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'Add Claude Code GitHub Action workflow', content: $('Prepare Payloads').first().json.claudeYmlB64 }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "add-claude-action",
+      "name": "Step 2 - Add Claude Code Action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName + '/contents/CLAUDE.md' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'Add CLAUDE.md with full PRD-derived design system and spec', content: $('Prepare Payloads').first().json.claudeMdB64 }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "add-claude-md",
+      "name": "Step 3 - Add CLAUDE.md",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName + '/issues' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $('Prepare Payloads').first().json.issueTitle, body: $('Prepare Payloads').first().json.issueBody, labels: ['product-agent'] }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "create-issue",
+      "name": "Step 4 - Create Build Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?id=eq.' + $('Prepare Payloads').first().json.businessId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ launched_at: new Date().toISOString(), repo_url: 'https://github.com/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName, status: 'deploying' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "update-knowledge-graph",
+      "name": "Step 5 - Register in Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'success', message: 'Birth Protocol complete for ' + $('Prepare Payloads').first().json.businessName, businessId: $('Prepare Payloads').first().json.businessId, repoUrl: 'https://github.com/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName, issueUrl: $('Step 4 - Create Build Issue').first().json.html_url || 'created', hasPrd: $('Prepare Payloads').first().json.hasPrd, steps: { repoCreated: true, claudeActionAdded: true, claudeMdAdded: true, buildIssueCreated: true, knowledgeGraphUpdated: true } }) }}",
+        "options": {
+          "responseCode": 201
+        }
+      },
+      "id": "respond-success",
+      "name": "Step 6 - Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Deploy Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Payloads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Payloads": {
+      "main": [
+        [
+          {
+            "node": "Step 1 - Create GitHub Repo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 1 - Create GitHub Repo": {
+      "main": [
+        [
+          {
+            "node": "Step 2 - Add Claude Code Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 2 - Add Claude Code Action": {
+      "main": [
+        [
+          {
+            "node": "Step 3 - Add CLAUDE.md",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 3 - Add CLAUDE.md": {
+      "main": [
+        [
+          {
+            "node": "Step 4 - Create Build Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 4 - Create Build Issue": {
+      "main": [
+        [
+          {
+            "node": "Step 5 - Register in Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 5 - Register in Knowledge Graph": {
+      "main": [
+        [
+          {
+            "node": "Step 6 - Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

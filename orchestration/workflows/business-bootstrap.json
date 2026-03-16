@@ -1,0 +1,385 @@
+{
+  "name": "Business Bootstrap - Seed File Creator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bootstrap-business",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Bootstrap Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$json.body.businessId}/state.md` }}",
+        "resource": "file",
+        "options": {}
+      },
+      "id": "check-exists",
+      "name": "Check If Business Exists",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "exists-check",
+              "leftValue": "={{ $json.content !== undefined && $json.content !== null && !$json.error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-exists",
+      "name": "IF Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'skipped', message: 'Business already bootstrapped', businessId: $('Bootstrap Webhook').first().json.body.businessId }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-exists",
+      "name": "Respond - Already Exists",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        660,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhook = $('Bootstrap Webhook').first().json;\nconst businessId = webhook.body.businessId;\nconst businessName = webhook.body.businessName;\nconst businessDescription = webhook.body.businessDescription;\n\nconst today = new Date();\nconst todayStr = today.toISOString().split('T')[0];\n\n// Calculate next Monday\nconst nextMonday = new Date(today);\nconst dayOfWeek = nextMonday.getDay();\nconst daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);\nnextMonday.setDate(nextMonday.getDate() + daysUntilMonday);\nconst nextMondayStr = nextMonday.toISOString().split('T')[0];\n\nconst stateContent = `# ${businessName} - Current State\n\n## Status: SEED\n## Stage: Pre-Launch\n## Date Initialized: ${todayStr}\n\n## Description\n${businessDescription}\n\n## Key Metrics\n- MRR: $0\n- Users: 0\n- Churn: N/A\n- NPS: N/A\n\n## Active Issues\n- Initial setup in progress\n\n## Recent Changes\n- Business bootstrapped by The Forge on ${todayStr}\n`;\n\nconst strategyContent = `# ${businessName} - Strategy\n\n## Mission\n${businessDescription}\n\n## Target Market\n[To be defined by Discovery Engine analysis]\n\n## Value Proposition\n[To be defined]\n\n## Competitive Advantage\n[To be defined]\n\n## Revenue Model\n[To be defined]\n\n## Growth Strategy\n- Phase 1: MVP & Initial Users\n- Phase 2: Product-Market Fit\n- Phase 3: Scale\n\n## Key Milestones\n- [ ] MVP Complete\n- [ ] First 10 Users\n- [ ] First Revenue\n- [ ] Product-Market Fit\n`;\n\nconst weeklyPlanContent = `# ${businessName} - Weekly Plan\n\n## Week of ${nextMondayStr}\n## Status: INITIAL\n\n### CEO Agent Tasks\n- Review business strategy and validate market assumptions\n- Set initial KPIs\n\n### Product Agent Tasks\n- Set up development environment\n- Create initial product roadmap\n- Define MVP feature set\n\n### Content Agent Tasks\n- Create initial brand voice guidelines\n- Draft first blog post\n- Set up content calendar\n\n### Marketing Agent Tasks\n- Research target audience\n- Identify initial distribution channels\n- Set up analytics\n\n### Finance Agent Tasks\n- Set up financial tracking\n- Define budget allocations\n- Establish burn rate targets\n\n### Support Agent Tasks\n- Set up support channels\n- Create FAQ document\n`;\n\nconst contentStrategyContent = `# ${businessName} - Content Strategy\n\n## Brand Voice\n[To be defined by Content Agent]\n\n## Target Audience\n[To be defined]\n\n## Content Pillars\n1. [Pillar 1]\n2. [Pillar 2]\n3. [Pillar 3]\n\n## Publishing Schedule\n- Blog: 2x per week\n- Social: Daily\n\n## SEO Keywords\n[To be researched]\n\n## Quality Standards\n- No AI-sounding words (leverage, utilize, streamline, etc.)\n- Write like a person\n- Unique perspective required\n- Minimum 1000 words for blog posts\n`;\n\nconst supportLogContent = `# ${businessName} - Support Log\n\n## Tickets\nNo tickets yet.\n`;\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    stateContent,\n    strategyContent,\n    weeklyPlanContent,\n    contentStrategyContent,\n    supportLogContent\n  }\n}];"
+      },
+      "id": "generate-seed",
+      "name": "Generate Seed Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$json.businessId}/state.md` }}",
+        "fileContent": "={{ $json.stateContent }}",
+        "commitMessage": "={{ `Bootstrap ${$json.businessName}: create state.md` }}",
+        "resource": "file"
+      },
+      "id": "create-state",
+      "name": "Create state.md",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/strategy.md` }}",
+        "fileContent": "={{ $('Generate Seed Content').first().json.strategyContent }}",
+        "commitMessage": "={{ `Bootstrap ${$('Generate Seed Content').first().json.businessName}: create strategy.md` }}",
+        "resource": "file"
+      },
+      "id": "create-strategy",
+      "name": "Create strategy.md",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/weekly-plan.md` }}",
+        "fileContent": "={{ $('Generate Seed Content').first().json.weeklyPlanContent }}",
+        "commitMessage": "={{ `Bootstrap ${$('Generate Seed Content').first().json.businessName}: create weekly-plan.md` }}",
+        "resource": "file"
+      },
+      "id": "create-weekly-plan",
+      "name": "Create weekly-plan.md",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/content-strategy.md` }}",
+        "fileContent": "={{ $('Generate Seed Content').first().json.contentStrategyContent }}",
+        "commitMessage": "={{ `Bootstrap ${$('Generate Seed Content').first().json.businessName}: create content-strategy.md` }}",
+        "resource": "file"
+      },
+      "id": "create-content-strategy",
+      "name": "Create content-strategy.md",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/support-log.md` }}",
+        "fileContent": "={{ $('Generate Seed Content').first().json.supportLogContent }}",
+        "commitMessage": "={{ `Bootstrap ${$('Generate Seed Content').first().json.businessName}: create support-log.md` }}",
+        "resource": "file"
+      },
+      "id": "create-support-log",
+      "name": "Create support-log.md",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/reports/.gitkeep` }}",
+        "fileContent": "",
+        "commitMessage": "={{ `Bootstrap ${$('Generate Seed Content').first().json.businessName}: create reports directory` }}",
+        "resource": "file"
+      },
+      "id": "create-reports-dir",
+      "name": "Create reports/.gitkeep",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/comptroller/.gitkeep` }}",
+        "fileContent": "",
+        "commitMessage": "={{ `Bootstrap ${$('Generate Seed Content').first().json.businessName}: create comptroller directory` }}",
+        "resource": "file"
+      },
+      "id": "create-comptroller-dir",
+      "name": "Create comptroller/.gitkeep",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'success', message: 'Business bootstrapped successfully', businessId: $('Generate Seed Content').first().json.businessId, businessName: $('Generate Seed Content').first().json.businessName, filesCreated: ['state.md', 'strategy.md', 'weekly-plan.md', 'content-strategy.md', 'support-log.md', 'reports/.gitkeep', 'comptroller/.gitkeep'] }) }}",
+        "options": {
+          "responseCode": 201
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Bootstrap Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check If Business Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Business Exists": {
+      "main": [
+        [
+          {
+            "node": "IF Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Exists": {
+      "main": [
+        [
+          {
+            "node": "Respond - Already Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Seed Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Seed Content": {
+      "main": [
+        [
+          {
+            "node": "Create state.md",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create state.md": {
+      "main": [
+        [
+          {
+            "node": "Create strategy.md",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create strategy.md": {
+      "main": [
+        [
+          {
+            "node": "Create weekly-plan.md",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create weekly-plan.md": {
+      "main": [
+        [
+          {
+            "node": "Create content-strategy.md",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create content-strategy.md": {
+      "main": [
+        [
+          {
+            "node": "Create support-log.md",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create support-log.md": {
+      "main": [
+        [
+          {
+            "node": "Create reports/.gitkeep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create reports/.gitkeep": {
+      "main": [
+        [
+          {
+            "node": "Create comptroller/.gitkeep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create comptroller/.gitkeep": {
+      "main": [
+        [
+          {
+            "node": "Respond - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

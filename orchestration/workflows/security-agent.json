@@ -1,0 +1,568 @@
+{
+  "name": "Security Agent - Daily Audit",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 5 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Daily 5 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = new Date().toISOString().split('T')[0];\nreturn [{\n  json: {\n    date: today,\n    supabaseUrl: 'https://wjukfdziomnejtlmegvv.supabase.co',\n    supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU',\n    githubOwner: 'ShalinPatel670',\n    repos: ['bayflow-app', 'sluice-orchestration'],\n    n8nUrl: 'https://n8n-production-bb4b.up.railway.app',\n    tables: ['businesses', 'users', 'repair_orders', 'customers', 'invoices', 'line_items', 'inspections', 'inspection_items']\n  }\n}];"
+      },
+      "id": "setup-config",
+      "name": "Setup Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?select=id&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $json.supabaseAnonKey }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-rls-businesses",
+      "name": "Check RLS - businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, -200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/users?select=id,email&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-rls-users",
+      "name": "Check RLS - users",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, -50],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/repair_orders?select=id&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-rls-repair-orders",
+      "name": "Check RLS - repair_orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/customers?select=id&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-rls-customers",
+      "name": "Check RLS - customers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 250],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/invoices?select=id&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-rls-invoices",
+      "name": "Check RLS - invoices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/inspections?select=id&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-rls-inspections",
+      "name": "Check RLS - inspections",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 550],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/ShalinPatel670/bayflow-app/contents/.env",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-env-bayflow",
+      "name": "Check .env - bayflow-app",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 750],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/.env",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-env-sluice",
+      "name": "Check .env - sluice-orchestration",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 900],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/search/code?q=org:ShalinPatel670+sk-ant+OR+SUPABASE_SERVICE_ROLE+OR+password+OR+secret+OR+api_key+OR+private_key",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "check-secrets-in-code",
+      "name": "Check Secrets in Code",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 1050],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://n8n-production-bb4b.up.railway.app/rest/settings",
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-n8n-exposed",
+      "name": "Check n8n Settings Exposed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 1200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://n8n-production-bb4b.up.railway.app/setup",
+        "options": {
+          "timeout": 10000,
+          "redirect": {
+            "redirect": { "followRedirects": false }
+          }
+        }
+      },
+      "id": "check-n8n-setup",
+      "name": "Check n8n Setup Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 1350],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/ShalinPatel670/bayflow-app/contents/CLAUDE.md",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-claude-md-bayflow",
+      "name": "Check CLAUDE.md - bayflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 1500],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/CLAUDE.md",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "check-claude-md-sluice",
+      "name": "Check CLAUDE.md - sluice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 1650],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Phase 2: Analyze all security check results\nconst findings = [];\nconst config = $('Setup Config').first().json;\nconst date = config.date;\n\nfunction addFinding(severity, category, title, detail, remediation) {\n  findings.push({ severity, category, title, detail, remediation });\n}\n\n// --- 1. RLS Checks ---\nconst rlsNodes = [\n  { name: 'Check RLS - businesses', table: 'businesses' },\n  { name: 'Check RLS - users', table: 'users' },\n  { name: 'Check RLS - repair_orders', table: 'repair_orders' },\n  { name: 'Check RLS - customers', table: 'customers' },\n  { name: 'Check RLS - invoices', table: 'invoices' },\n  { name: 'Check RLS - inspections', table: 'inspections' }\n];\n\nfor (const rls of rlsNodes) {\n  try {\n    const result = $(rls.name).first().json;\n    const hasError = result.error || result.message || result.code;\n    // If we got actual data back (array with items), RLS is too permissive\n    if (Array.isArray(result) && result.length > 0) {\n      addFinding('CRITICAL', 'RLS', `RLS bypass on ${rls.table}`,\n        `Anon key returned data from ${rls.table} table. Row Level Security is not blocking unauthenticated reads.`,\n        `Enable RLS on ${rls.table}: ALTER TABLE ${rls.table} ENABLE ROW LEVEL SECURITY; then add appropriate policies.`);\n    }\n    // Also check if n8n unwrapped the array into multiple items\n    const allItems = $(rls.name).all();\n    if (allItems.length > 1) {\n      addFinding('CRITICAL', 'RLS', `RLS bypass on ${rls.table}`,\n        `Anon key returned ${allItems.length} rows from ${rls.table}. RLS is not enabled or policies are too permissive.`,\n        `Enable RLS: ALTER TABLE ${rls.table} ENABLE ROW LEVEL SECURITY;`);\n    } else if (allItems.length === 1 && !hasError) {\n      // Single item returned - could be data leak if it has actual data fields\n      const keys = Object.keys(result);\n      const nonErrorKeys = keys.filter(k => !['error', 'message', 'code', 'hint', 'details', 'statusCode'].includes(k));\n      if (nonErrorKeys.length > 0 && result.id !== undefined) {\n        addFinding('CRITICAL', 'RLS', `RLS bypass on ${rls.table}`,\n          `Anon key returned record data from ${rls.table} (fields: ${nonErrorKeys.join(', ')}). RLS may be too permissive.`,\n          `Enable RLS on ${rls.table}: ALTER TABLE ${rls.table} ENABLE ROW LEVEL SECURITY;`);\n      }\n    }\n  } catch (e) {\n    // Node errored entirely - likely blocked, which is good\n  }\n}\n\n// --- 2. Exposed .env files ---\nconst envChecks = [\n  { name: 'Check .env - bayflow-app', repo: 'bayflow-app' },\n  { name: 'Check .env - sluice-orchestration', repo: 'sluice-orchestration' }\n];\n\nfor (const env of envChecks) {\n  try {\n    const result = $(env.name).first().json;\n    if (result.content || result.sha || result.name === '.env') {\n      addFinding('CRITICAL', 'SECRETS', `Exposed .env in ${env.repo}`,\n        `.env file found committed in ${env.repo} repository. This likely contains API keys and secrets.`,\n        `Remove .env from repo: git rm --cached .env && add .env to .gitignore && rotate all exposed credentials.`);\n    }\n  } catch (e) { /* 404 or error - good */ }\n}\n\n// --- 3. Secrets in code search ---\ntry {\n  const codeSearch = $('Check Secrets in Code').first().json;\n  if (codeSearch.total_count && codeSearch.total_count > 0) {\n    const items = codeSearch.items || [];\n    const fileList = items.slice(0, 10).map(i => `${i.repository.full_name}/${i.path}`).join(', ');\n    addFinding('CRITICAL', 'SECRETS', 'API keys/secrets found in code',\n      `GitHub code search found ${codeSearch.total_count} file(s) potentially containing secrets: ${fileList}`,\n      'Audit each file. Remove secrets, use environment variables instead, and rotate any exposed credentials.');\n  }\n} catch (e) { /* search failed or no results */ }\n\n// --- 4. CLAUDE.md secrets check ---\nconst claudeChecks = [\n  { name: 'Check CLAUDE.md - bayflow', repo: 'bayflow-app' },\n  { name: 'Check CLAUDE.md - sluice', repo: 'sluice-orchestration' }\n];\n\nfor (const cc of claudeChecks) {\n  try {\n    const result = $(cc.name).first().json;\n    if (result.content) {\n      const decoded = Buffer.from(result.content, 'base64').toString('utf8');\n      const secretPatterns = [\n        { pat: /sk-ant-[a-zA-Z0-9-]+/, label: 'Anthropic API key' },\n        { pat: /SUPABASE_SERVICE_ROLE[=:]/, label: 'Supabase service role key' },\n        { pat: /ghp_[a-zA-Z0-9]+/, label: 'GitHub personal access token' },\n        { pat: /password\\s*[=:]\\s*['\"][^'\"]+['\"]/i, label: 'Hardcoded password' },\n        { pat: /sk_live_[a-zA-Z0-9]+/, label: 'Stripe live key' },\n        { pat: /sk_test_[a-zA-Z0-9]+/, label: 'Stripe test key' },\n        { pat: /PRIVATE_KEY/, label: 'Private key reference' }\n      ];\n      for (const { pat, label } of secretPatterns) {\n        if (pat.test(decoded)) {\n          addFinding('CRITICAL', 'SECRETS', `Secret in CLAUDE.md (${cc.repo})`,\n            `CLAUDE.md in ${cc.repo} contains what appears to be a ${label}.`,\n            'Remove secrets from CLAUDE.md. Use n8n credentials or environment variables instead.');\n          break;\n        }\n      }\n    }\n  } catch (e) { /* file not found or error */ }\n}\n\n// --- 5. n8n exposure checks ---\ntry {\n  const settingsResult = $('Check n8n Settings Exposed').first().json;\n  if (settingsResult && !settingsResult.error && !settingsResult.statusCode && settingsResult.data) {\n    addFinding('HIGH', 'N8N', 'n8n settings endpoint exposed',\n      'The /rest/settings endpoint returned data without authentication. n8n admin API may be publicly accessible.',\n      'Ensure N8N_BASIC_AUTH_ACTIVE=true or use proper authentication. Check Railway environment variables.');\n  }\n} catch (e) { /* blocked - good */ }\n\ntry {\n  const setupResult = $('Check n8n Setup Page').first().json;\n  if (setupResult && !setupResult.error) {\n    const body = JSON.stringify(setupResult);\n    if ((body.includes('setup') || body.includes('owner') || body.includes('Create')) && body.length > 100) {\n      addFinding('HIGH', 'N8N', 'n8n setup page accessible',\n        'The /setup endpoint appears to be accessible. An attacker could potentially create an admin account.',\n        'Ensure n8n is properly configured and initial setup is complete. Set N8N_USER_MANAGEMENT_DISABLED if needed.');\n    }\n  }\n} catch (e) { /* blocked - good */ }\n\n// --- Deduplicate findings by title ---\nconst seen = new Set();\nconst dedupedFindings = findings.filter(f => {\n  if (seen.has(f.title)) return false;\n  seen.add(f.title);\n  return true;\n});\n\n// --- Build severity summary ---\nconst critical = dedupedFindings.filter(f => f.severity === 'CRITICAL');\nconst high = dedupedFindings.filter(f => f.severity === 'HIGH');\nconst medium = dedupedFindings.filter(f => f.severity === 'MEDIUM');\nconst low = dedupedFindings.filter(f => f.severity === 'LOW');\n\n// --- Build markdown report ---\nlet report = `# Security Audit Report - ${date}\\n\\n`;\nreport += `**Run time:** ${new Date().toISOString()}\\n`;\nreport += `**Agent:** Security Agent v1.0\\n\\n`;\nreport += `## Summary\\n\\n`;\nreport += `| Severity | Count |\\n|----------|-------|\\n`;\nreport += `| CRITICAL | ${critical.length} |\\n`;\nreport += `| HIGH | ${high.length} |\\n`;\nreport += `| MEDIUM | ${medium.length} |\\n`;\nreport += `| LOW | ${low.length} |\\n`;\nreport += `| **Total** | **${dedupedFindings.length}** |\\n\\n`;\n\nif (dedupedFindings.length === 0) {\n  report += `**All checks passed. No security issues detected.**\\n\\n`;\n} else {\n  report += `## Findings\\n\\n`;\n  for (const f of dedupedFindings) {\n    report += `### [${f.severity}] ${f.title}\\n\\n`;\n    report += `- **Category:** ${f.category}\\n`;\n    report += `- **Detail:** ${f.detail}\\n`;\n    report += `- **Remediation:** ${f.remediation}\\n\\n`;\n  }\n}\n\nreport += `## Checks Performed\\n\\n`;\nreport += `- [x] Supabase RLS verification (6 tables)\\n`;\nreport += `- [x] GitHub .env file exposure (2 repos)\\n`;\nreport += `- [x] GitHub code secret scan\\n`;\nreport += `- [x] CLAUDE.md secret scan (2 repos)\\n`;\nreport += `- [x] n8n admin API exposure\\n`;\nreport += `- [x] n8n setup page exposure\\n`;\n\nreturn [{\n  json: {\n    date,\n    report,\n    findings: dedupedFindings,\n    criticalCount: critical.length,\n    highCount: high.length,\n    mediumCount: medium.length,\n    lowCount: low.length,\n    totalFindings: dedupedFindings.length,\n    hasCritical: critical.length > 0,\n    hasHigh: high.length > 0,\n    needsAlert: critical.length > 0 || high.length > 0,\n    needsIssues: critical.length > 0 || high.length > 0,\n    criticalFindings: critical,\n    highFindings: high\n  }\n}];"
+      },
+      "id": "analyze-results",
+      "name": "Analyze Security Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 550]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/system/reports/security-{{ $json.date }}.md",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "message", "value": "=security-agent: audit report {{ $json.date }}" },
+            { "name": "content", "value": "={{ Buffer.from($json.report).toString('base64') }}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "write-report",
+      "name": "Write Report to GitHub",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 400],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "needs-alert",
+              "leftValue": "={{ $json.needsAlert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-needs-alert",
+      "name": "Has Critical/High?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 700]
+    },
+    {
+      "parameters": {
+        "fromEmail": "25shapatel@gmail.com",
+        "toEmail": "25shapatel@gmail.com",
+        "subject": "=[SECURITY ALERT] {{ $('Analyze Security Results').first().json.criticalCount }} Critical, {{ $('Analyze Security Results').first().json.highCount }} High findings - {{ $('Analyze Security Results').first().json.date }}",
+        "emailType": "text",
+        "message": "=FORGE SECURITY AGENT - ALERT\n=============================\n\nDate: {{ $('Analyze Security Results').first().json.date }}\nCritical: {{ $('Analyze Security Results').first().json.criticalCount }}\nHigh: {{ $('Analyze Security Results').first().json.highCount }}\n\nCRITICAL FINDINGS:\n{{ $('Analyze Security Results').first().json.criticalFindings.map(f => '- ' + f.title + ': ' + f.detail).join('\\n') }}\n\nHIGH FINDINGS:\n{{ $('Analyze Security Results').first().json.highFindings.map(f => '- ' + f.title + ': ' + f.detail).join('\\n') }}\n\nFull report committed to: memory-bank/system/reports/security-{{ $('Analyze Security Results').first().json.date }}.md\n\nn8n: https://n8n-production-bb4b.up.railway.app"
+      },
+      "id": "send-alert-email",
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1300, 600],
+      "credentials": {
+        "smtp": { "id": "smtp-cred", "name": "Gmail SMTP" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Analyze Security Results').first().json;\nconst issues = [];\n\nconst actionableFindings = [...data.criticalFindings, ...data.highFindings];\n\nfor (const finding of actionableFindings) {\n  let repo = 'sluice-orchestration';\n  if (finding.detail.includes('bayflow')) repo = 'bayflow-app';\n  if (finding.category === 'RLS') repo = 'bayflow-app';\n\n  const body = `## Security Finding: ${finding.title}\\n\\n`\n    + `**Severity:** ${finding.severity}\\n`\n    + `**Category:** ${finding.category}\\n`\n    + `**Detected:** ${data.date}\\n\\n`\n    + `### Detail\\n${finding.detail}\\n\\n`\n    + `### Remediation\\n${finding.remediation}\\n\\n`\n    + `---\\n`\n    + `*Auto-generated by Security Agent. @claude please investigate and fix.*`;\n\n  issues.push({\n    json: {\n      repo,\n      title: `[${finding.severity}] ${finding.title}`,\n      body,\n      labels: ['security', 'automated']\n    }\n  });\n}\n\nif (issues.length === 0) {\n  return [{ json: { skip: true, message: 'No issues to create' } }];\n}\n\nreturn issues;"
+      },
+      "id": "build-issues",
+      "name": "Build GitHub Issues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 800]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-issue",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-skip-issues",
+      "name": "Has Issues to Create?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1500, 800]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/ShalinPatel670/{{ $json.repo }}/issues",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": {{ JSON.stringify($json.title) }},\n  \"body\": {{ JSON.stringify($json.body) }},\n  \"labels\": [\"security\", \"automated\"]\n}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "create-github-issue",
+      "name": "Create GitHub Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1700, 700],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-alert-needed",
+      "name": "No Alert Needed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1300, 950]
+    },
+    {
+      "parameters": {},
+      "id": "no-issues-needed",
+      "name": "No Issues Needed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1700, 950]
+    }
+  ],
+  "connections": {
+    "Daily 5 AM Trigger": {
+      "main": [
+        [
+          { "node": "Setup Config", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Setup Config": {
+      "main": [
+        [
+          { "node": "Check RLS - businesses", "type": "main", "index": 0 },
+          { "node": "Check RLS - users", "type": "main", "index": 0 },
+          { "node": "Check RLS - repair_orders", "type": "main", "index": 0 },
+          { "node": "Check RLS - customers", "type": "main", "index": 0 },
+          { "node": "Check RLS - invoices", "type": "main", "index": 0 },
+          { "node": "Check RLS - inspections", "type": "main", "index": 0 },
+          { "node": "Check .env - bayflow-app", "type": "main", "index": 0 },
+          { "node": "Check .env - sluice-orchestration", "type": "main", "index": 0 },
+          { "node": "Check Secrets in Code", "type": "main", "index": 0 },
+          { "node": "Check n8n Settings Exposed", "type": "main", "index": 0 },
+          { "node": "Check n8n Setup Page", "type": "main", "index": 0 },
+          { "node": "Check CLAUDE.md - bayflow", "type": "main", "index": 0 },
+          { "node": "Check CLAUDE.md - sluice", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check RLS - businesses": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check RLS - users": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check RLS - repair_orders": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check RLS - customers": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check RLS - invoices": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check RLS - inspections": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check .env - bayflow-app": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check .env - sluice-orchestration": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check Secrets in Code": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check n8n Settings Exposed": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check n8n Setup Page": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check CLAUDE.md - bayflow": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Check CLAUDE.md - sluice": {
+      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    },
+    "Analyze Security Results": {
+      "main": [
+        [
+          { "node": "Write Report to GitHub", "type": "main", "index": 0 },
+          { "node": "Has Critical/High?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Has Critical/High?": {
+      "main": [
+        [
+          { "node": "Send Alert Email", "type": "main", "index": 0 },
+          { "node": "Build GitHub Issues", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "No Alert Needed", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build GitHub Issues": {
+      "main": [
+        [
+          { "node": "Has Issues to Create?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Has Issues to Create?": {
+      "main": [
+        [
+          { "node": "Create GitHub Issue", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "No Issues Needed", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "security" },
+    { "name": "daily" }
+  ]
+}

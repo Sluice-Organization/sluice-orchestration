@@ -46,10 +46,10 @@
     },
     {
       "parameters": {
-        "model": "claude-3-5-haiku-20241022",
+        "model": "claude-haiku-4-5-20251001",
         "options": {
           "temperature": 0.2,
-          "maxTokens": 1000
+          "maxTokensToSample": 1000
         }
       },
       "id": "haiku-model",
@@ -120,7 +120,7 @@
       "typeVersion": 1,
       "position": [
         1100,
-        -100
+        -200
       ]
     },
     {
@@ -137,27 +137,85 @@
       "typeVersion": 1,
       "position": [
         1100,
-        100
+        200
       ]
     },
     {
       "parameters": {
-        "operation": "create",
+        "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/{{ $('Parse Ticket').first().json.businessId }}/reports/support-log.md",
-        "fileContent": "={{ `## Ticket - ${$json.receivedAt}\\nFrom: ${$json.customerEmail}\\nSubject: ${$json.subject}\\nTag: ${$json.ticket_tag}\\nResolved: ${$json.can_resolve}\\nSeverity: ${$json.severity}\\n${$json.feature_request_summary ? 'Feature Request: ' + $json.feature_request_summary + '\\n' : ''}---\\n` }}",
-        "commitMessage": "Support ticket log - {{ $('Parse Ticket').first().json.businessId }} - {{ $now.format('yyyy-MM-dd') }}",
-        "resource": "file"
+        "filePath": "={{ `memory-bank/businesses/${$('Process AI Response').first().json.businessId}/reports/support-log.md` }}",
+        "resource": "file",
+        "options": {}
       },
-      "id": "log-ticket",
-      "name": "Log Ticket to Memory Bank",
+      "id": "read-support-log",
+      "name": "Read Existing Support Log",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
       "position": [
-        1100,
-        300
+        1320,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the ticket data from Process AI Response\nconst ticket = $('Process AI Response').first().json;\n\n// Try to get existing log content and SHA from the GitHub read\nconst readResult = $input.first().json;\nlet existingContent = '';\nlet sha = null;\nlet fileExists = false;\n\n// Check if the read succeeded (file exists)\nif (readResult.content && !readResult.error) {\n  // GitHub returns base64-encoded content\n  if (readResult.encoding === 'base64') {\n    existingContent = Buffer.from(readResult.content, 'base64').toString('utf-8');\n  } else {\n    existingContent = readResult.content;\n  }\n  sha = readResult.sha;\n  fileExists = true;\n}\n\n// Format the new ticket entry\nconst now = new Date();\nconst dateStr = now.toISOString().split('T')[0];\nconst timeStr = now.toISOString().split('T')[1].split('.')[0];\n\nlet newEntry = `## Ticket - ${dateStr} ${timeStr}\\n`;\nnewEntry += `**From:** ${ticket.customerEmail}\\n`;\nnewEntry += `**Subject:** ${ticket.subject}\\n`;\nnewEntry += `**Tag:** ${ticket.ticket_tag}\\n`;\nnewEntry += `**Severity:** ${ticket.severity}\\n`;\nnewEntry += `**Resolved:** ${ticket.can_resolve}\\n`;\n\nif (ticket.can_resolve) {\n  newEntry += `**Response:** ${ticket.response_to_customer}\\n`;\n} else {\n  newEntry += `**Escalation Reason:** ${ticket.escalation_reason}\\n`;\n}\n\nif (ticket.feature_request_summary) {\n  newEntry += `**Feature Request:** ${ticket.feature_request_summary}\\n`;\n}\n\nnewEntry += `\\n---\\n\\n`;\n\n// Build full content: header (if new file) + existing entries + new entry\nlet fullContent;\nif (fileExists && existingContent.trim().length > 0) {\n  fullContent = existingContent.trimEnd() + '\\n\\n' + newEntry;\n} else {\n  fullContent = `# Support Log\\n\\n` + newEntry;\n}\n\nreturn [{\n  json: {\n    fileContent: fullContent,\n    sha: sha,\n    fileExists: fileExists,\n    businessId: ticket.businessId\n  }\n}];"
+      },
+      "id": "append-entry",
+      "name": "Append Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
       ]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$json.businessId}/reports/support-log.md` }}",
+        "fileContent": "={{ $json.fileContent }}",
+        "commitMessage": "={{ `Support ticket log - ${$json.businessId} - ${$now.toFormat('yyyy-MM-dd HH:mm')}` }}",
+        "additionalParameters": "={{ $json.sha ? JSON.stringify({ sha: $json.sha }) : '{}' }}",
+        "resource": "file"
+      },
+      "id": "update-support-log",
+      "name": "Update Support Log",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Support Agent', message: 'Ticket escalated - From: ' + $json.customerEmail + ' | Subject: ' + $json.subject + ' | Severity: ' + $json.severity + ' | Reason: ' + $json.escalation_reason, severity: 'warning', businessId: $json.businessId, requiresResponse: false }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "notify-telegram",
+      "name": "Notify Human (Telegram)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        400
+      ],
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -225,7 +283,7 @@
             "index": 0
           },
           {
-            "node": "Log Ticket to Memory Bank",
+            "node": "Read Existing Support Log",
             "type": "main",
             "index": 0
           }
@@ -237,7 +295,34 @@
             "index": 0
           },
           {
-            "node": "Log Ticket to Memory Bank",
+            "node": "Read Existing Support Log",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Human (Telegram)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Existing Support Log": {
+      "main": [
+        [
+          {
+            "node": "Append Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Entry": {
+      "main": [
+        [
+          {
+            "node": "Update Support Log",
             "type": "main",
             "index": 0
           }

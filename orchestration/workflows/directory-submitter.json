@@ -1,0 +1,291 @@
+{
+  "name": "Directory Submitter - Auto-List New Businesses",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "submit-directories",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook: Submit Directories",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "submit-directories"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst b = input.body || input;\n\nconst businessId = b.businessId;\nconst businessName = b.businessName;\nconst siteUrl = b.siteUrl;\nconst category = b.category || 'SaaS';\nconst description = b.description || '';\nconst pricing = b.pricing || '29';\n\nif (!businessId || !businessName || !siteUrl) {\n  throw new Error('Missing required: businessId, businessName, siteUrl');\n}\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    siteUrl,\n    category,\n    description,\n    pricing,\n    startedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "extract-payload",
+      "name": "Extract Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'submissions_started', businessId: $json.businessId }) }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "respond-accepted",
+      "name": "Respond: Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [250, 550]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst directories = [\n  {\n    name: 'Capterra',\n    task: `Go to capterra.com/vendors/sign-up, fill in the form with:\\n  Company name: ${data.businessName}\\n  Website: ${data.siteUrl}\\n  Category: ${data.category}\\n  Description: ${data.description}\\n  Pricing: starts at $${data.pricing}/month\\nSubmit the form.`\n  },\n  {\n    name: 'G2',\n    task: `Go to sell.g2.com/create-profile, fill in the form with:\\n  Product name: ${data.businessName}\\n  Website: ${data.siteUrl}\\n  Category: ${data.category}\\n  Description: ${data.description}\\n  Pricing: starts at $${data.pricing}/month\\nSubmit the form.`\n  },\n  {\n    name: 'GetApp',\n    task: `Go to getapp.com/submit, fill in the form with:\\n  Company name: ${data.businessName}\\n  Website: ${data.siteUrl}\\n  Category: ${data.category}\\n  Description: ${data.description}\\n  Pricing: starts at $${data.pricing}/month\\nSubmit the form.`\n  },\n  {\n    name: 'Software Advice',\n    task: `Go to softwareadvice.com/vendors, fill in the form with:\\n  Company name: ${data.businessName}\\n  Website: ${data.siteUrl}\\n  Category: ${data.category}\\n  Description: ${data.description}\\n  Pricing: starts at $${data.pricing}/month\\nSubmit the form.`\n  },\n  {\n    name: 'Product Hunt',\n    task: `Go to producthunt.com/posts/new, fill in the form with:\\n  Product name: ${data.businessName}\\n  Website: ${data.siteUrl}\\n  Tagline: ${data.description.substring(0, 60)}\\n  Description: ${data.description}\\nSubmit the form.`\n  },\n  {\n    name: 'AlternativeTo',\n    task: `Go to alternativeto.net/add-app, fill in the form with:\\n  App name: ${data.businessName}\\n  Website: ${data.siteUrl}\\n  Category: ${data.category}\\n  Description: ${data.description}\\nSubmit the form.`\n  },\n  {\n    name: 'SaaSHub',\n    task: `Go to saashub.com/submit, fill in the form with:\\n  Product name: ${data.businessName}\\n  Website: ${data.siteUrl}\\n  Category: ${data.category}\\n  Description: ${data.description}\\n  Pricing: starts at $${data.pricing}/month\\nSubmit the form.`\n  }\n];\n\nreturn directories.map(d => ({\n  json: {\n    ...data,\n    directoryName: d.name,\n    browserTask: d.task\n  }\n}));"
+      },
+      "id": "build-directory-tasks",
+      "name": "Build Directory Tasks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cloud.browser-use.com/v1/run-task",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ task: $json.browserTask, timeout: 120 }) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "browser-use-submit",
+      "name": "Browser Use: Submit to Directory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "browser-use-cred",
+          "name": "Browser Use API Key"
+        }
+      },
+      "continueOnFail": true,
+      "notes": "Uses BROWSER_USE_API_KEY via httpHeaderAuth credential. Header: Authorization: Bearer {{BROWSER_USE_API_KEY}}"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst directory = $('Build Directory Tasks').first().json.directoryName;\nconst businessName = $('Build Directory Tasks').first().json.businessName;\n\nconst success = result.status === 'completed' || result.status === 'success';\nconst error = result.error || result.message || null;\n\nreturn [{\n  json: {\n    directory,\n    businessName,\n    success,\n    error,\n    result: success ? 'submitted' : 'failed',\n    details: error || 'Submission completed'\n  }\n}];"
+      },
+      "id": "parse-submission-result",
+      "name": "Parse Submission Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst businessName = items[0]?.json?.businessName || 'Unknown';\n\nconst results = items.map(i => i.json);\nconst succeeded = results.filter(r => r.success);\nconst failed = results.filter(r => !r.success);\n\nconst report = {\n  businessName,\n  totalDirectories: results.length,\n  successCount: succeeded.length,\n  failCount: failed.length,\n  succeeded: succeeded.map(r => r.directory),\n  failed: failed.map(r => ({ directory: r.directory, error: r.error || r.details })),\n  timestamp: new Date().toISOString()\n};\n\nlet reportText = `Directory Submission Report for ${businessName}\\n`;\nreportText += `================================\\n`;\nreportText += `Submitted: ${succeeded.length}/${results.length}\\n\\n`;\n\nif (succeeded.length > 0) {\n  reportText += `Successful:\\n${succeeded.map(r => `  - ${r.directory}`).join('\\n')}\\n\\n`;\n}\n\nif (failed.length > 0) {\n  reportText += `Failed (need manual submission):\\n${failed.map(r => `  - ${r.directory}: ${r.error || r.details}`).join('\\n')}\\n`;\n}\n\nreturn [{\n  json: {\n    ...report,\n    reportText\n  }\n}];"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-failures",
+              "leftValue": "={{ $json.failCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-failures",
+      "name": "Any Failures?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1550, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst failed = data.failed || [];\n\nconst body = `## Manual Directory Submission Required\\n\\n` +\n  `Business: **${data.businessName}**\\n\\n` +\n  `The following directories failed automated submission and need manual attention:\\n\\n` +\n  failed.map(f => `- **${f.directory}**: ${f.error}`).join('\\n') + '\\n\\n' +\n  `### Submission Details\\n` +\n  `Use the business info from the memory-bank to fill in directory forms.\\n\\n` +\n  `Generated: ${data.timestamp}`;\n\nreturn [{\n  json: {\n    owner: 'ShalinPatel670',\n    repo: 'sluice-orchestration',\n    title: '[Manual] Directory submissions needed for ' + data.businessName,\n    body,\n    labels: ['manual-submission', 'distribution']\n  }\n}];"
+      },
+      "id": "build-github-issue",
+      "name": "Build GitHub Issue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $json.owner }}/{{ $json.repo }}/issues",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $json.title, body: $json.body, labels: $json.labels }) }}",
+        "options": {}
+      },
+      "id": "create-github-issue",
+      "name": "Create GitHub Issue for Manual Submissions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2050, 200],
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'directory-submitter', level: $json.failCount > 0 ? 'warning' : 'info', message: '**Directory Submission Report**: ' + $json.businessName + '\\n\\nSubmitted: ' + $json.successCount + '/' + $json.totalDirectories + '\\n' + ($json.failCount > 0 ? 'Failed: ' + $json.failed.map(f => f.directory).join(', ') + ' (GitHub issue created)' : 'All directories submitted successfully!') }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "notify-telegram",
+      "name": "Notify: Telegram Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 450],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook: Submit Directories": {
+      "main": [
+        [
+          {
+            "node": "Extract Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Payload": {
+      "main": [
+        [
+          {
+            "node": "Build Directory Tasks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond: Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Directory Tasks": {
+      "main": [
+        [
+          {
+            "node": "Browser Use: Submit to Directory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Browser Use: Submit to Directory": {
+      "main": [
+        [
+          {
+            "node": "Parse Submission Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Submission Result": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Any Failures?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Failures?": {
+      "main": [
+        [
+          {
+            "node": "Build GitHub Issue",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify: Telegram Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify: Telegram Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build GitHub Issue": {
+      "main": [
+        [
+          {
+            "node": "Create GitHub Issue for Manual Submissions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "name": "CEO Agent - Daily Review",
+  "name": "CEO Agent - Daily Review (Control System)",
   "nodes": [
     {
       "parameters": {
@@ -16,36 +16,106 @@
       "name": "Daily 8 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, 0]
     },
     {
       "parameters": {
-        "jsCode": "// Hardcoded business list (replace getMany which doesn't work for file resource)\nreturn [{ json: { name: 'bayflow', path: 'memory-bank/businesses/bayflow' } }];"
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/system_context",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "business_id", "value": "eq.bayflow" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "read-system-context",
+      "name": "Read System Context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, -200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/system_config",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "business_id", "value": "eq.bayflow" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "read-system-config",
+      "name": "Read System Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/system_config",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "business_id", "value": "eq._global" },
+            { "name": "config_key", "value": "eq.ceo_authority" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "read-ceo-authority",
+      "name": "Read CEO Authority",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { name: 'bayflow', path: 'memory-bank/businesses/bayflow' } }];"
       },
       "id": "list-businesses",
       "name": "List Business Directories",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        220,
-        0
-      ]
+      "position": [260, 400]
     },
     {
       "parameters": {
-        "jsCode": "const businesses = $input.all();\nconst results = [];\n\nfor (const biz of businesses) {\n  if (biz.json.name === '_template') continue;\n  results.push({\n    json: {\n      businessId: biz.json.name,\n      businessPath: `memory-bank/businesses/${biz.json.name}`\n    }\n  });\n}\n\nreturn results;"
+        "jsCode": "const businesses = $input.all();\nconst results = [];\nfor (const biz of businesses) {\n  if (biz.json.name === '_template') continue;\n  results.push({ json: { businessId: biz.json.name, businessPath: 'memory-bank/businesses/' + biz.json.name } });\n}\nreturn results;"
       },
       "id": "filter-businesses",
       "name": "Filter Active Businesses",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        440,
-        0
-      ]
+      "position": [480, 400]
     },
     {
       "parameters": {
@@ -59,57 +129,115 @@
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        660,
-        -100
-      ]
+      "position": [700, 400]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "={{ $json.businessPath }}/weekly-plan.md",
-        "resource": "file"
-      },
-      "id": "read-plan",
-      "name": "Read Weekly Plan",
-      "type": "n8n-nodes-base.github",
-      "typeVersion": 1,
-      "position": [
-        660,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "get",
-        "owner": "ShalinPatel670",
-        "repository": "sluice-orchestration",
-        "filePath": "={{ $json.businessPath }}/strategy.md",
+        "filePath": "={{ $('Filter Active Businesses').first().json.businessPath }}/strategy.md",
         "resource": "file"
       },
       "id": "read-strategy",
       "name": "Read Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        660,
-        0
-      ]
+      "position": [920, 400]
     },
     {
       "parameters": {
-        "jsCode": "const state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\nconst plan = $('Read Weekly Plan').first().json.content || '';\nconst businessId = $('Filter Active Businesses').first().json.businessId;\n\nreturn [{\n  json: {\n    businessId,\n    businessPath: $('Filter Active Businesses').first().json.businessPath,\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the CEO Agent for ${businessId}.\n\nHere is the current context:\n\n## Current State\n${state}\n\n## Strategy\n${strategy}\n\n## Current Weekly Plan\n${plan}\n\nPerform your daily review:\n1. Assess the current state and any issues\n2. Check metrics trends\n3. Issue any necessary directives\n4. Generate your daily report in the structured format\n\nOutput your report in markdown.`\n  }\n}];"
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Filter Active Businesses').first().json.businessPath }}/weekly-plan.md",
+        "resource": "file"
       },
-      "id": "merge-context",
-      "name": "Merge Context",
+      "id": "read-plan",
+      "name": "Read Weekly Plan",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1140, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const businessPath = $('Filter Active Businesses').first().json.businessPath;\nconst now = new Date();\nconst yesterday = new Date(now);\nyesterday.setDate(yesterday.getDate() - 1);\nconst yesterdayStr = yesterday.toISOString().split('T')[0];\nconst lastMonday = new Date(now);\nconst dayOfWeek = lastMonday.getDay();\nconst daysToMonday = dayOfWeek === 0 ? 6 : (dayOfWeek === 1 ? 7 : dayOfWeek - 1);\nlastMonday.setDate(lastMonday.getDate() - daysToMonday);\nconst lastMondayStr = lastMonday.toISOString().split('T')[0];\nconst lastTuesday = new Date(lastMonday);\nlastTuesday.setDate(lastTuesday.getDate() + 1);\nconst lastTuesdayStr = lastTuesday.toISOString().split('T')[0];\nreturn [{ json: { businessPath, financeReportPath: businessPath + '/reports/finance-' + yesterdayStr + '.md', contentReportPath: businessPath + '/reports/content-' + lastMondayStr + '.md', marketingReportPath: businessPath + '/reports/marketing-' + lastMondayStr + '.md', productReportPath: businessPath + '/reports/product-' + lastTuesdayStr + '.md', yesterdayDate: yesterdayStr, lastMondayDate: lastMondayStr, lastTuesdayDate: lastTuesdayStr } }];"
+      },
+      "id": "compute-report-dates",
+      "name": "Compute Report Dates",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        880,
-        0
-      ]
+      "position": [1360, 400]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.financeReportPath }}",
+        "resource": "file"
+      },
+      "id": "read-finance-report",
+      "name": "Read Finance Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1580, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Report Dates').first().json.contentReportPath }}",
+        "resource": "file"
+      },
+      "id": "read-content-report",
+      "name": "Read Content Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1800, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Report Dates').first().json.marketingReportPath }}",
+        "resource": "file"
+      },
+      "id": "read-marketing-report",
+      "name": "Read Marketing Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2020, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Report Dates').first().json.productReportPath }}",
+        "resource": "file"
+      },
+      "id": "read-product-report",
+      "name": "Read Product Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2240, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const businessId = $('Filter Active Businesses').first().json.businessId;\nconst businessPath = $('Filter Active Businesses').first().json.businessPath;\nconst dates = $('Compute Report Dates').first().json;\n\nconst state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\nconst plan = $('Read Weekly Plan').first().json.content || '';\nconst stateSha = $('Read State').first().json.sha || '';\n\nconst financeNode = $('Read Finance Report').first();\nconst contentNode = $('Read Content Report').first();\nconst marketingNode = $('Read Marketing Report').first();\nconst productNode = $('Read Product Report').first();\n\nconst financeReport = (financeNode && !financeNode.json.error) ? (financeNode.json.content || '') : '[No finance report available]';\nconst contentReport = (contentNode && !contentNode.json.error) ? (contentNode.json.content || '') : '[No content report available]';\nconst marketingReport = (marketingNode && !marketingNode.json.error) ? (marketingNode.json.content || '') : '[No marketing report available]';\nconst productReport = (productNode && !productNode.json.error) ? (productNode.json.content || '') : '[No product report available]';\n\n// Parse system_context rows into a map\nfunction parseSupabaseArray(nodeName) {\n  try {\n    const first = $(nodeName).first().json;\n    return Array.isArray(first) ? first : [first];\n  } catch (e) { return []; }\n}\n\nconst contextRows = parseSupabaseArray('Read System Context');\nconst contextMap = {};\nfor (const row of contextRows) {\n  if (row.context_key) contextMap[row.context_key] = row.context_value;\n}\n\nconst configRows = parseSupabaseArray('Read System Config');\nconst configMap = {};\nfor (const row of configRows) {\n  if (row.config_key) configMap[row.config_key] = row.config_value;\n}\n\nconst authorityRows = parseSupabaseArray('Read CEO Authority');\nconst authority = (authorityRows[0] && authorityRows[0].config_value) ? authorityRows[0].config_value : { requires_approval: ['everything'] };\n\nconst today = new Date().toISOString().split('T')[0];\n\nconst configSection = Object.entries(configMap).map(function(entry) {\n  return '### ' + entry[0] + '\\n' + JSON.stringify(entry[1], null, 2);\n}).join('\\n\\n');\n\nconst approvalList = (authority.requires_approval || []).map(function(a) { return '- ' + a; }).join('\\n');\n\nconst prompt = 'Today is ' + today + '. You are the CEO Agent for The Forge, reviewing business: ' + businessId + '.\\n\\nYou have full visibility into all systems and the authority to issue directives.\\n\\n# SECTION 1: LIVE METRICS (from system_context)\\n\\n## Pipeline Summary\\n' + JSON.stringify(contextMap.pipeline_summary || {}, null, 2) + '\\n\\n## Revenue Summary\\n' + JSON.stringify(contextMap.revenue_summary || {}, null, 2) + '\\n\\n## Traffic Summary\\n' + JSON.stringify(contextMap.traffic_summary || {}, null, 2) + '\\n\\n## Content Summary\\n' + JSON.stringify(contextMap.content_summary || {}, null, 2) + '\\n\\n## Email Outreach Summary\\n' + JSON.stringify(contextMap.email_summary || {}, null, 2) + '\\n\\n## Voice Call Summary\\n' + JSON.stringify(contextMap.call_summary || {}, null, 2) + '\\n\\n## Keyword/SEO Summary\\n' + JSON.stringify(contextMap.keyword_summary || {}, null, 2) + '\\n\\n## Budget Summary\\n' + JSON.stringify(contextMap.budget_summary || {}, null, 2) + '\\n\\n## Pending Opportunities\\n' + JSON.stringify(contextMap.opportunities_summary || {}, null, 2) + '\\n\\n## Recent Activity\\n' + JSON.stringify(contextMap.activity_summary || {}, null, 2) + '\\n\\n# SECTION 2: CURRENT CONFIGURATION (system_config)\\nThese are the settings that control all workflows. You can issue actions to change any of these.\\n\\n' + configSection + '\\n\\n# SECTION 3: YOUR AUTHORITY\\n\\n' + JSON.stringify(authority, null, 2) + '\\n\\nYou CAN do these without approval:\\n- Activate/deactivate cold email, AI calling, content, lead gen, SEO monitoring\\n- Expand regions for lead gen\\n- Scale email daily limits\\n- Activate paid ads (up to max_daily_ad_spend)\\n- Launch a new business\\n\\nYou NEED human approval for:\\n' + approvalList + '\\n\\n# SECTION 4: STATE & STRATEGY (from GitHub)\\n\\n## Current State\\n' + state + '\\n\\n## Strategy\\n' + strategy + '\\n\\n## Current Weekly Plan\\n' + plan + '\\n\\n# SECTION 5: AGENT REPORTS\\n\\n### Finance Report (' + dates.yesterdayDate + ')\\n' + financeReport + '\\n\\n### Content Report (' + dates.lastMondayDate + ')\\n' + contentReport + '\\n\\n### Marketing Report (' + dates.lastMondayDate + ')\\n' + marketingReport + '\\n\\n### Product Report (' + dates.lastTuesdayDate + ')\\n' + productReport + '\\n\\n# YOUR TASK\\n\\nPerform your daily CEO review:\\n\\n1. **Situation Assessment**: What is the current state of the business? Flag blockers, risks, or anomalies in the metrics.\\n2. **Metrics Analysis**: Review pipeline, traffic, revenue, email, calling, content, and budget data. Identify trends (improving, declining, stagnant).\\n3. **Agent Performance**: Review each agent report. Are they executing? Any gaps?\\n4. **Strategic Decisions**: Based on all data, decide:\\n   - Should any channels be activated or deactivated?\\n   - Should email/calling limits be adjusted?\\n   - Should regions be expanded?\\n   - Are there opportunities worth approving?\\n   - Does pricing need review (flag for approval)?\\n   - Any budget concerns?\\n5. **Directives**: Issue specific directives to each agent team.\\n6. **Priority Update**: Update priorities if needed.\\n\\nGenerate your daily CEO report in structured markdown.\\n\\n# OUTPUT FORMAT\\n\\nAfter your report, include TWO special sections:\\n\\n## 1. State Update\\nInclude an updated state.md reflecting any changes:\\n\\n===STATE_UPDATE_START===\\n(Full updated state.md content here, in markdown)\\n===STATE_UPDATE_END===\\n\\n## 2. Actions\\nIf you want to change any system_config values or trigger any actions, output them here.\\nEach action is a JSON object. Only include actions you actually want to take.\\n\\n===ACTIONS===\\n[\\n  {\\n    \"action\": \"update_config\",\\n    \"business_id\": \"bayflow\",\\n    \"config_key\": \"cold_email\",\\n    \"config_value\": { \"daily_limit\": 50, \"sending_domains\": [\"trybayflow.com\"], \"active\": true }\\n  },\\n  {\\n    \"action\": \"notify_human\",\\n    \"message\": \"Requesting approval to increase ad spend to $100/day\",\\n    \"priority\": \"high\"\\n  },\\n  {\\n    \"action\": \"approve_opportunity\",\\n    \"opportunity_id\": \"uuid-here\"\\n  }\\n]\\n===END_ACTIONS===\\n\\nIf no actions needed, output:\\n===ACTIONS===\\n[]\\n===END_ACTIONS===';\n\nreturn [{ json: { businessId, businessPath, stateSha, prompt } }];"
+      },
+      "id": "merge-context",
+      "name": "Merge All Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2460, 200]
     },
     {
       "parameters": {
@@ -120,150 +248,208 @@
       "name": "CEO LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [
-        1100,
-        0
-      ]
+      "position": [2680, 200]
     },
     {
       "parameters": {
-        "model": "claude-opus-4-20250514",
+        "model": "claude-opus-4-6",
         "options": {
           "temperature": 0.3,
-          "maxTokens": 2000
+          "maxTokensToSample": 6000
         }
       },
       "id": "anthropic-model",
       "name": "Anthropic Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [
-        1100,
-        220
-      ]
+      "position": [2680, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "const llmOutput = $('CEO LLM Chain').first().json.text || '';\nconst businessId = $('Merge All Context').first().json.businessId;\nconst businessPath = $('Merge All Context').first().json.businessPath;\nconst stateSha = $('Merge All Context').first().json.stateSha;\n\n// Extract state update\nvar stateUpdate = '';\nconst stateStart = '===STATE_UPDATE_START===';\nconst stateEnd = '===STATE_UPDATE_END===';\nconst startIdx = llmOutput.indexOf(stateStart);\nconst endIdx = llmOutput.indexOf(stateEnd);\nif (startIdx !== -1 && endIdx !== -1) {\n  stateUpdate = llmOutput.substring(startIdx + stateStart.length, endIdx).trim();\n}\n\n// Extract actions\nvar actions = [];\nconst actionsStart = '===ACTIONS===';\nconst actionsEnd = '===END_ACTIONS===';\nconst aStartIdx = llmOutput.indexOf(actionsStart);\nconst aEndIdx = llmOutput.indexOf(actionsEnd);\nif (aStartIdx !== -1 && aEndIdx !== -1) {\n  const actionsRaw = llmOutput.substring(aStartIdx + actionsStart.length, aEndIdx).trim();\n  try { actions = JSON.parse(actionsRaw); } catch (e) { actions = []; }\n}\n\n// CEO report is everything before state update marker\nvar ceoReport = llmOutput;\nif (startIdx !== -1) {\n  ceoReport = llmOutput.substring(0, startIdx).trim();\n}\n\nreturn [{ json: { businessId, businessPath, stateSha, ceoReport, stateUpdate, hasStateUpdate: stateUpdate.length > 0, actions, hasActions: actions.length > 0 } }];"
+      },
+      "id": "parse-ceo-output",
+      "name": "Parse CEO Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2900, 200]
     },
     {
       "parameters": {
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "={{ $('Merge Context').first().json.businessPath }}/reports/ceo-{{ $now.format('yyyy-MM-dd') }}.md",
-        "fileContent": "={{ $json.text }}",
-        "commitMessage": "CEO Agent daily report - {{ $('Merge Context').first().json.businessId }} - {{ $now.format('yyyy-MM-dd') }}",
+        "filePath": "={{ $json.businessPath }}/reports/ceo-{{ $now.toFormat('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $json.ceoReport }}",
+        "commitMessage": "CEO Agent daily report - {{ $json.businessId }} - {{ $now.toFormat('yyyy-MM-dd') }}",
         "resource": "file"
       },
       "id": "write-report",
-      "name": "Write Daily Report",
+      "name": "Write CEO Report",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        1320,
-        0
-      ]
+      "position": [3120, 0]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.businessPath }}/state.md",
+        "fileContent": "={{ $json.stateUpdate }}",
+        "commitMessage": "CEO Agent state update - {{ $json.businessId }} - {{ $now.toFormat('yyyy-MM-dd') }}",
+        "additionalParameters": {
+          "sha": "={{ $json.stateSha }}"
+        },
+        "resource": "file"
+      },
+      "id": "update-state",
+      "name": "Update State.md",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [3120, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse CEO Output').first().json;\nconst actions = parsed.actions || [];\nif (actions.length === 0) {\n  return [{ json: { skip: true, message: 'No actions to execute', configUpdates: [], notifications: [], approvals: [], other: [], totalActions: 0 } }];\n}\nvar configUpdates = actions.filter(function(a) { return a.action === 'update_config'; });\nvar notifications = actions.filter(function(a) { return a.action === 'notify_human'; });\nvar approvals = actions.filter(function(a) { return a.action === 'approve_opportunity'; });\nvar other = actions.filter(function(a) { return ['update_config','notify_human','approve_opportunity'].indexOf(a.action) === -1; });\nreturn [{ json: { configUpdates, notifications, approvals, other, totalActions: actions.length, skip: false } }];"
+      },
+      "id": "prepare-actions",
+      "name": "Prepare Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3120, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/ceo-actions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $('Parse CEO Output').first().json.businessId, timestamp: new Date().toISOString(), config_updates: $json.configUpdates, notifications: $json.notifications, approvals: $json.approvals, other_actions: $json.other, total_actions: $json.totalActions }) }}",
+        "options": {}
+      },
+      "id": "dispatch-actions",
+      "name": "Dispatch Actions via Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3340, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prepared = $('Prepare Actions').first().json;\nif (prepared.skip || !prepared.configUpdates || prepared.configUpdates.length === 0) {\n  return [{ json: { message: 'No config updates to apply', applied: 0 } }];\n}\nreturn prepared.configUpdates.map(function(cu) {\n  return { json: { business_id: cu.business_id || 'bayflow', config_key: cu.config_key, config_value: cu.config_value, updated_by: 'ceo_agent' } };\n});"
+      },
+      "id": "prepare-config-writes",
+      "name": "Prepare Config Writes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3340, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/system_config",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "resolution=merge-duplicates,return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $json.business_id, config_key: $json.config_key, config_value: $json.config_value, updated_by: $json.updated_by, updated_at: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "apply-config-update",
+      "name": "Apply Config Update to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3560, 600],
+      "continueOnFail": true
     }
   ],
   "connections": {
     "Daily 8 AM Trigger": {
-      "main": [
-        [
-          {
-            "node": "List Business Directories",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[
+        { "node": "Read System Context", "type": "main", "index": 0 },
+        { "node": "Read System Config", "type": "main", "index": 0 },
+        { "node": "Read CEO Authority", "type": "main", "index": 0 },
+        { "node": "List Business Directories", "type": "main", "index": 0 }
+      ]]
     },
     "List Business Directories": {
-      "main": [
-        [
-          {
-            "node": "Filter Active Businesses",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Filter Active Businesses", "type": "main", "index": 0 }]]
     },
     "Filter Active Businesses": {
-      "main": [
-        [
-          {
-            "node": "Read State",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Read State", "type": "main", "index": 0 }]]
     },
     "Read State": {
-      "main": [
-        [
-          {
-            "node": "Read Strategy",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Read Strategy", "type": "main", "index": 0 }]]
     },
     "Read Strategy": {
-      "main": [
-        [
-          {
-            "node": "Read Weekly Plan",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Read Weekly Plan", "type": "main", "index": 0 }]]
     },
     "Read Weekly Plan": {
-      "main": [
-        [
-          {
-            "node": "Merge Context",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Compute Report Dates", "type": "main", "index": 0 }]]
     },
-    "Merge Context": {
-      "main": [
-        [
-          {
-            "node": "CEO LLM Chain",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Compute Report Dates": {
+      "main": [[{ "node": "Read Finance Report", "type": "main", "index": 0 }]]
+    },
+    "Read Finance Report": {
+      "main": [[{ "node": "Read Content Report", "type": "main", "index": 0 }]]
+    },
+    "Read Content Report": {
+      "main": [[{ "node": "Read Marketing Report", "type": "main", "index": 0 }]]
+    },
+    "Read Marketing Report": {
+      "main": [[{ "node": "Read Product Report", "type": "main", "index": 0 }]]
+    },
+    "Read Product Report": {
+      "main": [[{ "node": "Merge All Context", "type": "main", "index": 0 }]]
+    },
+    "Read System Context": {
+      "main": [[{ "node": "Merge All Context", "type": "main", "index": 1 }]]
+    },
+    "Read System Config": {
+      "main": [[{ "node": "Merge All Context", "type": "main", "index": 2 }]]
+    },
+    "Read CEO Authority": {
+      "main": [[{ "node": "Merge All Context", "type": "main", "index": 3 }]]
+    },
+    "Merge All Context": {
+      "main": [[{ "node": "CEO LLM Chain", "type": "main", "index": 0 }]]
     },
     "Anthropic Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "CEO LLM Chain",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
+      "ai_languageModel": [[{ "node": "CEO LLM Chain", "type": "ai_languageModel", "index": 0 }]]
     },
     "CEO LLM Chain": {
-      "main": [
-        [
-          {
-            "node": "Write Daily Report",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Parse CEO Output", "type": "main", "index": 0 }]]
+    },
+    "Parse CEO Output": {
+      "main": [[
+        { "node": "Write CEO Report", "type": "main", "index": 0 },
+        { "node": "Update State.md", "type": "main", "index": 0 },
+        { "node": "Prepare Actions", "type": "main", "index": 0 }
+      ]]
+    },
+    "Prepare Actions": {
+      "main": [[
+        { "node": "Dispatch Actions via Webhook", "type": "main", "index": 0 },
+        { "node": "Prepare Config Writes", "type": "main", "index": 0 }
+      ]]
+    },
+    "Prepare Config Writes": {
+      "main": [[{ "node": "Apply Config Update to Supabase", "type": "main", "index": 0 }]]
     }
   },
-  "settings": {
-    "executionOrder": "v1"
-  }
+  "settings": { "executionOrder": "v1" }
 }

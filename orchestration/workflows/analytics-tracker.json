@@ -1,0 +1,228 @@
+{
+  "name": "Analytics Tracker - Daily Plausible → Knowledge Graph",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-trigger",
+      "name": "Daily 6:30 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://plausible.io/api/v1/stats/aggregate",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "site_id", "value": "bayflow.com" },
+            { "name": "period", "value": "day" },
+            { "name": "date", "value": "yesterday" },
+            { "name": "metrics", "value": "visitors,pageviews,bounce_rate,visit_duration" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.PLAUSIBLE_API_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-aggregate",
+      "name": "Fetch Aggregate Traffic",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, -200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://plausible.io/api/v1/stats/breakdown",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "site_id", "value": "bayflow.com" },
+            { "name": "period", "value": "day" },
+            { "name": "date", "value": "yesterday" },
+            { "name": "property", "value": "visit:source" },
+            { "name": "metrics", "value": "visitors" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.PLAUSIBLE_API_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-sources",
+      "name": "Fetch Traffic Sources",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://plausible.io/api/v1/stats/breakdown",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "site_id", "value": "bayflow.com" },
+            { "name": "period", "value": "day" },
+            { "name": "date", "value": "yesterday" },
+            { "name": "property", "value": "event:page" },
+            { "name": "metrics", "value": "visitors,pageviews" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.PLAUSIBLE_API_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-pages",
+      "name": "Fetch Top Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gather raw responses from all three Plausible calls\nconst aggregateRaw = $('Fetch Aggregate Traffic').first().json;\nconst sourcesRaw = $('Fetch Traffic Sources').first().json;\nconst pagesRaw = $('Fetch Top Pages').first().json;\n\n// --- Parse aggregate metrics ---\nconst agg = aggregateRaw.results || {};\nconst visitors = (agg.visitors || {}).value || 0;\nconst pageviews = (agg.pageviews || {}).value || 0;\nconst bounceRate = (agg.bounce_rate || {}).value || 0;\nconst visitDuration = (agg.visit_duration || {}).value || 0;\n\n// --- Classify traffic sources ---\nconst organicEngines = ['google', 'bing', 'duckduckgo', 'yahoo', 'baidu', 'yandex', 'ecosia'];\nconst socialPlatforms = ['twitter', 'x.com', 't.co', 'facebook', 'linkedin', 'reddit', 'instagram', 'youtube', 'tiktok', 'threads.net', 'mastodon', 'hacker news', 'producthunt'];\n\nlet trafficOrganic = 0;\nlet trafficDirect = 0;\nlet trafficSocial = 0;\nlet trafficReferral = 0;\n\nconst sources = sourcesRaw.results || [];\nfor (const src of sources) {\n  const name = (src.source || '').toLowerCase();\n  const count = src.visitors || 0;\n  if (name === 'direct / none' || name === 'direct' || name === '') {\n    trafficDirect += count;\n  } else if (organicEngines.some(e => name.includes(e))) {\n    trafficOrganic += count;\n  } else if (socialPlatforms.some(s => name.includes(s))) {\n    trafficSocial += count;\n  } else {\n    trafficReferral += count;\n  }\n}\n\n// Combine social into referral for Knowledge Graph (social = referral channel)\nconst trafficReferralTotal = trafficSocial + trafficReferral;\n\n// --- Top pages ---\nconst pages = (pagesRaw.results || []).slice(0, 10).map(p => ({\n  page: p.page,\n  visitors: p.visitors || 0,\n  pageviews: p.pageviews || 0\n}));\n\n// --- Build source breakdown for report ---\nconst sourceBreakdown = sources.map(s => ({\n  source: s.source || '(unknown)',\n  visitors: s.visitors || 0\n})).sort((a, b) => b.visitors - a.visitors);\n\nconst yesterday = new Date();\nyesterday.setDate(yesterday.getDate() - 1);\nconst dateStr = yesterday.toISOString().split('T')[0];\n\nreturn [{\n  json: {\n    date: dateStr,\n    traffic_total: visitors,\n    traffic_organic: trafficOrganic,\n    traffic_paid: 0,\n    traffic_direct: trafficDirect,\n    traffic_referral: trafficReferralTotal,\n    traffic_social: trafficSocial,\n    pageviews: pageviews,\n    bounce_rate: bounceRate,\n    avg_visit_duration: visitDuration,\n    top_pages: pages,\n    source_breakdown: sourceBreakdown,\n    api_success: !!(aggregateRaw.results)\n  }\n}];"
+      },
+      "id": "process-data",
+      "name": "Process Plausible Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [540, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "business_id", "value": "eq.bayflow" },
+            { "name": "select", "value": "id" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "lookup-business-id",
+      "name": "Lookup Business ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/daily_metrics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "resolution=merge-duplicates,return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $('Lookup Business ID').first().json[0].id, date: $('Process Plausible Data').first().json.date, traffic_total: $('Process Plausible Data').first().json.traffic_total, traffic_organic: $('Process Plausible Data').first().json.traffic_organic, traffic_paid: $('Process Plausible Data').first().json.traffic_paid, traffic_direct: $('Process Plausible Data').first().json.traffic_direct, traffic_referral: $('Process Plausible Data').first().json.traffic_referral }) }}",
+        "options": {}
+      },
+      "id": "upsert-daily-metrics",
+      "name": "Upsert Daily Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, -100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Process Plausible Data').first().json;\nconst date = d.date;\nconst topPages = d.top_pages || [];\nconst sources = d.source_breakdown || [];\n\nlet report = `# Traffic Report - BayFlow - ${date}\\n\\n`;\nreport += `## Summary\\n`;\nreport += `| Metric | Value |\\n|--------|-------|\\n`;\nreport += `| Total Visitors | ${d.traffic_total} |\\n`;\nreport += `| Pageviews | ${d.pageviews} |\\n`;\nreport += `| Bounce Rate | ${d.bounce_rate}% |\\n`;\nreport += `| Avg Visit Duration | ${d.avg_visit_duration}s |\\n`;\nreport += `\\n`;\n\nreport += `## Traffic by Channel\\n`;\nreport += `| Channel | Visitors |\\n|---------|----------|\\n`;\nreport += `| Organic | ${d.traffic_organic} |\\n`;\nreport += `| Direct | ${d.traffic_direct} |\\n`;\nreport += `| Social | ${d.traffic_social} |\\n`;\nreport += `| Referral | ${d.traffic_referral - d.traffic_social} |\\n`;\nreport += `| Paid | ${d.traffic_paid} |\\n`;\nreport += `\\n`;\n\nif (sources.length > 0) {\n  report += `## Source Breakdown\\n`;\n  report += `| Source | Visitors |\\n|--------|----------|\\n`;\n  for (const s of sources.slice(0, 15)) {\n    report += `| ${s.source} | ${s.visitors} |\\n`;\n  }\n  report += `\\n`;\n}\n\nif (topPages.length > 0) {\n  report += `## Top Pages\\n`;\n  report += `| Page | Visitors | Pageviews |\\n|------|----------|-----------|\\n`;\n  for (const p of topPages) {\n    report += `| ${p.page} | ${p.visitors} | ${p.pageviews} |\\n`;\n  }\n  report += `\\n`;\n}\n\nreport += `---\\n*Generated by Analytics Tracker workflow at ${new Date().toISOString()}*\\n`;\n\nreturn [{ json: { report, date } }];"
+      },
+      "id": "build-report",
+      "name": "Build Traffic Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 100]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ 'memory-bank/businesses/bayflow/reports/traffic-' + $json.date + '.md' }}",
+        "fileContent": "={{ $json.report }}",
+        "commitMessage": "={{ 'Analytics Tracker traffic report - bayflow - ' + $json.date }}"
+      },
+      "id": "write-report",
+      "name": "Write Traffic Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1300, 100],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Daily 6:30 AM Trigger": {
+      "main": [[
+        { "node": "Fetch Aggregate Traffic", "type": "main", "index": 0 },
+        { "node": "Fetch Traffic Sources", "type": "main", "index": 0 },
+        { "node": "Fetch Top Pages", "type": "main", "index": 0 }
+      ]]
+    },
+    "Fetch Aggregate Traffic": {
+      "main": [[{ "node": "Process Plausible Data", "type": "main", "index": 0 }]]
+    },
+    "Fetch Traffic Sources": {
+      "main": [[{ "node": "Process Plausible Data", "type": "main", "index": 1 }]]
+    },
+    "Fetch Top Pages": {
+      "main": [[{ "node": "Process Plausible Data", "type": "main", "index": 2 }]]
+    },
+    "Process Plausible Data": {
+      "main": [[{ "node": "Lookup Business ID", "type": "main", "index": 0 }]]
+    },
+    "Lookup Business ID": {
+      "main": [[
+        { "node": "Upsert Daily Metrics", "type": "main", "index": 0 },
+        { "node": "Build Traffic Report", "type": "main", "index": 0 }
+      ]]
+    },
+    "Build Traffic Report": {
+      "main": [[{ "node": "Write Traffic Report", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

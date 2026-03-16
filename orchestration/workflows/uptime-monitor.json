@@ -1,0 +1,230 @@
+{
+  "name": "Uptime Monitor - Every 5 Minutes",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://bayflow.com",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "check-bayflow",
+      "name": "Check BayFlow Site",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://n8n-production-bb4b.up.railway.app/healthz",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "check-n8n",
+      "name": "Check n8n Instance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "check-supabase",
+      "name": "Check Supabase Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// Get responses from all checks\nconst bayflowResp = $('Check BayFlow Site').first().json;\nconst n8nResp = $('Check n8n Instance').first().json;\nconst supabaseResp = $('Check Supabase Health').first().json;\n\n// Determine status based on HTTP status codes\nconst bayflowStatus = (bayflowResp.statusCode >= 200 && bayflowResp.statusCode < 400) || bayflowResp.headers ? 'UP' : 'DOWN';\nconst n8nStatus = (n8nResp.statusCode >= 200 && n8nResp.statusCode < 400) || n8nResp.status === 'ok' ? 'UP' : 'DOWN';\nconst supabaseStatus = (supabaseResp.statusCode >= 200 && supabaseResp.statusCode < 400) || (typeof supabaseResp === 'object' && !supabaseResp.error) ? 'UP' : 'DOWN';\n\nconst services = [\n  { name: 'BayFlow Site', status: bayflowStatus, url: 'https://bayflow.com' },\n  { name: 'n8n Instance', status: n8nStatus, url: 'https://n8n-production-bb4b.up.railway.app' },\n  { name: 'Supabase', status: supabaseStatus, url: 'https://wjukfdziomnejtlmegvv.supabase.co' }\n];\n\n// Compare with previous state\nconst previousState = staticData.serviceState || {};\nconst alerts = [];\nconst recoveries = [];\n\nfor (const svc of services) {\n  const prevStatus = previousState[svc.name] || 'UP';\n  if (svc.status === 'DOWN' && prevStatus !== 'DOWN') {\n    alerts.push(svc);\n  } else if (svc.status === 'UP' && prevStatus === 'DOWN') {\n    recoveries.push(svc);\n  }\n}\n\n// Update static data with current state\nconst newState = {};\nfor (const svc of services) {\n  newState[svc.name] = svc.status;\n}\nstaticData.serviceState = newState;\nstaticData.lastChecked = new Date().toISOString();\n\nreturn [{\n  json: {\n    services,\n    alerts,\n    recoveries,\n    hasAlerts: alerts.length > 0,\n    hasRecoveries: recoveries.length > 0,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "evaluate-status",
+      "name": "Evaluate Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "has-alerts",
+              "leftValue": "={{ $json.hasAlerts }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-alerts",
+      "name": "Has Alerts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [780, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "has-recoveries",
+              "leftValue": "={{ $json.hasRecoveries }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-recoveries",
+      "name": "Has Recoveries?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [780, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: '🚨 SERVICE DOWN\\n\\n' + $json.alerts.map(a => '❌ ' + a.name + ' (' + a.url + ')').join('\\n') + '\\n\\nDetected: ' + $json.timestamp, parse_mode: 'HTML' }) }}",
+        "options": {}
+      },
+      "id": "alert-telegram",
+      "name": "Alert DOWN Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "25shapatel@gmail.com",
+        "toEmail": "25shapatel@gmail.com",
+        "subject": "=URGENT: Service DOWN - {{ $json.alerts.map(a => a.name).join(', ') }}",
+        "emailType": "text",
+        "message": "=The following services are DOWN:\n\n{{ $json.alerts.map(a => a.name + ' - ' + a.url).join('\\n') }}\n\nDetected at: {{ $json.timestamp }}\n\nCheck immediately."
+      },
+      "id": "alert-email",
+      "name": "Alert DOWN Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1040, 300],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-cred",
+          "name": "Gmail SMTP"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: '✅ SERVICE RECOVERED\\n\\n' + $json.recoveries.map(a => '✅ ' + a.name + ' is back UP').join('\\n') + '\\n\\nRecovered: ' + $json.timestamp, parse_mode: 'HTML' }) }}",
+        "options": {}
+      },
+      "id": "recovery-telegram",
+      "name": "Recovery Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 500],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [[
+        { "node": "Check BayFlow Site", "type": "main", "index": 0 },
+        { "node": "Check n8n Instance", "type": "main", "index": 0 },
+        { "node": "Check Supabase Health", "type": "main", "index": 0 }
+      ]]
+    },
+    "Check BayFlow Site": {
+      "main": [[{ "node": "Evaluate Status", "type": "main", "index": 0 }]]
+    },
+    "Check n8n Instance": {
+      "main": [[{ "node": "Evaluate Status", "type": "main", "index": 1 }]]
+    },
+    "Check Supabase Health": {
+      "main": [[{ "node": "Evaluate Status", "type": "main", "index": 2 }]]
+    },
+    "Evaluate Status": {
+      "main": [[
+        { "node": "Has Alerts?", "type": "main", "index": 0 },
+        { "node": "Has Recoveries?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Has Alerts?": {
+      "main": [
+        [
+          { "node": "Alert DOWN Telegram", "type": "main", "index": 0 },
+          { "node": "Alert DOWN Email", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Has Recoveries?": {
+      "main": [
+        [{ "node": "Recovery Telegram", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

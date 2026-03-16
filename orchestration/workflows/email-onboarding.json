@@ -1,0 +1,487 @@
+{
+  "name": "Email Onboarding & Transactional - BayFlow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "user-signup",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-signup",
+      "name": "User Signup Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body || $input.first().json;\n\nconst email = payload.email || '';\nconst name = payload.name || 'there';\nconst businessId = payload.businessId || 'bayflow';\nconst plan = payload.plan || 'starter';\nconst signupDate = new Date().toISOString();\n\nif (!email) {\n  throw new Error('Missing required field: email');\n}\n\nreturn [{\n  json: {\n    email,\n    name,\n    businessId,\n    plan,\n    signupDate\n  }\n}];"
+      },
+      "id": "parse-signup",
+      "name": "Parse Signup Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { name } = $input.first().json;\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <style>\n    body { margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Arial, sans-serif; }\n    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; }\n    .header { background: linear-gradient(135deg, #dc2626, #991b1b); padding: 40px 32px; text-align: center; }\n    .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; }\n    .header p { color: #fecaca; margin: 8px 0 0; font-size: 14px; }\n    .body { padding: 32px; }\n    .body h2 { color: #18181b; font-size: 22px; margin: 0 0 16px; }\n    .body p { color: #3f3f46; font-size: 15px; line-height: 1.6; margin: 0 0 16px; }\n    .steps { margin: 24px 0; }\n    .step { display: flex; align-items: flex-start; margin-bottom: 20px; }\n    .step-number { background: #dc2626; color: #fff; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; text-align: center; line-height: 32px; }\n    .step-text { margin-left: 16px; }\n    .step-text strong { color: #18181b; display: block; font-size: 15px; margin-bottom: 2px; }\n    .step-text span { color: #71717a; font-size: 13px; }\n    .cta-btn { display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; margin: 8px 0 24px; }\n    .divider { border: none; border-top: 1px solid #e4e4e7; margin: 24px 0; }\n    .footer { padding: 24px 32px; background: #fafafa; text-align: center; }\n    .footer p { color: #a1a1aa; font-size: 12px; margin: 0 0 4px; }\n    .footer a { color: #dc2626; text-decoration: none; }\n  </style>\n</head>\n<body>\n  <div style=\"padding: 24px;\">\n    <div class=\"container\">\n      <div class=\"header\">\n        <h1>Welcome to BayFlow!</h1>\n        <p>Your auto repair shop just got smarter</p>\n      </div>\n      <div class=\"body\">\n        <h2>Hey ${name}!</h2>\n        <p>Thanks for signing up for BayFlow. We built this specifically for independent auto repair shops like yours, so you can spend less time on paperwork and more time turning wrenches.</p>\n        <p>Here are 3 things to do right now to get rolling:</p>\n        <div class=\"steps\">\n          <div class=\"step\">\n            <div class=\"step-number\">1</div>\n            <div class=\"step-text\">\n              <strong>Create your first customer</strong>\n              <span>Add a customer profile so you can start tracking their vehicles and history.</span>\n            </div>\n          </div>\n          <div class=\"step\">\n            <div class=\"step-number\">2</div>\n            <div class=\"step-text\">\n              <strong>Create a repair order</strong>\n              <span>Open your first RO with line items, labor, and parts. It takes about 60 seconds.</span>\n            </div>\n          </div>\n          <div class=\"step\">\n            <div class=\"step-number\">3</div>\n            <div class=\"step-text\">\n              <strong>Set up your team</strong>\n              <span>Invite your techs and service writers so everyone stays in sync.</span>\n            </div>\n          </div>\n        </div>\n        <a href=\"https://app.bayflow.com/dashboard\" class=\"cta-btn\">Go to Your Dashboard</a>\n        <hr class=\"divider\">\n        <p style=\"font-size: 13px; color: #71717a;\">Questions? Reply to this email or reach us at <a href=\"mailto:support@bayflow.com\" style=\"color: #dc2626; text-decoration: none;\">support@bayflow.com</a>. We typically respond within a few hours.</p>\n      </div>\n      <div class=\"footer\">\n        <p>BayFlow - Shop management that actually works</p>\n        <p><a href=\"https://bayflow.com\">bayflow.com</a></p>\n      </div>\n    </div>\n  </div>\n</body>\n</html>\n`.trim();\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    welcomeEmailHtml: html\n  }\n}];"
+      },
+      "id": "build-welcome-email",
+      "name": "Build Welcome Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'BayFlow <hello@bayflow.com>', to: [$json.email], subject: 'Welcome to BayFlow!', html: $json.welcomeEmailHtml }) }}",
+        "options": {}
+      },
+      "id": "send-welcome-email",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const signup = $('Parse Signup Data').first().json;\nconst resendResponse = $input.first().json;\n\nconst welcomeSent = !!(resendResponse.id);\nconst resendError = resendResponse.error || null;\n\nconst dripEntry = {\n  email: signup.email,\n  name: signup.name,\n  businessId: signup.businessId,\n  plan: signup.plan,\n  signupDate: signup.signupDate,\n  welcomeEmailSent: welcomeSent,\n  welcomeEmailId: resendResponse.id || null,\n  dripEmailsSent: [],\n  status: 'active'\n};\n\nreturn [{\n  json: dripEntry\n}];"
+      },
+      "id": "build-drip-entry",
+      "name": "Build Drip Queue Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://qmwiahstuzcqmdksrzxe.supabase.co/rest/v1/drip_queue",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ email: $json.email, name: $json.name, business_id: $json.businessId, plan: $json.plan, signup_date: $json.signupDate, welcome_email_sent: $json.welcomeEmailSent, drip_emails_sent: $json.dripEmailsSent, status: $json.status }) }}",
+        "options": {}
+      },
+      "id": "save-drip-queue",
+      "name": "Save to Drip Queue (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', email: $('Parse Signup Data').first().json.email, welcomeEmailSent: $('Build Drip Queue Entry').first().json.welcomeEmailSent, dripQueueSaved: !$json.error }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24,
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      },
+      "id": "schedule-drip",
+      "name": "Daily 10 AM Drip Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://qmwiahstuzcqmdksrzxe.supabase.co/rest/v1/drip_queue?status=eq.active&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-drip-queue",
+      "name": "Fetch Active Drip Users",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        400
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const users = $input.first().json;\n\nconst userList = Array.isArray(users) ? users : (Array.isArray($input.all().map(i => i.json)) ? $input.all().map(i => i.json) : []);\n\nconst now = new Date();\nconst results = [];\n\nfor (const user of userList) {\n  const signupDate = new Date(user.signup_date);\n  const daysSinceSignup = Math.floor((now - signupDate) / (1000 * 60 * 60 * 24));\n  const sent = user.drip_emails_sent || [];\n\n  let emailToSend = null;\n\n  if (daysSinceSignup >= 1 && !sent.includes('day1_getting_started')) {\n    emailToSend = 'day1_getting_started';\n  } else if (daysSinceSignup >= 3 && !sent.includes('day3_pro_tips')) {\n    emailToSend = 'day3_pro_tips';\n  } else if (daysSinceSignup >= 7 && !sent.includes('day7_check_in')) {\n    emailToSend = 'day7_check_in';\n  } else if (daysSinceSignup >= 14 && !sent.includes('day14_upgrade') && (user.plan === 'free' || user.plan === 'starter')) {\n    emailToSend = 'day14_upgrade';\n  }\n\n  if (emailToSend) {\n    results.push({\n      json: {\n        id: user.id,\n        email: user.email,\n        name: user.name || 'there',\n        plan: user.plan,\n        businessId: user.business_id,\n        daysSinceSignup,\n        emailToSend,\n        previouslySent: sent\n      }\n    });\n  }\n}\n\nif (results.length === 0) {\n  results.push({ json: { _skip: true } });\n}\n\nreturn results;"
+      },
+      "id": "determine-drip-email",
+      "name": "Determine Drip Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-email-to-send",
+              "leftValue": "={{ $json._skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-skip",
+      "name": "Has Email to Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const user = $input.first().json;\nconst { name, email, emailToSend, plan } = user;\n\nconst templates = {\n  day1_getting_started: {\n    subject: `${name}, here's how to nail your first repair order`,\n    html: `<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>body { margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Arial, sans-serif; } .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; } .header { background: linear-gradient(135deg, #dc2626, #991b1b); padding: 32px; text-align: center; } .header h1 { color: #ffffff; margin: 0; font-size: 22px; } .body { padding: 32px; } .body p { color: #3f3f46; font-size: 15px; line-height: 1.6; margin: 0 0 16px; } .tip-box { background: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; border-radius: 0 8px 8px 0; margin: 16px 0; } .tip-box strong { color: #dc2626; } .cta-btn { display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 8px 0; } .footer { padding: 20px 32px; background: #fafafa; text-align: center; } .footer p { color: #a1a1aa; font-size: 12px; margin: 0; }</style></head><body><div style=\"padding: 24px;\"><div class=\"container\"><div class=\"header\"><h1>Getting Started with BayFlow</h1></div><div class=\"body\"><p>Hey ${name},</p><p>You signed up yesterday -- nice. Here is how to get your first repair order created in under 2 minutes:</p><div class=\"tip-box\"><strong>Quick start:</strong><ol style=\"margin: 8px 0 0; padding-left: 20px; color: #3f3f46;\"><li>Go to <strong>Customers</strong> and add your first customer with their vehicle info</li><li>Click <strong>New Repair Order</strong> from the dashboard</li><li>Add line items (labor + parts) and save</li><li>That is it. You have a trackable RO with a professional estimate ready to send.</li></ol></div><p>The whole point of BayFlow is to get this stuff out of your head and into a system. Start with one RO and build from there.</p><a href=\"https://app.bayflow.com/dashboard\" class=\"cta-btn\">Open Dashboard</a></div><div class=\"footer\"><p>BayFlow - Shop management that actually works</p></div></div></div></body></html>`\n  },\n  day3_pro_tips: {\n    subject: 'Pro tip: Digital inspections close more work',\n    html: `<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>body { margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Arial, sans-serif; } .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; } .header { background: linear-gradient(135deg, #dc2626, #991b1b); padding: 32px; text-align: center; } .header h1 { color: #ffffff; margin: 0; font-size: 22px; } .body { padding: 32px; } .body p { color: #3f3f46; font-size: 15px; line-height: 1.6; margin: 0 0 16px; } .stat-box { background: #18181b; color: #ffffff; padding: 24px; border-radius: 12px; text-align: center; margin: 20px 0; } .stat-box .number { font-size: 40px; font-weight: 700; color: #dc2626; } .stat-box .label { font-size: 14px; color: #a1a1aa; margin-top: 4px; } .cta-btn { display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 8px 0; } .footer { padding: 20px 32px; background: #fafafa; text-align: center; } .footer p { color: #a1a1aa; font-size: 12px; margin: 0; }</style></head><body><div style=\"padding: 24px;\"><div class=\"container\"><div class=\"header\"><h1>Level Up Your Shop</h1></div><div class=\"body\"><p>Hey ${name},</p><p>Quick tip from shops that are crushing it on BayFlow:</p><div class=\"stat-box\"><div class=\"number\">89%</div><div class=\"label\">of customers approve more work when they see photos</div></div><p><strong>Digital inspections</strong> let your techs snap photos of worn parts and send them directly to the customer. No more \"trust me, your brakes are shot\" conversations.</p><p>Two more things worth trying this week:</p><ul style=\"color: #3f3f46; line-height: 1.8;\"><li><strong>Customer communication:</strong> Send estimate approvals via text or email straight from the RO</li><li><strong>Status tracking:</strong> Move ROs through your workflow (Estimate > Approved > In Progress > Complete) so your whole team knows what is happening</li></ul><a href=\"https://app.bayflow.com/dashboard\" class=\"cta-btn\">Try Digital Inspections</a></div><div class=\"footer\"><p>BayFlow - Shop management that actually works</p></div></div></div></body></html>`\n  },\n  day7_check_in: {\n    subject: `${name}, how is BayFlow working for you?`,\n    html: `<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>body { margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Arial, sans-serif; } .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; } .header { background: linear-gradient(135deg, #dc2626, #991b1b); padding: 32px; text-align: center; } .header h1 { color: #ffffff; margin: 0; font-size: 22px; } .body { padding: 32px; } .body p { color: #3f3f46; font-size: 15px; line-height: 1.6; margin: 0 0 16px; } .reply-box { background: #f4f4f5; border-radius: 12px; padding: 24px; text-align: center; margin: 20px 0; } .reply-box p { color: #52525b; font-size: 14px; margin: 0 0 12px; } .reply-box a { color: #dc2626; font-weight: 600; text-decoration: none; font-size: 15px; } .footer { padding: 20px 32px; background: #fafafa; text-align: center; } .footer p { color: #a1a1aa; font-size: 12px; margin: 0; }</style></head><body><div style=\"padding: 24px;\"><div class=\"container\"><div class=\"header\"><h1>One Week In</h1></div><div class=\"body\"><p>Hey ${name},</p><p>You have been on BayFlow for about a week now. How is it going?</p><p>I genuinely want to know -- whether it is working great, or something is confusing, or you have not had time to dig in yet. All of that is useful.</p><div class=\"reply-box\"><p>Just hit reply and let me know:</p><a href=\"mailto:support@bayflow.com?subject=Week 1 feedback\">Share your thoughts</a></div><p>If something is not working the way you expected, I will personally make sure it gets fixed. We are a small team and every shop matters to us.</p><p>Thanks for giving BayFlow a shot.</p><p style=\"margin-top: 24px;\">-- The BayFlow Team</p></div><div class=\"footer\"><p>BayFlow - Shop management that actually works</p></div></div></div></body></html>`\n  },\n  day14_upgrade: {\n    subject: 'Unlock the full toolkit for your shop',\n    html: `<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>body { margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Arial, sans-serif; } .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; } .header { background: linear-gradient(135deg, #dc2626, #991b1b); padding: 32px; text-align: center; } .header h1 { color: #ffffff; margin: 0; font-size: 22px; } .body { padding: 32px; } .body p { color: #3f3f46; font-size: 15px; line-height: 1.6; margin: 0 0 16px; } .feature-grid { margin: 20px 0; } .feature { padding: 12px 0; border-bottom: 1px solid #e4e4e7; } .feature:last-child { border-bottom: none; } .feature strong { color: #18181b; } .feature span { color: #71717a; font-size: 13px; display: block; margin-top: 2px; } .cta-btn { display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; margin: 16px 0; } .guarantee { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; text-align: center; margin: 16px 0; } .guarantee p { color: #166534; font-size: 13px; margin: 0; } .footer { padding: 20px 32px; background: #fafafa; text-align: center; } .footer p { color: #a1a1aa; font-size: 12px; margin: 0; }</style></head><body><div style=\"padding: 24px;\"><div class=\"container\"><div class=\"header\"><h1>Ready for More?</h1></div><div class=\"body\"><p>Hey ${name},</p><p>You have been using BayFlow for 2 weeks. By now you have probably hit a few limits on the ${plan} plan. Here is what you unlock on Pro:</p><div class=\"feature-grid\"><div class=\"feature\"><strong>Unlimited repair orders</strong><span>No monthly cap on ROs</span></div><div class=\"feature\"><strong>Digital inspections with photos</strong><span>Send visual proof to customers, close more recommended work</span></div><div class=\"feature\"><strong>Team management</strong><span>Add unlimited techs and service writers</span></div><div class=\"feature\"><strong>Integrated invoicing</strong><span>Generate and send invoices directly from repair orders</span></div><div class=\"feature\"><strong>Priority support</strong><span>Get help fast when you need it</span></div></div><div style=\"text-align: center;\"><a href=\"https://app.bayflow.com/settings/billing\" class=\"cta-btn\">Upgrade to Pro</a></div><div class=\"guarantee\"><p>30-day money-back guarantee. If BayFlow does not save you time, we will refund every penny.</p></div></div><div class=\"footer\"><p>BayFlow - Shop management that actually works</p></div></div></div></body></html>`\n  }\n};\n\nconst template = templates[emailToSend];\n\nif (!template) {\n  return [{ json: { ...user, _skip: true, reason: 'Unknown email template: ' + emailToSend } }];\n}\n\nreturn [{\n  json: {\n    ...user,\n    emailSubject: template.subject,\n    emailHtml: template.html\n  }\n}];"
+      },
+      "id": "build-drip-email",
+      "name": "Build Drip Email Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.RESEND_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'BayFlow <hello@bayflow.com>', to: [$json.email], subject: $json.emailSubject, html: $json.emailHtml }) }}",
+        "options": {}
+      },
+      "id": "send-drip-email",
+      "name": "Send Drip Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const user = $('Build Drip Email Template').first().json;\nconst resendResponse = $input.first().json;\nconst sent = !!(resendResponse.id);\n\nif (!sent) {\n  return [{ json: { ...user, sendFailed: true, error: resendResponse.error || 'Unknown error' } }];\n}\n\nconst updatedSent = [...(user.previouslySent || []), user.emailToSend];\n\nreturn [{\n  json: {\n    id: user.id,\n    emailToSend: user.emailToSend,\n    email: user.email,\n    updatedSent,\n    sendFailed: false\n  }\n}];"
+      },
+      "id": "mark-sent",
+      "name": "Mark Email Sent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://qmwiahstuzcqmdksrzxe.supabase.co/rest/v1/drip_queue?id=eq.' + $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ drip_emails_sent: $json.updatedSent }) }}",
+        "options": {}
+      },
+      "id": "update-drip-status",
+      "name": "Update Drip Status (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        300
+      ],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "User Signup Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Signup Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Signup Data": {
+      "main": [
+        [
+          {
+            "node": "Build Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Build Drip Queue Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Drip Queue Entry": {
+      "main": [
+        [
+          {
+            "node": "Save to Drip Queue (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Drip Queue (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 10 AM Drip Check": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Drip Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Drip Users": {
+      "main": [
+        [
+          {
+            "node": "Determine Drip Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Drip Email": {
+      "main": [
+        [
+          {
+            "node": "Has Email to Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email to Send?": {
+      "main": [
+        [
+          {
+            "node": "Build Drip Email Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Drip Email Template": {
+      "main": [
+        [
+          {
+            "node": "Send Drip Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Email Sent": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Status (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

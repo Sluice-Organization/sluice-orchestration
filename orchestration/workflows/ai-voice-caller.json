@@ -1,0 +1,522 @@
+{
+  "name": "AI Voice Caller - Retell AI - BayFlow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 10 * * 2,3,4"
+            }
+          ]
+        }
+      },
+      "id": "schedule-daily-calls",
+      "name": "Daily 10:30AM Tue-Thu",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/rpc/get_warm_leads_for_calling",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "id": "fetch-warm-leads-rpc",
+      "name": "Fetch Warm Leads (RPC)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "continueOnFail": true,
+      "notes": "Fallback: If RPC doesn't exist, use the Code node below instead. RPC should run: SELECT * FROM cold_email_leads WHERE status = 'replied' AND reply_sentiment = 'positive' AND call_status IS NULL LIMIT 50"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fallback: Direct REST query if RPC not set up\n// This node fetches warm leads via Supabase REST API\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU';\n\nconst rpcResult = $input.first().json;\n\n// If RPC returned results, pass them through\nif (Array.isArray(rpcResult) && rpcResult.length > 0) {\n  return rpcResult.map(lead => ({ json: lead }));\n}\nif (rpcResult && !rpcResult.error && rpcResult.id) {\n  return [{ json: rpcResult }];\n}\n\n// Otherwise, query directly via REST\ntry {\n  const response = await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?status=eq.replied&reply_sentiment=eq.positive&call_status=is.null&limit=50&select=*`,\n    {\n      headers: {\n        'apikey': SUPABASE_ANON_KEY,\n        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,\n        'Content-Type': 'application/json'\n      }\n    }\n  );\n  const leads = await response.json();\n  if (!leads || leads.length === 0) {\n    return [{ json: { _empty: true, reason: 'No warm leads to call today' } }];\n  }\n  return leads.slice(0, 50).map(lead => ({ json: lead }));\n} catch (err) {\n  return [{ json: { _empty: true, reason: 'Supabase query failed: ' + err.message } }];\n}"
+      },
+      "id": "parse-warm-leads",
+      "name": "Parse Warm Leads (50 max)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-leads",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-leads-exist",
+      "name": "Has Leads?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.retellai.com/v2/create-phone-call",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.RETELL_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from_number\": \"{{ $env.RETELL_FROM_NUMBER }}\",\n  \"to_number\": \"{{ $json.phone }}\",\n  \"agent_id\": \"{{ $env.RETELL_AGENT_ID }}\",\n  \"metadata\": {\n    \"lead_email\": \"{{ $json.email }}\",\n    \"business_name\": \"{{ $json.business_name }}\",\n    \"first_name\": \"{{ $json.first_name }}\",\n    \"booking_url\": \"https://cal.com/shalinp\"\n  },\n  \"retell_llm_dynamic_variables\": {\n    \"prospect_name\": \"{{ $json.first_name }}\",\n    \"prospect_business\": \"{{ $json.business_name }}\",\n    \"booking_link\": \"https://cal.com/shalinp\"\n  }\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "create-retell-call",
+      "name": "Create Retell AI Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.{{ encodeURIComponent($json.metadata?.lead_email || $input.first().json.email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"call_status\": \"initiated\",\n  \"retell_call_id\": \"{{ $json.call_id }}\",\n  \"last_call_date\": \"{{ new Date().toISOString() }}\"\n}",
+        "options": {}
+      },
+      "id": "update-lead-call-initiated",
+      "name": "Update Lead: Call Initiated",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-call",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-manual-call",
+      "name": "Webhook: Manual Call Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "trigger-call"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { email, phone, business_name, first_name } = body;\n\nif (!phone || !email) {\n  return [{ json: { _error: true, message: 'Missing required fields: email and phone' } }];\n}\n\nreturn [{\n  json: {\n    email,\n    phone,\n    business_name: business_name || 'your shop',\n    first_name: first_name || 'there'\n  }\n}];"
+      },
+      "id": "parse-manual-trigger",
+      "name": "Parse Manual Trigger Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Call initiated for ' + $json.first_name }) }}",
+        "options": {}
+      },
+      "id": "respond-webhook-manual",
+      "name": "Respond: Call Queued",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retell-call-complete",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-retell-complete",
+      "name": "Webhook: Retell Call Complete",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 700],
+      "webhookId": "retell-call-complete"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body || $input.first().json;\n\n// Retell webhook payload structure\nconst callId = payload.call_id || payload.call?.call_id || '';\nconst callStatus = payload.call_status || payload.call?.status || 'unknown';\nconst duration = payload.duration_ms || payload.call?.duration_ms || 0;\nconst transcript = payload.transcript || payload.call?.transcript || '';\nconst disconnectReason = payload.disconnect_reason || payload.call?.disconnect_reason || '';\nconst metadata = payload.metadata || payload.call?.metadata || {};\n\n// Determine call outcome\nlet callOutcome = 'unknown';\nlet bookingMade = false;\nlet isVoicemail = false;\nlet notInterested = false;\n\n// Check transcript for booking signals\nconst transcriptLower = (typeof transcript === 'string' ? transcript : JSON.stringify(transcript)).toLowerCase();\n\nif (transcriptLower.includes('book') || transcriptLower.includes('schedule') || transcriptLower.includes('demo') || transcriptLower.includes('set up') || transcriptLower.includes('sounds good') || transcriptLower.includes('let\\'s do it')) {\n  callOutcome = 'interested_booking';\n  bookingMade = true;\n} else if (disconnectReason === 'voicemail_reached' || transcriptLower.includes('voicemail') || transcriptLower.includes('leave a message') || duration < 15000) {\n  callOutcome = 'voicemail';\n  isVoicemail = true;\n} else if (transcriptLower.includes('not interested') || transcriptLower.includes('no thanks') || transcriptLower.includes('don\\'t call') || transcriptLower.includes('remove me') || transcriptLower.includes('stop calling')) {\n  callOutcome = 'not_interested';\n  notInterested = true;\n} else if (transcriptLower.includes('call back') || transcriptLower.includes('busy right now') || transcriptLower.includes('not a good time')) {\n  callOutcome = 'callback_requested';\n} else {\n  callOutcome = 'completed_no_action';\n}\n\nreturn [{\n  json: {\n    call_id: callId,\n    call_status: callStatus,\n    call_outcome: callOutcome,\n    duration_seconds: Math.round(duration / 1000),\n    transcript: typeof transcript === 'string' ? transcript : JSON.stringify(transcript),\n    disconnect_reason: disconnectReason,\n    booking_made: bookingMade,\n    is_voicemail: isVoicemail,\n    not_interested: notInterested,\n    lead_email: metadata.lead_email || '',\n    business_name: metadata.business_name || '',\n    first_name: metadata.first_name || '',\n    booking_url: metadata.booking_url || 'https://cal.com/shalinp',\n    raw_payload: payload\n  }\n}];"
+      },
+      "id": "parse-retell-webhook",
+      "name": "Parse Retell Call Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 700]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.{{ encodeURIComponent($json.lead_email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"call_status\": \"{{ $json.call_outcome }}\",\n  \"call_outcome\": \"{{ $json.call_outcome }}\",\n  \"call_transcript\": {{ JSON.stringify($json.transcript) }},\n  \"call_duration_seconds\": {{ $json.duration_seconds }},\n  \"last_call_date\": \"{{ new Date().toISOString() }}\"\n}",
+        "options": {}
+      },
+      "id": "update-lead-call-result",
+      "name": "Update Lead: Call Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 700],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.booking_made }}",
+                    "rightValue": true,
+                    "operator": { "type": "boolean", "operation": "true" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "Demo Booked"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.is_voicemail }}",
+                    "rightValue": true,
+                    "operator": { "type": "boolean", "operation": "true" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "Voicemail"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.not_interested }}",
+                    "rightValue": true,
+                    "operator": { "type": "boolean", "operation": "true" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "Not Interested"
+            }
+          ],
+          "fallbackOutput": {
+            "renameOutput": "Other"
+          }
+        },
+        "options": {}
+      },
+      "id": "route-call-outcome",
+      "name": "Route by Outcome",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [700, 700]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.{{ encodeURIComponent($json.lead_email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"demo_booked\" }",
+        "options": {}
+      },
+      "id": "update-lead-demo-booked",
+      "name": "Update Lead: Demo Booked",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"BayFlow <hello@bayflow.com>\",\n  \"to\": [\"{{ $json.lead_email }}\"],\n  \"subject\": \"Your BayFlow Demo is Confirmed!\",\n  \"html\": \"<p>Hey {{ $json.first_name }},</p><p>Thanks for chatting with us! Your demo is being scheduled — you'll get a calendar invite at <strong>{{ $json.lead_email }}</strong> shortly.</p><p>In the meantime, feel free to check out <a href='https://bayflow.com'>bayflow.com</a> to see what we're building for shops like {{ $json.business_name }}.</p><p>Talk soon,<br/>Shalin @ BayFlow</p>\"\n}",
+        "options": {}
+      },
+      "id": "send-confirmation-email",
+      "name": "Send Confirmation Email (Resend)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"DEMO BOOKED via AI Voice Call!\\n\\nBusiness: {{ $json.business_name }}\\nContact: {{ $json.first_name }} ({{ $json.lead_email }})\\nCall Duration: {{ $json.duration_seconds }}s\\nBooking URL: https://cal.com/shalinp\\n\\nConfirmation email sent.\",\n  \"channel\": \"telegram\",\n  \"priority\": \"high\"\n}",
+        "options": {}
+      },
+      "id": "notify-telegram-demo-booked",
+      "name": "Telegram: Demo Booked!",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle voicemail: increment attempts, schedule retry if < 3 attempts\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU';\n\nconst leadEmail = $json.lead_email;\n\n// First, fetch current call_attempts\nlet currentAttempts = 0;\ntry {\n  const getResp = await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?email=eq.${encodeURIComponent(leadEmail)}&select=call_attempts`,\n    {\n      headers: {\n        'apikey': SUPABASE_ANON_KEY,\n        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`\n      }\n    }\n  );\n  const rows = await getResp.json();\n  if (rows && rows[0]) {\n    currentAttempts = rows[0].call_attempts || 0;\n  }\n} catch (e) {\n  // Default to 0\n}\n\nconst newAttempts = currentAttempts + 1;\nconst maxRetries = 3;\n\nlet updateBody = {\n  call_status: 'voicemail',\n  call_attempts: newAttempts\n};\n\nif (newAttempts < maxRetries) {\n  // Schedule retry in 2 days\n  const retryDate = new Date();\n  retryDate.setDate(retryDate.getDate() + 2);\n  updateBody.next_call_date = retryDate.toISOString().split('T')[0];\n  updateBody.call_status = 'voicemail_retry_scheduled';\n} else {\n  updateBody.call_status = 'voicemail_max_attempts';\n}\n\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?email=eq.${encodeURIComponent(leadEmail)}`,\n    {\n      method: 'PATCH',\n      headers: {\n        'apikey': SUPABASE_ANON_KEY,\n        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify(updateBody)\n    }\n  );\n} catch (e) {\n  // Log error but don't fail\n}\n\nreturn [{\n  json: {\n    ...updateBody,\n    lead_email: leadEmail,\n    business_name: $json.business_name,\n    first_name: $json.first_name,\n    retry_scheduled: newAttempts < maxRetries\n  }\n}];"
+      },
+      "id": "handle-voicemail",
+      "name": "Handle Voicemail + Schedule Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 700]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.{{ encodeURIComponent($json.lead_email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"call_status\": \"not_interested\", \"status\": \"rejected\" }",
+        "options": {}
+      },
+      "id": "update-lead-not-interested",
+      "name": "Update Lead: Not Interested",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/voice_call_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"call_id\": \"{{ $json.call_id }}\",\n  \"lead_email\": \"{{ $json.lead_email }}\",\n  \"business_name\": \"{{ $json.business_name }}\",\n  \"call_outcome\": \"{{ $json.call_outcome }}\",\n  \"call_duration_seconds\": {{ $json.duration_seconds || 0 }},\n  \"transcript\": {{ JSON.stringify($json.transcript || '') }},\n  \"booking_made\": {{ $json.booking_made || false }},\n  \"disconnect_reason\": \"{{ $json.disconnect_reason || '' }}\",\n  \"created_at\": \"{{ new Date().toISOString() }}\"\n}",
+        "options": {}
+      },
+      "id": "log-call-to-supabase",
+      "name": "Log Call to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "noop-no-leads",
+      "name": "No Leads Today",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [960, 200]
+    }
+  ],
+  "connections": {
+    "Daily 10:30AM Tue-Thu": {
+      "main": [
+        [{ "node": "Fetch Warm Leads (RPC)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Warm Leads (RPC)": {
+      "main": [
+        [{ "node": "Parse Warm Leads (50 max)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Warm Leads (50 max)": {
+      "main": [
+        [{ "node": "Has Leads?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Leads?": {
+      "main": [
+        [{ "node": "Create Retell AI Call", "type": "main", "index": 0 }],
+        [{ "node": "No Leads Today", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Retell AI Call": {
+      "main": [
+        [{ "node": "Update Lead: Call Initiated", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook: Manual Call Trigger": {
+      "main": [
+        [{ "node": "Parse Manual Trigger Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Manual Trigger Data": {
+      "main": [
+        [
+          { "node": "Create Retell AI Call", "type": "main", "index": 0 },
+          { "node": "Respond: Call Queued", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Webhook: Retell Call Complete": {
+      "main": [
+        [{ "node": "Parse Retell Call Result", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Retell Call Result": {
+      "main": [
+        [
+          { "node": "Update Lead: Call Result", "type": "main", "index": 0 },
+          { "node": "Log Call to Supabase", "type": "main", "index": 0 },
+          { "node": "Route by Outcome", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Route by Outcome": {
+      "main": [
+        [{ "node": "Update Lead: Demo Booked", "type": "main", "index": 0 }],
+        [{ "node": "Handle Voicemail + Schedule Retry", "type": "main", "index": 0 }],
+        [{ "node": "Update Lead: Not Interested", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Update Lead: Demo Booked": {
+      "main": [
+        [{ "node": "Send Confirmation Email (Resend)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Confirmation Email (Resend)": {
+      "main": [
+        [{ "node": "Telegram: Demo Booked!", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "bayflow" },
+    { "name": "voice-calling" },
+    { "name": "retell-ai" },
+    { "name": "sales" }
+  ],
+  "triggerCount": 3,
+  "updatedAt": "2026-03-15T00:00:00.000Z",
+  "versionId": "1",
+  "meta": {
+    "notes": [
+      {
+        "id": "retell-agent-prompt",
+        "type": "sticky",
+        "position": [0, 1100],
+        "size": [600, 500],
+        "content": "## Retell AI Agent Prompt\n\nYou are calling on behalf of BayFlow, software built specifically for independent auto repair shops. You're calling {prospect_name} at {prospect_business}.\n\nYour goal: Book a 15-minute demo at {booking_link}\n\nKey points:\n- BayFlow handles scheduling, digital inspections, invoicing, and customer management\n- $49/month, 14-day free trial, no credit card needed\n- Digital inspections: techs snap photos, customers approve work from their phone\n- Shops save about 5 hours a week on paperwork\n\nIf they're interested: \"Great, I can get you set up with a quick 15-minute walkthrough. Would [suggest two specific times this week] work for you?\"\n\nIf voicemail: \"Hey {prospect_name}, this is a quick call about BayFlow — we built shop management software specifically for independent repair shops like {prospect_business}. If you're curious, check out bayflow.com or I'll try you again in a couple days.\"\n\nIf not interested: \"No problem at all. If things change, we're at bayflow.com. Have a great day.\"\n\nBe natural, conversational, not salesy. Get to the point fast — shop owners are busy."
+      },
+      {
+        "id": "setup-instructions",
+        "type": "sticky",
+        "position": [700, 1100],
+        "size": [500, 400],
+        "content": "## Setup Instructions\n\n1. Replace RETELL_API_KEY with your Retell AI API key\n2. Replace RETELL_AGENT_ID with the agent ID from Retell dashboard\n3. Replace +1XXXXXXXXXX with your Retell phone number\n4. Update Supabase anon key placeholders with real key\n5. Configure Retell webhook URL to point to: {n8n_base_url}/webhook/retell-call-complete\n6. Create voice_call_log table in Supabase:\n   - call_id TEXT PRIMARY KEY\n   - lead_email TEXT\n   - business_name TEXT\n   - call_outcome TEXT\n   - call_duration_seconds INTEGER\n   - transcript TEXT\n   - booking_made BOOLEAN DEFAULT false\n   - disconnect_reason TEXT\n   - created_at TIMESTAMPTZ DEFAULT now()\n7. Add columns to cold_email_leads if missing:\n   - call_status TEXT\n   - call_outcome TEXT\n   - call_transcript TEXT\n   - call_duration_seconds INTEGER\n   - call_attempts INTEGER DEFAULT 0\n   - next_call_date DATE\n   - last_call_date TIMESTAMPTZ\n   - retell_call_id TEXT\n8. Rate limit: 50 calls/day enforced by LIMIT 50 in lead query"
+      }
+    ]
+  }
+}

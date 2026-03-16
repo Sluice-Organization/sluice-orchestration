@@ -16,23 +16,17 @@
       "name": "Friday 12 PM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, 0]
     },
     {
       "parameters": {
-        "jsCode": "// Hardcoded business list (replace getMany which doesn't work for file resource)\nreturn [{ json: { name: 'bayflow', path: 'memory-bank/businesses/bayflow' } }];"
+        "jsCode": "// Hardcoded business list\nreturn [{ json: { name: 'bayflow', path: 'memory-bank/businesses/bayflow' } }];"
       },
       "id": "list-businesses",
       "name": "List All Businesses",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        220,
-        0
-      ]
+      "position": [220, 0]
     },
     {
       "parameters": {
@@ -42,10 +36,7 @@
       "name": "Filter Active Businesses",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        440,
-        0
-      ]
+      "position": [440, 0]
     },
     {
       "parameters": {
@@ -59,40 +50,101 @@
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        660,
-        -50
-      ]
+      "position": [660, 0]
     },
     {
       "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "={{ $json.businessPath }}/strategy.md",
+        "filePath": "={{ $('Filter Active Businesses').first().json.businessPath }}/strategy.md",
         "resource": "file"
       },
       "id": "read-strategy",
-      "name": "Read Strategy",
+      "name": "Read Strategy (save SHA)",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        660,
-        50
-      ]
+      "position": [880, 0]
     },
     {
       "parameters": {
-        "jsCode": "const state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\nconst businessId = $('Filter Active Businesses').first().json.businessId;\n\nreturn [{\n  json: {\n    businessId,\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Portfolio Orchestrator for The Forge (Forge Technologies).\n\nYou have cross-portfolio intelligence responsibilities. You read all CEO Agent state files and the Knowledge Graph.\n\nHere is the current portfolio data:\n\n## Business: ${businessId}\n### State\n${state}\n\n### Strategy\n${strategy}\n\nPerform your weekly portfolio review:\n\n1. **Revenue Ceiling Enforcement:** Can each business plausibly reach $100K MRR? If ceiling is $15-30K, flag it (still valuable, but no breakout investment).\n\n2. **Distribution Channel Intelligence:** Which keywords are converting? Which content formats drive signups? Identify cross-portfolio patterns.\n\n3. **Breakout Detection:** Any business showing >30% MoM growth? Flag immediately for budget increase.\n\n4. **Kill/Sell Assessment:** Any business with no revenue after 60 days? Any plateaued at $5-30K MRR (sell candidate on Acquire.com at 3-4x annual)?\n\n5. **Content Reuse:** Can winning content strategies from one business be adapted for others in related verticals?\n\n6. **UGC Graduation:** Any business at $5K+ MRR still running 100% AI content? Flag for UGC transition.\n\n7. **Token Budget Audit:** Are AI costs per business reasonable for the stage? Any businesses hitting token caps without results (kill signal)?\n\nOutput your report in markdown with clear action items for each business.`\n  }\n}];"
+        "jsCode": "// Compute report date strings for file lookups\nconst now = new Date();\nconst today = now.toISOString().split('T')[0];\n\n// Last Monday\nconst dayOfWeek = now.getDay();\nconst daysToMonday = (dayOfWeek + 6) % 7; // 0=Sun => 6, 1=Mon => 0, ..., 5=Fri => 4\nconst lastMonday = new Date(now);\nlastMonday.setDate(now.getDate() - (daysToMonday === 0 ? 7 : daysToMonday));\nconst lastMondayStr = lastMonday.toISOString().split('T')[0];\n\n// Last Tuesday\nconst daysToTuesday = (dayOfWeek + 5) % 7; // 0=Sun => 5, 1=Mon => 6, 2=Tue => 0, ..., 5=Fri => 3\nconst lastTuesday = new Date(now);\nlastTuesday.setDate(now.getDate() - (daysToTuesday === 0 ? 7 : daysToTuesday));\nconst lastTuesdayStr = lastTuesday.toISOString().split('T')[0];\n\n// Pass through business context\nconst businessId = $('Filter Active Businesses').first().json.businessId;\nconst businessPath = $('Filter Active Businesses').first().json.businessPath;\nconst stateContent = $('Read State').first().json.content || '';\nconst strategyContent = $('Read Strategy (save SHA)').first().json.content || '';\nconst strategySha = $('Read Strategy (save SHA)').first().json.sha || '';\n\nreturn [{\n  json: {\n    today,\n    lastMonday: lastMondayStr,\n    lastTuesday: lastTuesdayStr,\n    businessId,\n    businessPath,\n    stateContent,\n    strategyContent,\n    strategySha\n  }\n}];"
       },
-      "id": "build-prompt",
-      "name": "Build Orchestrator Prompt",
+      "id": "compute-dates",
+      "name": "Compute Report Dates",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        880,
-        0
-      ]
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.businessPath }}/reports/ceo-{{ $json.lastMonday }}.md",
+        "resource": "file"
+      },
+      "id": "read-ceo-report",
+      "name": "Read Latest CEO Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1320, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/system/discovery-opportunities-{{ $('Compute Report Dates').first().json.lastTuesday }}.md",
+        "resource": "file"
+      },
+      "id": "read-discovery",
+      "name": "Read Latest Discovery Opportunities",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1540, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "memory-bank/system/comptroller-review-{{ $('Compute Report Dates').first().json.lastMonday }}.md",
+        "resource": "file"
+      },
+      "id": "read-comptroller",
+      "name": "Read Latest Comptroller Review",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1760, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $('Compute Report Dates').first().json.businessPath }}/reports/product-{{ $('Compute Report Dates').first().json.lastMonday }}.md",
+        "resource": "file"
+      },
+      "id": "read-product-report",
+      "name": "Read Latest Product Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1980, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge all context into a single prompt\nconst dates = $('Compute Report Dates').first().json;\nconst businessId = dates.businessId;\nconst stateContent = dates.stateContent;\nconst strategyContent = dates.strategyContent;\n\n// Safely extract content from optional reads (may have failed)\nlet ceoReport = '';\ntry { ceoReport = $('Read Latest CEO Report').first().json.content || ''; } catch(e) { ceoReport = '[No CEO report found for this period]'; }\n\nlet discoveryOpps = '';\ntry { discoveryOpps = $('Read Latest Discovery Opportunities').first().json.content || ''; } catch(e) { discoveryOpps = '[No discovery opportunities found for this period]'; }\n\nlet comptrollerReview = '';\ntry { comptrollerReview = $('Read Latest Comptroller Review').first().json.content || ''; } catch(e) { comptrollerReview = '[No comptroller review found for this period]'; }\n\nlet productReport = '';\ntry { productReport = $('Read Latest Product Report').first().json.content || ''; } catch(e) { productReport = '[No product report found for this period]'; }\n\nconst prompt = `Today is ${dates.today}. You are the Portfolio Orchestrator for The Forge (Forge Technologies, Inc.).\n\nYou have cross-portfolio intelligence responsibilities. You review ALL agent outputs holistically to identify patterns, risks, and opportunities across the entire portfolio.\n\nHere is the current portfolio data:\n\n## Business: ${businessId}\n\n### Current State\n${stateContent}\n\n### Current Strategy\n${strategyContent}\n\n### Latest CEO Report (${dates.lastMonday})\n${ceoReport}\n\n### Latest Discovery Opportunities (${dates.lastTuesday})\n${discoveryOpps}\n\n### Latest Comptroller Review (${dates.lastMonday})\n${comptrollerReview}\n\n### Latest Product Report (${dates.lastMonday})\n${productReport}\n\n---\n\nPerform your weekly portfolio review. You MUST cover ALL of the following:\n\n1. **Holistic Agent Output Review:** Synthesize findings from the CEO report, comptroller review, and product report. Are agents aligned? Any contradictions or blind spots?\n\n2. **Discovery Opportunity Evaluation:** Review the latest discovery opportunities. Evaluate each for portfolio fit: Does it complement existing businesses? Is the market large enough (100K+ customers)? Does it match our clone-and-improve from Acquire.com strategy? Recommend accept/reject/defer for each.\n\n3. **Revenue Ceiling Enforcement:** Can each business plausibly reach $100K MRR? If ceiling is $15-30K, flag it (still valuable, but no breakout investment).\n\n4. **Distribution Channel Intelligence:** Which keywords are converting? Which content formats drive signups? Identify cross-portfolio patterns.\n\n5. **Breakout Detection:** Any business showing >30% MoM growth? Flag immediately for budget increase.\n\n6. **Kill/Sell Assessment:** Any business with no revenue after 60 days? Any plateaued at $5-30K MRR (sell candidate on Acquire.com at 3-4x annual)?\n\n7. **Content Reuse:** Can winning content strategies from one business be adapted for others in related verticals?\n\n8. **UGC Graduation:** Any business at $5K+ MRR still running 100% AI content? Flag for UGC transition.\n\n9. **Token Budget Audit:** Are AI costs per business reasonable for the stage? Any businesses hitting token caps without results (kill signal)?\n\n---\n\n**OUTPUT FORMAT:**\n\nFirst, output your full portfolio review report in markdown.\n\nThen, if any strategic adjustments are needed for the business strategy, output them between delimiters. The content between the delimiters should be the COMPLETE updated strategy.md file content (not a diff).\n\n===STRATEGY_UPDATE_START===\n[Full updated strategy.md content here, only if changes are needed]\n===STRATEGY_UPDATE_END===\n\nIf no strategic adjustments are needed, do NOT include the strategy update delimiters.`;\n\nreturn [{ json: { prompt, strategySha: dates.strategySha, businessId, businessPath: dates.businessPath } }];"
+      },
+      "id": "merge-context",
+      "name": "Merge Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 0]
     },
     {
       "parameters": {
@@ -103,46 +155,67 @@
       "name": "Orchestrator LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [
-        1100,
-        0
-      ]
+      "position": [2420, 0]
     },
     {
       "parameters": {
-        "model": "claude-opus-4-20250514",
+        "model": "claude-opus-4-6",
         "options": {
           "temperature": 0.3,
-          "maxTokens": 3000
+          "maxTokensToSample": 3000
         }
       },
       "id": "opus-model",
       "name": "Opus Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [
-        1100,
-        220
-      ]
+      "position": [2420, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the LLM output: extract report and optional strategy update\nconst fullOutput = $('Orchestrator LLM Chain').first().json.text || '';\nconst strategySha = $('Merge Context').first().json.strategySha;\nconst businessId = $('Merge Context').first().json.businessId;\nconst businessPath = $('Merge Context').first().json.businessPath;\n\nlet report = fullOutput;\nlet strategyUpdate = '';\nlet hasStrategyUpdate = false;\n\nconst startDelim = '===STRATEGY_UPDATE_START===';\nconst endDelim = '===STRATEGY_UPDATE_END===';\n\nconst startIdx = fullOutput.indexOf(startDelim);\nconst endIdx = fullOutput.indexOf(endDelim);\n\nif (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {\n  report = fullOutput.substring(0, startIdx).trim();\n  strategyUpdate = fullOutput.substring(startIdx + startDelim.length, endIdx).trim();\n  hasStrategyUpdate = true;\n}\n\nreturn [{\n  json: {\n    report,\n    strategyUpdate,\n    hasStrategyUpdate,\n    strategySha,\n    businessId,\n    businessPath\n  }\n}];"
+      },
+      "id": "parse-output",
+      "name": "Parse Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 0]
     },
     {
       "parameters": {
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/system/orchestrator-review-{{ $now.format('yyyy-MM-dd') }}.md",
-        "fileContent": "={{ $json.text }}",
-        "commitMessage": "Portfolio Orchestrator weekly review - {{ $now.format('yyyy-MM-dd') }}",
+        "filePath": "memory-bank/system/orchestrator-review-{{ $now.toFormat('yyyy-MM-dd') }}.md",
+        "fileContent": "={{ $json.report }}",
+        "commitMessage": "Portfolio Orchestrator weekly review - {{ $now.toFormat('yyyy-MM-dd') }}",
         "resource": "file"
       },
       "id": "write-report",
       "name": "Write Orchestrator Report",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [
-        1320,
-        0
-      ]
+      "position": [2860, -100]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.businessPath }}/strategy.md",
+        "fileContent": "={{ $json.strategyUpdate }}",
+        "commitMessage": "Orchestrator strategic adjustment - {{ $now.toFormat('yyyy-MM-dd') }}",
+        "additionalParameters": {
+          "sha": "={{ $json.strategySha }}"
+        },
+        "resource": "file"
+      },
+      "id": "update-strategy",
+      "name": "Update Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2860, 100],
+      "executeOnce": true
     }
   ],
   "connections": {
@@ -183,25 +256,80 @@
       "main": [
         [
           {
-            "node": "Read Strategy",
+            "node": "Read Strategy (save SHA)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read Strategy": {
+    "Read Strategy (save SHA)": {
       "main": [
         [
           {
-            "node": "Build Orchestrator Prompt",
+            "node": "Compute Report Dates",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Build Orchestrator Prompt": {
+    "Compute Report Dates": {
+      "main": [
+        [
+          {
+            "node": "Read Latest CEO Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Latest CEO Report": {
+      "main": [
+        [
+          {
+            "node": "Read Latest Discovery Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Latest Discovery Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Read Latest Comptroller Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Latest Comptroller Review": {
+      "main": [
+        [
+          {
+            "node": "Read Latest Product Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Latest Product Report": {
+      "main": [
+        [
+          {
+            "node": "Merge Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Context": {
       "main": [
         [
           {
@@ -227,7 +355,23 @@
       "main": [
         [
           {
+            "node": "Parse Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Output": {
+      "main": [
+        [
+          {
             "node": "Write Orchestrator Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Strategy",
             "type": "main",
             "index": 0
           }

@@ -1,0 +1,201 @@
+{
+  "name": "Competitor Monitor - Weekly Intel",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * 5"
+            }
+          ]
+        }
+      },
+      "id": "weekly-trigger",
+      "name": "Weekly Friday 3 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const competitors = [\n  { name: 'Tekmetric', domain: 'tekmetric.com', pricingUrl: 'https://www.tekmetric.com/pricing', blogUrl: 'https://www.tekmetric.com/blog' },\n  { name: 'Shop-Ware', domain: 'shop-ware.com', pricingUrl: 'https://www.shop-ware.com/pricing', blogUrl: 'https://www.shop-ware.com/blog' },\n  { name: 'AutoLeap', domain: 'autoleap.com', pricingUrl: 'https://www.autoleap.com/pricing', blogUrl: 'https://www.autoleap.com/blog' },\n  { name: 'Mitchell 1', domain: 'mitchell1.com', pricingUrl: 'https://www.mitchell1.com/shop-management', blogUrl: 'https://www.mitchell1.com/news' }\n];\nreturn competitors.map(c => ({ json: c }));"
+      },
+      "id": "define-competitors",
+      "name": "Define Competitors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.pricingUrl }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-pricing",
+      "name": "Fetch Pricing Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://serpapi.com/search.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "q", "value": "={{ $json.name + ' auto repair software reviews' }}" },
+            { "name": "api_key", "value": "={{ $env.SERPAPI_API_KEY }}" },
+            { "name": "engine", "value": "google" },
+            { "name": "num", "value": "10" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-reviews",
+      "name": "Check Reviews via SerpAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 350],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.blogUrl }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-blog",
+      "name": "Fetch Blog Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 550],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const competitor = $('Define Competitors').item.json;\nconst pricingResponse = $('Fetch Pricing Page').item.json;\nconst reviewResponse = $('Check Reviews via SerpAPI').item.json;\nconst blogResponse = $('Fetch Blog Page').item.json;\n\n// Extract pricing info (look for dollar signs and plan names in raw HTML)\nconst pricingHtml = typeof pricingResponse === 'string' ? pricingResponse : (pricingResponse.data || pricingResponse.body || '');\nconst priceMatches = (typeof pricingHtml === 'string') ? pricingHtml.match(/\\$[\\d,]+(?:\\.\\d{2})?(?:\\/mo|per month|month)?/gi) || [] : [];\nconst pricingStatus = pricingResponse.statusCode === 200 ? 'accessible' : 'blocked_or_error';\n\n// Extract review snippets from SerpAPI results\nconst organicResults = reviewResponse.organic_results || [];\nconst reviewSnippets = organicResults.slice(0, 5).map(r => ({\n  title: r.title || '',\n  snippet: r.snippet || '',\n  link: r.link || ''\n}));\n\n// Check if blog has recent posts (look for dates in HTML)\nconst blogHtml = typeof blogResponse === 'string' ? blogResponse : (blogResponse.data || blogResponse.body || '');\nconst blogStatus = blogResponse.statusCode === 200 ? 'accessible' : 'blocked_or_error';\n\nreturn [{\n  json: {\n    competitor: competitor.name,\n    domain: competitor.domain,\n    pricing: {\n      status: pricingStatus,\n      detected_prices: priceMatches.slice(0, 10)\n    },\n    reviews: reviewSnippets,\n    blog: {\n      status: blogStatus\n    }\n  }\n}];"
+      },
+      "id": "parse-intel",
+      "name": "Parse Competitor Intel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allIntel = $('Parse Competitor Intel').all().map(i => i.json);\nconst date = $now.toFormat('yyyy-MM-dd');\n\nlet report = `# Competitive Intelligence Report - BayFlow - ${date}\\n\\n`;\n\nlet hasSignificant = false;\n\nfor (const comp of allIntel) {\n  report += `## ${comp.competitor} (${comp.domain})\\n\\n`;\n\n  // Pricing\n  report += `### Pricing\\n`;\n  report += `- Page status: ${comp.pricing.status}\\n`;\n  if (comp.pricing.detected_prices.length > 0) {\n    report += `- Detected prices: ${comp.pricing.detected_prices.join(', ')}\\n`;\n  } else {\n    report += `- No prices detected (may use custom quoting)\\n`;\n  }\n  report += `\\n`;\n\n  // Reviews\n  report += `### Recent Review Mentions\\n`;\n  if (comp.reviews.length > 0) {\n    for (const r of comp.reviews) {\n      report += `- **${r.title}**: ${r.snippet}\\n`;\n    }\n  } else {\n    report += `- No review data found\\n`;\n  }\n  report += `\\n`;\n\n  // Blog\n  report += `### Blog\\n`;\n  report += `- Status: ${comp.blog.status}\\n`;\n  report += `\\n---\\n\\n`;\n}\n\nreport += `*Generated by Competitor Monitor at ${new Date().toISOString()}*\\n`;\n\n// Flag significant if any pricing page became accessible/blocked\nfor (const comp of allIntel) {\n  if (comp.pricing.detected_prices.length > 0) hasSignificant = true;\n}\n\nreturn [{ json: { report, date, hasSignificant, competitorCount: allIntel.length } }];"
+      },
+      "id": "build-report",
+      "name": "Build Intel Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 350]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ 'memory-bank/businesses/bayflow/reports/competitor-intel-' + $json.date + '.md' }}",
+        "fileContent": "={{ $json.report }}",
+        "commitMessage": "={{ 'Competitor Monitor report - bayflow - ' + $json.date }}"
+      },
+      "id": "write-report",
+      "name": "Write Report to GitHub",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1300, 250],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "has-significant",
+              "leftValue": "={{ $json.hasSignificant }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-significant",
+      "name": "Significant Changes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1300, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'Competitor Monitor: Weekly report generated for ' + $json.competitorCount + ' competitors. Pricing changes detected - check the report.', source: 'competitor-monitor' }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram",
+      "name": "Notify Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 450],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Weekly Friday 3 AM": {
+      "main": [[{ "node": "Define Competitors", "type": "main", "index": 0 }]]
+    },
+    "Define Competitors": {
+      "main": [[
+        { "node": "Fetch Pricing Page", "type": "main", "index": 0 },
+        { "node": "Check Reviews via SerpAPI", "type": "main", "index": 0 },
+        { "node": "Fetch Blog Page", "type": "main", "index": 0 }
+      ]]
+    },
+    "Fetch Pricing Page": {
+      "main": [[{ "node": "Parse Competitor Intel", "type": "main", "index": 0 }]]
+    },
+    "Check Reviews via SerpAPI": {
+      "main": [[{ "node": "Parse Competitor Intel", "type": "main", "index": 1 }]]
+    },
+    "Fetch Blog Page": {
+      "main": [[{ "node": "Parse Competitor Intel", "type": "main", "index": 2 }]]
+    },
+    "Parse Competitor Intel": {
+      "main": [[{ "node": "Build Intel Report", "type": "main", "index": 0 }]]
+    },
+    "Build Intel Report": {
+      "main": [[
+        { "node": "Write Report to GitHub", "type": "main", "index": 0 },
+        { "node": "Significant Changes?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Significant Changes?": {
+      "main": [
+        [{ "node": "Notify Telegram", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,455 @@
+{
+  "name": "Content Publisher - BayFlow Blog",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Monday 9:30 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ `https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/bayflow/reports/content-${$now.toFormat('yyyy-MM-dd')}.md` }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "read-content-report",
+      "name": "Step 1 - Read Content Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.content !== undefined && $json.content !== '' }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-report-exists",
+      "name": "Report Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Decode the base64 content from GitHub API response\nconst rawContent = Buffer.from($('Step 1 - Read Content Report').first().json.content, 'base64').toString('utf-8');\n\n// Split content by the ---PIECE--- markers used by Content Agent\nconst pieces = rawContent.split('---PIECE---').filter(p => p.trim().length > 0);\n\nconst today = $now.toFormat('yyyy-MM-dd');\nconst blogPosts = [];\n\nfor (const piece of pieces) {\n  const trimmed = piece.trim();\n  \n  // Only process blog type pieces (skip reels)\n  const typeMatch = trimmed.match(/type:\\s*(blog|reel)/i);\n  if (typeMatch && typeMatch[1].toLowerCase() === 'reel') {\n    continue; // Skip reel scripts\n  }\n  \n  let title = '';\n  let excerpt = '';\n  let tags = ['auto repair', 'shop management'];\n  let bodyContent = trimmed;\n  \n  // Check if piece already has frontmatter\n  const frontmatterMatch = trimmed.match(/^---\\n([\\s\\S]*?)\\n---\\n([\\s\\S]*)$/);\n  if (frontmatterMatch) {\n    const fm = frontmatterMatch[1];\n    bodyContent = frontmatterMatch[2].trim();\n    \n    const titleMatch = fm.match(/title:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (titleMatch) title = titleMatch[1];\n    \n    const descMatch = fm.match(/description:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (descMatch) excerpt = descMatch[1];\n    \n    const excerptMatch = fm.match(/excerpt:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (excerptMatch) excerpt = excerptMatch[1];\n    \n    const tagsMatch = fm.match(/tags:\\s*\\[(.+?)\\]/m);\n    if (tagsMatch) {\n      tags = tagsMatch[1].split(',').map(t => t.trim().replace(/[\"']/g, ''));\n    }\n  } else {\n    // Extract title from first markdown heading\n    const headingMatch = trimmed.match(/^#\\s+(.+)$/m);\n    if (headingMatch) {\n      title = headingMatch[1].trim();\n      bodyContent = trimmed.replace(/^#\\s+.+$/m, '').trim();\n    }\n    \n    // Try to extract title from metadata line\n    const metaTitleMatch = trimmed.match(/title:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (metaTitleMatch && !title) {\n      title = metaTitleMatch[1];\n    }\n  }\n  \n  // Skip pieces without a title (not a blog post)\n  if (!title) continue;\n  \n  // Generate excerpt from first paragraph if not found\n  if (!excerpt) {\n    const firstParagraph = bodyContent.split('\\n\\n').find(p => p.trim().length > 20 && !p.startsWith('#') && !p.startsWith('type:') && !p.startsWith('tags:'));\n    if (firstParagraph) {\n      excerpt = firstParagraph.trim().substring(0, 160).replace(/\\n/g, ' ');\n      if (excerpt.length >= 160) excerpt += '...';\n    } else {\n      excerpt = title;\n    }\n  }\n  \n  // Strip metadata lines from body content\n  bodyContent = bodyContent\n    .replace(/^type:\\s*.+$/gm, '')\n    .replace(/^tags:\\s*.+$/gm, '')\n    .replace(/^title:\\s*.+$/gm, '')\n    .replace(/^description:\\s*.+$/gm, '')\n    .replace(/^excerpt:\\s*.+$/gm, '')\n    .replace(/^author:\\s*.+$/gm, '')\n    .replace(/^date:\\s*.+$/gm, '')\n    .trim();\n  \n  // Generate URL-friendly slug from title\n  const slug = title\n    .toLowerCase()\n    .replace(/[^a-z0-9\\s-]/g, '')\n    .replace(/\\s+/g, '-')\n    .replace(/-+/g, '-')\n    .replace(/^-|-$/g, '')\n    .substring(0, 80);\n  \n  // Build proper gray-matter frontmatter\n  const tagsFormatted = JSON.stringify(tags);\n  const fullContent = `---\\ntitle: \"${title.replace(/\"/g, '\\\\\"')}\"\\nexcerpt: \"${excerpt.replace(/\"/g, '\\\\\"')}\"\\ndate: \"${today}\"\\nauthor: \"BayFlow Team\"\\ntags: ${tagsFormatted}\\n---\\n\\n${bodyContent}`;\n  \n  blogPosts.push({\n    slug,\n    title,\n    content_with_frontmatter: fullContent\n  });\n}\n\nif (blogPosts.length === 0) {\n  return [{ json: { noPosts: true, message: 'No blog posts found in content report' } }];\n}\n\nreturn blogPosts.map(post => ({ json: post }));"
+      },
+      "id": "parse-content",
+      "name": "Step 2 - Parse Blog Posts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.noPosts !== true }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-posts-check",
+      "name": "Has Posts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ `https://api.github.com/repos/ShalinPatel670/bayflow/contents/src/content/blog/${$json.slug}.md` }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "check-existing-file",
+      "name": "Step 3a - Check If File Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const slug = $json.slug;\nconst title = $json.title;\nconst content = $json.content_with_frontmatter;\nconst contentB64 = Buffer.from(content, 'utf-8').toString('base64');\n\n// Check if the file already exists (has a sha)\nconst existingFile = $('Step 3a - Check If File Exists').first().json;\nconst sha = existingFile.sha || null;\n\nconst payload = {\n  message: `Publish blog post: ${title}`,\n  content: contentB64\n};\n\n// If file exists, include sha for update\nif (sha) {\n  payload.sha = sha;\n}\n\nreturn [{\n  json: {\n    slug,\n    title,\n    payload: JSON.stringify(payload)\n  }\n}];"
+      },
+      "id": "prepare-commit",
+      "name": "Step 3b - Prepare Commit Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ `https://api.github.com/repos/ShalinPatel670/bayflow/contents/src/content/blog/${$json.slug}.md` }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "commit-to-bayflow",
+      "name": "Step 3c - Commit Blog Post to BayFlow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const slug = $('Step 3b - Prepare Commit Payload').first().json.slug;\nconst blogUrl = `https://bayflow.app/blog/${slug}`;\n\nreturn [{\n  json: {\n    slug,\n    blogUrl,\n    indexingPayload: JSON.stringify({\n      url: blogUrl,\n      type: 'URL_UPDATED'\n    })\n  }\n}];"
+      },
+      "id": "prepare-indexing",
+      "name": "Step 4a - Prepare Indexing Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://indexing.googleapis.com/v3/urlNotifications:publish",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.GOOGLE_INDEXING_API_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.indexingPayload }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "submit-to-gsc",
+      "name": "Step 4b - Submit to Google Indexing API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        -100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect results from all processed blog posts\nconst items = $input.all();\nconst today = $now.toFormat('yyyy-MM-dd');\n\nconst publishedPosts = [];\nfor (const item of items) {\n  publishedPosts.push({\n    slug: item.json.slug || 'unknown',\n    url: item.json.blogUrl || 'unknown',\n    indexingSubmitted: !item.json.error\n  });\n}\n\nconst report = `# Content Publisher Report - ${today}\\n\\n## Status: SUCCESS\\n\\n## Published Blog Posts\\n\\n${publishedPosts.map((p, i) => `### ${i + 1}. ${p.slug}\\n- **URL**: ${p.url}\\n- **Committed to**: src/content/blog/${p.slug}.md\\n- **Google Indexing**: ${p.indexingSubmitted ? 'Submitted' : 'Skipped (API not configured)'}\\n`).join('\\n')}\\n\\n## Summary\\n- **Total posts published**: ${publishedPosts.length}\\n- **Target repo**: ShalinPatel670/bayflow\\n- **Vercel auto-deploy**: Triggered by commit\\n- **Timestamp**: ${new Date().toISOString()}\\n`;\n\nconst reportB64 = Buffer.from(report, 'utf-8').toString('base64');\n\nreturn [{\n  json: {\n    report,\n    reportPayload: JSON.stringify({\n      message: `Content Publisher report - ${today}`,\n      content: reportB64\n    })\n  }\n}];"
+      },
+      "id": "build-report",
+      "name": "Step 5a - Build Publish Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ `https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/bayflow/reports/publish-${$now.toFormat('yyyy-MM-dd')}.md` }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "token {{ $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.reportPayload }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "save-publish-report",
+      "name": "Step 5b - Save Publish Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        -100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { status: 'skipped', reason: 'No content report found for today. Content Agent may not have run yet.' } }];"
+      },
+      "id": "no-report-handler",
+      "name": "No Report - Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { status: 'skipped', reason: 'Content report contained no publishable blog posts.' } }];"
+      },
+      "id": "no-posts-handler",
+      "name": "No Posts - Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Monday 9:30 AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Step 1 - Read Content Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 1 - Read Content Report": {
+      "main": [
+        [
+          {
+            "node": "Report Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Exists?": {
+      "main": [
+        [
+          {
+            "node": "Step 2 - Parse Blog Posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Report - Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 2 - Parse Blog Posts": {
+      "main": [
+        [
+          {
+            "node": "Has Posts?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Posts?": {
+      "main": [
+        [
+          {
+            "node": "Step 3a - Check If File Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Posts - Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 3a - Check If File Exists": {
+      "main": [
+        [
+          {
+            "node": "Step 3b - Prepare Commit Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 3b - Prepare Commit Payload": {
+      "main": [
+        [
+          {
+            "node": "Step 3c - Commit Blog Post to BayFlow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 3c - Commit Blog Post to BayFlow": {
+      "main": [
+        [
+          {
+            "node": "Step 4a - Prepare Indexing Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 4a - Prepare Indexing Request": {
+      "main": [
+        [
+          {
+            "node": "Step 4b - Submit to Google Indexing API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 4b - Submit to Google Indexing API": {
+      "main": [
+        [
+          {
+            "node": "Step 5a - Build Publish Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 5a - Build Publish Report": {
+      "main": [
+        [
+          {
+            "node": "Step 5b - Save Publish Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

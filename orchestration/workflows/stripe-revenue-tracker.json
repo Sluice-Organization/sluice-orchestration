@@ -1,0 +1,390 @@
+{
+  "name": "Stripe Revenue Tracker - Real Revenue to Knowledge Graph",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stripe-events",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Stripe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 1: Parse and verify Stripe webhook event\n// In production, verify stripe-signature header against webhook secret.\n// For now, parse the event and extract relevant data.\n\nconst event = $input.first().json.body || $input.first().json;\n\nconst eventType = event.type || 'unknown';\nconst eventData = event.data?.object || {};\nconst eventId = event.id || `evt_${Date.now()}`;\nconst today = new Date().toISOString().split('T')[0];\n\n// Extract business_id from metadata, default to bayflow\nconst businessId = eventData.metadata?.business_id || eventData.subscription_details?.metadata?.business_id || 'bayflow';\n\n// Extract common fields depending on event type\nlet amount = 0;\nlet currency = 'usd';\nlet customerId = eventData.customer || '';\nlet customerEmail = eventData.customer_email || eventData.customer_details?.email || '';\nlet subscriptionId = eventData.subscription || eventData.id || '';\nlet planInterval = eventData.plan?.interval || eventData.items?.data?.[0]?.plan?.interval || 'month';\nlet planAmount = eventData.plan?.amount || eventData.items?.data?.[0]?.plan?.amount || 0;\nlet channel = eventData.metadata?.channel || 'direct';\n\n// For invoice events, amount is in cents\nif (eventType.startsWith('invoice.')) {\n  amount = (eventData.amount_paid || eventData.amount_due || 0) / 100;\n  currency = eventData.currency || 'usd';\n  customerEmail = eventData.customer_email || customerEmail;\n}\n\n// For checkout sessions\nif (eventType === 'checkout.session.completed') {\n  amount = (eventData.amount_total || 0) / 100;\n  currency = eventData.currency || 'usd';\n  customerEmail = eventData.customer_details?.email || customerEmail;\n}\n\n// For subscriptions, calculate MRR contribution\nlet subscriptionMrr = 0;\nif (eventData.items?.data) {\n  for (const item of eventData.items.data) {\n    const unitAmount = (item.plan?.amount || item.price?.unit_amount || 0) / 100;\n    const quantity = item.quantity || 1;\n    const interval = item.plan?.interval || item.price?.recurring?.interval || 'month';\n    if (interval === 'year') {\n      subscriptionMrr += (unitAmount * quantity) / 12;\n    } else {\n      subscriptionMrr += unitAmount * quantity;\n    }\n  }\n} else if (planAmount > 0) {\n  subscriptionMrr = planInterval === 'year' ? (planAmount / 100) / 12 : planAmount / 100;\n}\n\nreturn [{\n  json: {\n    eventId,\n    eventType,\n    businessId,\n    today,\n    amount,\n    currency,\n    customerId,\n    customerEmail,\n    subscriptionId,\n    subscriptionMrr,\n    channel,\n    planInterval,\n    rawEvent: event\n  }\n}];"
+      },
+      "id": "parse-event",
+      "name": "Parse Stripe Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.eventType }}",
+                    "rightValue": "checkout.session.completed",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "checkout"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.eventType }}",
+                    "rightValue": "customer.subscription.created",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "sub_created"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.eventType }}",
+                    "rightValue": "customer.subscription.updated",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "sub_updated"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.eventType }}",
+                    "rightValue": "customer.subscription.deleted",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "sub_deleted"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.eventType }}",
+                    "rightValue": "invoice.payment_succeeded",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "payment_succeeded"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.eventType }}",
+                    "rightValue": "invoice.payment_failed",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "payment_failed"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "route-event",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [520, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// checkout.session.completed\n// Increment signups and conversions in daily_metrics\nconst event = $('Parse Stripe Event').first().json;\n\nreturn [{\n  json: {\n    business_id: null,\n    date: event.today,\n    signups: 1,\n    conversions: 1,\n    revenue_direct: event.amount,\n    channel: event.channel,\n    _eventType: event.eventType,\n    _subscriptionMrr: event.subscriptionMrr,\n    _amount: event.amount\n  }\n}];"
+      },
+      "id": "build-new-customer",
+      "name": "Build New Customer Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, -500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// customer.subscription.created\nconst event = $('Parse Stripe Event').first().json;\n\nreturn [{\n  json: {\n    business_id: null,\n    date: event.today,\n    signups: 1,\n    conversions: 1,\n    revenue_direct: 0,\n    channel: event.channel,\n    _eventType: event.eventType,\n    _subscriptionMrr: event.subscriptionMrr,\n    _amount: 0\n  }\n}];"
+      },
+      "id": "build-sub-created",
+      "name": "Build Sub Created Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, -300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// customer.subscription.updated (plan change)\nconst event = $('Parse Stripe Event').first().json;\n\nreturn [{\n  json: {\n    business_id: null,\n    date: event.today,\n    signups: 0,\n    conversions: 0,\n    revenue_direct: 0,\n    channel: event.channel,\n    _eventType: event.eventType,\n    _subscriptionMrr: event.subscriptionMrr,\n    _amount: 0\n  }\n}];"
+      },
+      "id": "build-sub-updated",
+      "name": "Build Sub Updated Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// customer.subscription.deleted (churn)\nconst event = $('Parse Stripe Event').first().json;\n\nreturn [{\n  json: {\n    business_id: null,\n    date: event.today,\n    signups: 0,\n    conversions: 0,\n    churn_count: 1,\n    churn_mrr: event.subscriptionMrr,\n    revenue_direct: 0,\n    channel: event.channel,\n    _eventType: event.eventType,\n    _subscriptionMrr: event.subscriptionMrr,\n    _amount: 0\n  }\n}];"
+      },
+      "id": "build-churn",
+      "name": "Build Churn Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// invoice.payment_succeeded\nconst event = $('Parse Stripe Event').first().json;\n\n// Determine revenue channel from metadata\nconst channelKey = `revenue_${event.channel}`;\nconst revenueObj = {};\nrevenueObj[channelKey] = event.amount;\n\nreturn [{\n  json: {\n    business_id: null,\n    date: event.today,\n    signups: 0,\n    conversions: 0,\n    ...revenueObj,\n    channel: event.channel,\n    _eventType: event.eventType,\n    _subscriptionMrr: event.subscriptionMrr,\n    _amount: event.amount\n  }\n}];"
+      },
+      "id": "build-revenue",
+      "name": "Build Revenue Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// invoice.payment_failed\nconst event = $('Parse Stripe Event').first().json;\n\nreturn [{\n  json: {\n    business_id: null,\n    date: event.today,\n    signups: 0,\n    conversions: 0,\n    revenue_direct: 0,\n    channel: event.channel,\n    _eventType: event.eventType,\n    _subscriptionMrr: 0,\n    _amount: event.amount\n  }\n}];"
+      },
+      "id": "build-failed-payment",
+      "name": "Build Failed Payment Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 500]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "business_id", "value": "eq.bayflow" },
+            { "name": "select", "value": "id,current_mrr,total_revenue" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "lookup-business",
+      "name": "Lookup Business UUID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge business UUID into metrics and prepare UPSERT payload\nconst metrics = $input.first().json;\nconst businessLookup = $('Lookup Business UUID').first().json;\n\n// businessLookup is an array from Supabase GET\nconst businesses = Array.isArray(businessLookup) ? businessLookup : [businessLookup];\nconst business = businesses[0] || {};\nconst businessUuid = business.id || null;\nconst currentMrr = business.current_mrr || 0;\nconst totalRevenue = business.total_revenue || 0;\n\nconst eventType = metrics._eventType;\nconst subscriptionMrr = metrics._subscriptionMrr || 0;\nconst amount = metrics._amount || 0;\n\n// Calculate new MRR based on event type\nlet newMrr = currentMrr;\nif (eventType === 'checkout.session.completed' || eventType === 'customer.subscription.created') {\n  newMrr = currentMrr + subscriptionMrr;\n} else if (eventType === 'customer.subscription.deleted') {\n  newMrr = Math.max(0, currentMrr - subscriptionMrr);\n} else if (eventType === 'customer.subscription.updated') {\n  // For plan changes, keep current MRR as-is.\n  // Accurate MRR requires summing all active subs or comparing previous_attributes.\n  newMrr = currentMrr;\n}\n\n// Calculate new total revenue\nlet newTotalRevenue = totalRevenue;\nif (eventType === 'invoice.payment_succeeded' || eventType === 'checkout.session.completed') {\n  newTotalRevenue = totalRevenue + amount;\n}\n\n// Build the daily_metrics UPSERT body\n// Remove internal fields prefixed with _\nconst upsertBody = {};\nfor (const [key, val] of Object.entries(metrics)) {\n  if (!key.startsWith('_')) {\n    upsertBody[key] = val;\n  }\n}\nupsertBody.business_id = businessUuid;\n\nreturn [{\n  json: {\n    upsertBody,\n    businessUuid,\n    newMrr,\n    newTotalRevenue,\n    eventType,\n    amount\n  }\n}];"
+      },
+      "id": "prepare-upsert",
+      "name": "Prepare UPSERT Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/daily_metrics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "resolution=merge-duplicates" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.upsertBody) }}",
+        "options": {}
+      },
+      "id": "upsert-daily-metrics",
+      "name": "UPSERT Daily Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, -200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "business_id", "value": "eq.bayflow" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ current_mrr: $json.newMrr, total_revenue: $json.newTotalRevenue }) }}",
+        "options": {}
+      },
+      "id": "update-business",
+      "name": "Update Business MRR & Revenue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build a markdown log entry for the Stripe event\nconst event = $('Parse Stripe Event').first().json;\nconst prepData = $('Prepare UPSERT Data').first().json;\nconst now = new Date();\nconst timeStr = now.toISOString().split('T')[1].split('.')[0];\n\nconst labels = {\n  'checkout.session.completed': 'NEW CUSTOMER',\n  'customer.subscription.created': 'NEW SUBSCRIPTION',\n  'customer.subscription.updated': 'PLAN CHANGE',\n  'customer.subscription.deleted': 'CHURN',\n  'invoice.payment_succeeded': 'PAYMENT RECEIVED',\n  'invoice.payment_failed': 'PAYMENT FAILED'\n};\n\nconst label = labels[event.eventType] || event.eventType;\n\nlet entry = `### [${timeStr}] ${label}\\n`;\nentry += `- **Event ID:** ${event.eventId}\\n`;\nentry += `- **Type:** ${event.eventType}\\n`;\nentry += `- **Customer:** ${event.customerEmail || event.customerId || 'unknown'}\\n`;\n\nif (event.amount > 0) {\n  entry += `- **Amount:** $${event.amount.toFixed(2)} ${event.currency.toUpperCase()}\\n`;\n}\n\nif (event.subscriptionMrr > 0) {\n  entry += `- **Subscription MRR:** $${event.subscriptionMrr.toFixed(2)}/mo\\n`;\n}\n\nentry += `- **Channel:** ${event.channel}\\n`;\n\nif (prepData.newMrr !== undefined) {\n  entry += `- **Updated MRR:** $${prepData.newMrr.toFixed(2)}\\n`;\n}\nif (prepData.newTotalRevenue !== undefined) {\n  entry += `- **Updated Total Revenue:** $${prepData.newTotalRevenue.toFixed(2)}\\n`;\n}\n\nentry += `\\n---\\n\\n`;\n\nconst filePath = `memory-bank/businesses/bayflow/reports/stripe-events-${event.today}.md`;\n\nreturn [{\n  json: {\n    logEntry: entry,\n    filePath,\n    today: event.today,\n    eventType: event.eventType\n  }\n}];"
+      },
+      "id": "build-log-entry",
+      "name": "Build Log Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.filePath }}",
+        "resource": "file",
+        "options": {}
+      },
+      "id": "read-existing-log",
+      "name": "Read Existing Stripe Log",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1800, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Append the new log entry to the existing file or create a new one\nconst logData = $('Build Log Entry').first().json;\nconst readResult = $input.first().json;\n\nlet existingContent = '';\nlet sha = null;\nlet fileExists = false;\n\nif (readResult.content && !readResult.error) {\n  if (readResult.encoding === 'base64') {\n    existingContent = Buffer.from(readResult.content, 'base64').toString('utf-8');\n  } else {\n    existingContent = readResult.content;\n  }\n  sha = readResult.sha;\n  fileExists = true;\n}\n\nlet fullContent;\nif (fileExists && existingContent.trim().length > 0) {\n  fullContent = existingContent.trimEnd() + '\\n\\n' + logData.logEntry;\n} else {\n  fullContent = `# Stripe Events - ${logData.today}\\n\\nReal revenue data from Stripe webhooks. Used by CEO Agent for accurate financial reporting.\\n\\n---\\n\\n` + logData.logEntry;\n}\n\nreturn [{\n  json: {\n    fileContent: fullContent,\n    sha,\n    fileExists,\n    filePath: logData.filePath\n  }\n}];"
+      },
+      "id": "append-log-entry",
+      "name": "Append Log Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2040, 200]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.filePath }}",
+        "fileContent": "={{ $json.fileContent }}",
+        "commitMessage": "Stripe event log - bayflow - {{ $now.toFormat('yyyy-MM-dd HH:mm') }}",
+        "additionalParameters": "={{ $json.sha ? JSON.stringify({ sha: $json.sha }) : '{}' }}",
+        "resource": "file"
+      },
+      "id": "write-stripe-log",
+      "name": "Write Stripe Event Log",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2280, 200],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Stripe Webhook": {
+      "main": [[{ "node": "Parse Stripe Event", "type": "main", "index": 0 }]]
+    },
+    "Parse Stripe Event": {
+      "main": [[{ "node": "Route by Event Type", "type": "main", "index": 0 }]]
+    },
+    "Route by Event Type": {
+      "main": [
+        [{ "node": "Build New Customer Metrics", "type": "main", "index": 0 }],
+        [{ "node": "Build Sub Created Metrics", "type": "main", "index": 0 }],
+        [{ "node": "Build Sub Updated Metrics", "type": "main", "index": 0 }],
+        [{ "node": "Build Churn Metrics", "type": "main", "index": 0 }],
+        [{ "node": "Build Revenue Metrics", "type": "main", "index": 0 }],
+        [{ "node": "Build Failed Payment Metrics", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build New Customer Metrics": {
+      "main": [[{ "node": "Lookup Business UUID", "type": "main", "index": 0 }]]
+    },
+    "Build Sub Created Metrics": {
+      "main": [[{ "node": "Lookup Business UUID", "type": "main", "index": 0 }]]
+    },
+    "Build Sub Updated Metrics": {
+      "main": [[{ "node": "Lookup Business UUID", "type": "main", "index": 0 }]]
+    },
+    "Build Churn Metrics": {
+      "main": [[{ "node": "Lookup Business UUID", "type": "main", "index": 0 }]]
+    },
+    "Build Revenue Metrics": {
+      "main": [[{ "node": "Lookup Business UUID", "type": "main", "index": 0 }]]
+    },
+    "Build Failed Payment Metrics": {
+      "main": [[{ "node": "Lookup Business UUID", "type": "main", "index": 0 }]]
+    },
+    "Lookup Business UUID": {
+      "main": [[{ "node": "Prepare UPSERT Data", "type": "main", "index": 0 }]]
+    },
+    "Prepare UPSERT Data": {
+      "main": [[
+        { "node": "UPSERT Daily Metrics", "type": "main", "index": 0 },
+        { "node": "Update Business MRR & Revenue", "type": "main", "index": 0 },
+        { "node": "Build Log Entry", "type": "main", "index": 0 }
+      ]]
+    },
+    "Build Log Entry": {
+      "main": [[{ "node": "Read Existing Stripe Log", "type": "main", "index": 0 }]]
+    },
+    "Read Existing Stripe Log": {
+      "main": [[{ "node": "Append Log Entry", "type": "main", "index": 0 }]]
+    },
+    "Append Log Entry": {
+      "main": [[{ "node": "Write Stripe Event Log", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

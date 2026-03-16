@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  huginn:
+    image: ghcr.io/huginn/huginn:latest
+    restart: always
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # --- Database (Railway PostgreSQL plugin) ---
+      DATABASE_ADAPTER: postgresql
+      DATABASE_HOST: ${PGHOST}
+      DATABASE_PORT: ${PGPORT:-5432}
+      DATABASE_NAME: ${PGDATABASE:-huginn}
+      DATABASE_USERNAME: ${PGUSER:-huginn}
+      DATABASE_PASSWORD: ${PGPASSWORD}
+
+      # --- App settings ---
+      DOMAIN: ${RAILWAY_PUBLIC_DOMAIN:-localhost:3000}
+      FORCE_SSL: "true"
+      INVITATION_CODE: ${INVITATION_CODE:-forgetech2026}
+      SEED_USERNAME: ${HUGINN_USERNAME:-admin}
+      SEED_PASSWORD: ${HUGINN_PASSWORD}
+      SECRET_TOKEN: ${SECRET_TOKEN}
+
+      # --- Timezone ---
+      TIMEZONE: America/New_York
+
+      # --- n8n webhook integration ---
+      # Not a native Huginn env var; used in Post Agent options.
+      # Stored here so Railway's variable UI keeps it visible.
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal}
+
+      # --- Worker tuning ---
+      DELAYED_JOB_MAX_RUNTIME: 20
+      HUGINN_SCHEDULER_FREQUENCY: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # --- Local dev only; on Railway use their PostgreSQL plugin instead ---
+  db:
+    image: postgres:16-alpine
+    restart: always
+    profiles: ["local"]
+    environment:
+      POSTGRES_DB: huginn
+      POSTGRES_USER: huginn
+      POSTGRES_PASSWORD: ${PGPASSWORD:-changeme}
+    volumes:
+      - huginn_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huginn"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  huginn_pg_data:

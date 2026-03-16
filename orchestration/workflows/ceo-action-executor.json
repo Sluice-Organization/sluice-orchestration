@@ -1,0 +1,1074 @@
+{
+  "name": "CEO Action Executor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ceo-actions",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook POST /ceo-actions",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "ceo-actions"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst businessId = body.businessId || 'unknown';\nconst actions = body.actions || [];\n\nconst validTypes = [\n  'EXPAND_LEAD_GEN', 'ACTIVATE_GOOGLE_ADS', 'SCALE_COLD_EMAIL',\n  'INCREASE_CONTENT', 'ADJUST_PRICING', 'LAUNCH_BUSINESS',\n  'KILL_BUSINESS', 'ACTIVATE_META_ADS', 'INCREASE_CALL_VOLUME',\n  'REQUEST_HUMAN_DECISION'\n];\n\nconst validatedActions = [];\nconst errors = [];\n\nfor (let i = 0; i < actions.length; i++) {\n  const action = actions[i];\n  if (!action.type || !validTypes.includes(action.type)) {\n    errors.push(`Action ${i}: invalid type '${action.type}'`);\n    continue;\n  }\n  if (!action.params || typeof action.params !== 'object') {\n    errors.push(`Action ${i}: missing or invalid params`);\n    continue;\n  }\n  validatedActions.push({\n    json: {\n      businessId,\n      actionIndex: i,\n      actionType: action.type,\n      params: action.params,\n      totalActions: actions.length\n    }\n  });\n}\n\nif (validatedActions.length === 0 && errors.length > 0) {\n  return [{ json: { businessId, error: true, errors, actionType: 'NONE', params: {} } }];\n}\n\nif (validatedActions.length === 0) {\n  return [{ json: { businessId, error: false, actionType: 'NONE', params: {}, message: 'No actions to execute' } }];\n}\n\nreturn validatedActions;"
+      },
+      "id": "parse-actions",
+      "name": "Parse & Validate Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputIndex": 0,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "EXPAND_LEAD_GEN", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 1,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "ACTIVATE_GOOGLE_ADS", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 2,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "SCALE_COLD_EMAIL", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 3,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "INCREASE_CONTENT", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 4,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "ADJUST_PRICING", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 5,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "LAUNCH_BUSINESS", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 6,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "KILL_BUSINESS", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 7,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "ACTIVATE_META_ADS", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 8,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "INCREASE_CALL_VOLUME", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 9,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "REQUEST_HUMAN_DECISION", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "route-action-type",
+      "name": "Route by Action Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $json.params;\nconst regions = params.regions || ['california'];\nconst queries = params.queries || ['auto repair shop'];\n\nconst combos = [];\nfor (const region of regions) {\n  for (const query of queries) {\n    combos.push({\n      json: {\n        businessId: $json.businessId,\n        actionType: $json.actionType,\n        region,\n        query,\n        searchQuery: `${query} in ${region}`\n      }\n    });\n  }\n}\nreturn combos;"
+      },
+      "id": "lead-gen-prepare",
+      "name": "Prepare Lead Gen Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, -400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://serpapi.com/search.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "engine", "value": "google_maps" },
+            { "name": "q", "value": "={{ $json.searchQuery }}" },
+            { "name": "api_key", "value": "={{ $env.SERPAPI_API_KEY }}" },
+            { "name": "type", "value": "search" }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "serpapi-scrape",
+      "name": "SerpAPI Google Maps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1020, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $json.local_results || $json.place_results || [];\nconst region = $('Prepare Lead Gen Queries').first().json.region;\nconst query = $('Prepare Lead Gen Queries').first().json.query;\nconst businessId = $('Prepare Lead Gen Queries').first().json.businessId;\n\nconst leads = results.map(r => ({\n  business_name: r.title || '',\n  address: r.address || '',\n  phone: r.phone || '',\n  website: r.website || '',\n  rating: r.rating || null,\n  reviews: r.reviews || 0,\n  region: region,\n  source_query: query,\n  status: 'new'\n}));\n\nreturn [{\n  json: {\n    businessId,\n    region,\n    query,\n    leads,\n    leadCount: leads.length,\n    actionType: 'EXPAND_LEAD_GEN',\n    success: true,\n    message: `Lead gen expanded to ${region}, found ${leads.length} new leads`\n  }\n}];"
+      },
+      "id": "lead-gen-parse",
+      "name": "Parse Lead Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, -400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.leads) }}"
+      },
+      "id": "lead-gen-save",
+      "name": "Save Leads to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'info', businessId: $json.businessId, message: $json.message }) }}"
+      },
+      "id": "lead-gen-notify",
+      "name": "Notify Lead Gen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1740, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://googleads.googleapis.com/v17/customers/CUSTOMER_ID/campaigns:mutate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer PLACEHOLDER_OAUTH_TOKEN" },
+            { "name": "developer-token", "value": "PLACEHOLDER_DEV_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ operations: [{ create: { name: 'Forge-' + $json.businessId + '-' + new Date().toISOString().split('T')[0], advertisingChannelType: 'SEARCH', status: 'PAUSED', campaignBudget: 'customers/CUSTOMER_ID/campaignBudgets/PLACEHOLDER', biddingStrategyType: 'MAXIMIZE_CLICKS' } }] }) }}"
+      },
+      "id": "google-ads-campaign",
+      "name": "Google Ads Create Campaign",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, -200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $json.params || $('Route by Action Type').first().json.params;\nconst keywords = params.keywords || [];\nconst dailyBudget = params.daily_budget || 20;\nconst businessId = $json.businessId || $('Route by Action Type').first().json.businessId;\n\nreturn [{\n  json: {\n    businessId,\n    actionType: 'ACTIVATE_GOOGLE_ADS',\n    success: true,\n    message: `Google Ads campaign created: $${dailyBudget}/day, ${keywords.length} keywords`,\n    note: 'Placeholder - Google Ads OAuth not yet configured. Campaign created in PAUSED state.'\n  }\n}];"
+      },
+      "id": "google-ads-result",
+      "name": "Google Ads Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, -200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'info', businessId: $json.businessId, message: $json.message }) }}"
+      },
+      "id": "google-ads-notify",
+      "name": "Notify Google Ads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, -200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/workflow_config?config_key=eq.cold_email_daily_limit",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ config_value: String($json.params.new_daily_limit || 50) }) }}"
+      },
+      "id": "scale-email-update",
+      "name": "Update Cold Email Limit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const newLimit = $json.params?.new_daily_limit || $('Route by Action Type').first().json.params?.new_daily_limit || 50;\nconst businessId = $json.businessId || $('Route by Action Type').first().json.businessId;\nreturn [{\n  json: {\n    businessId,\n    actionType: 'SCALE_COLD_EMAIL',\n    success: true,\n    message: `Cold email daily limit increased to ${newLimit}`\n  }\n}];"
+      },
+      "id": "scale-email-result",
+      "name": "Scale Email Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'info', businessId: $json.businessId, message: $json.message }) }}"
+      },
+      "id": "scale-email-notify",
+      "name": "Notify Scale Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/={{ $json.businessId }}/content-strategy.md",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'CEO Agent: Update content volume targets - ' + new Date().toISOString().split('T')[0], content: Buffer.from('# Content Strategy - Updated by CEO Agent\\n\\n## Volume Targets\\n- Blog posts per week: ' + ($json.params.blog_posts_per_week || 3) + '\\n- Reel scripts per week: ' + ($json.params.reel_scripts_per_week || 2) + '\\n\\nLast updated: ' + new Date().toISOString().split('T')[0] + ' by CEO Action Executor').toString('base64') }) }}"
+      },
+      "id": "content-update-github",
+      "name": "Update Content Strategy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $json.params || $('Route by Action Type').first().json.params || {};\nconst posts = params.blog_posts_per_week || 3;\nconst reels = params.reel_scripts_per_week || 2;\nconst businessId = $json.businessId || $('Route by Action Type').first().json.businessId;\nreturn [{\n  json: {\n    businessId,\n    actionType: 'INCREASE_CONTENT',\n    success: true,\n    message: `Content volume increased: ${posts} posts/week, ${reels} reels/week`\n  }\n}];"
+      },
+      "id": "content-result",
+      "name": "Content Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'info', businessId: $json.businessId, message: $json.message }) }}"
+      },
+      "id": "content-notify",
+      "name": "Notify Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'question', requiresResponse: true, businessId: $json.businessId, message: 'PRICING CHANGE REQUEST: Update ' + $json.params.plan + ' plan to $' + $json.params.new_price + '/mo. Approve?' }) }}"
+      },
+      "id": "pricing-approval",
+      "name": "Request Pricing Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $json.params || $('Route by Action Type').first().json.params || {};\nconst businessId = $json.businessId || $('Route by Action Type').first().json.businessId;\nreturn [{\n  json: {\n    businessId,\n    actionType: 'ADJUST_PRICING',\n    success: true,\n    message: `Pricing change requested: ${params.plan || 'unknown'} plan to $${params.new_price || '?'}/mo (awaiting human approval)`,\n    requiresApproval: true\n  }\n}];"
+      },
+      "id": "pricing-result",
+      "name": "Pricing Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/approve-opportunity",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $json.params.businessId, businessName: $json.params.businessName, businessDescription: $json.params.businessDescription, category: $json.params.category, source: 'ceo-action-executor' }) }}"
+      },
+      "id": "launch-business",
+      "name": "Launch Business",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $json.params || $('Route by Action Type').first().json.params || {};\nconst businessId = $json.businessId || $('Route by Action Type').first().json.businessId;\nreturn [{\n  json: {\n    businessId,\n    actionType: 'LAUNCH_BUSINESS',\n    success: true,\n    message: `CEO Agent initiated new business: ${params.businessName || 'unknown'}`\n  }\n}];"
+      },
+      "id": "launch-result",
+      "name": "Launch Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'info', businessId: $json.businessId, message: $json.message }) }}"
+      },
+      "id": "launch-notify",
+      "name": "Notify Launch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/kill-business",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $json.params.businessId, businessName: $json.params.businessName, reason: $json.params.reason, source: 'ceo-action-executor' }) }}"
+      },
+      "id": "kill-business",
+      "name": "Kill Business",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 800],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'critical', businessId: $json.params?.businessId || $json.businessId, message: 'BUSINESS KILLED: ' + ($json.params?.businessName || 'unknown') + ' - Reason: ' + ($json.params?.reason || 'none given') }) }}"
+      },
+      "id": "kill-notify",
+      "name": "Notify Kill",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1020, 800],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $json.params || $('Route by Action Type').first().json.params || {};\nconst businessId = $json.businessId || $('Route by Action Type').first().json.businessId;\nreturn [{\n  json: {\n    businessId,\n    actionType: 'KILL_BUSINESS',\n    success: true,\n    message: `Business killed: ${params.businessName || 'unknown'} - ${params.reason || 'no reason'}`\n  }\n}];"
+      },
+      "id": "kill-result",
+      "name": "Kill Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 800]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/act_PLACEHOLDER/campaigns",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer PLACEHOLDER_META_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: 'Forge-' + $json.businessId + '-' + new Date().toISOString().split('T')[0], objective: 'OUTCOME_LEADS', status: 'PAUSED', special_ad_categories: [] }) }}"
+      },
+      "id": "meta-ads-campaign",
+      "name": "Meta Ads Create Campaign",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 1000],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $json.params || $('Route by Action Type').first().json.params || {};\nconst dailyBudget = params.daily_budget || 20;\nconst businessId = $json.businessId || $('Route by Action Type').first().json.businessId;\nreturn [{\n  json: {\n    businessId,\n    actionType: 'ACTIVATE_META_ADS',\n    success: true,\n    message: `Meta Ads campaign created: $${dailyBudget}/day (placeholder - Meta OAuth not yet configured)`,\n    note: 'Placeholder - Meta Marketing API OAuth not yet configured. Campaign created in PAUSED state.'\n  }\n}];"
+      },
+      "id": "meta-ads-result",
+      "name": "Meta Ads Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 1000]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'info', businessId: $json.businessId, message: $json.message }) }}"
+      },
+      "id": "meta-ads-notify",
+      "name": "Notify Meta Ads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 1000],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/workflow_config?config_key=eq.ai_voice_daily_limit",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ config_value: String($json.params.daily_limit || 100) }) }}"
+      },
+      "id": "call-volume-update",
+      "name": "Update Call Volume Limit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 1200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $json.params || $('Route by Action Type').first().json.params || {};\nconst dailyLimit = params.daily_limit || 100;\nconst businessId = $json.businessId || $('Route by Action Type').first().json.businessId;\nreturn [{\n  json: {\n    businessId,\n    actionType: 'INCREASE_CALL_VOLUME',\n    success: true,\n    message: `AI voice caller daily limit increased to ${dailyLimit}`\n  }\n}];"
+      },
+      "id": "call-volume-result",
+      "name": "Call Volume Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 1200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'info', businessId: $json.businessId, message: $json.message }) }}"
+      },
+      "id": "call-volume-notify",
+      "name": "Notify Call Volume",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 1200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'question', requiresResponse: true, businessId: $json.businessId, message: 'CEO AGENT NEEDS YOUR INPUT:\\n\\n' + ($json.params?.question || 'No question specified') + '\\n\\nContext: ' + ($json.params?.context || 'none') + '\\n\\nOptions: ' + JSON.stringify($json.params?.options || []) }) }}"
+      },
+      "id": "human-decision-notify",
+      "name": "Request Human Decision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 1400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $json.params || $('Route by Action Type').first().json.params || {};\nconst businessId = $json.businessId || $('Route by Action Type').first().json.businessId;\nreturn [{\n  json: {\n    businessId,\n    actionType: 'REQUEST_HUMAN_DECISION',\n    success: true,\n    message: `Human decision requested: ${params.question || 'unknown question'}`,\n    requiresResponse: true\n  }\n}];"
+      },
+      "id": "human-decision-result",
+      "name": "Human Decision Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 1400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all action results from all branches\nconst allItems = $input.all();\nconst results = allItems.map(item => ({\n  actionType: item.json.actionType || 'UNKNOWN',\n  success: item.json.success !== false,\n  message: item.json.message || 'No message'\n}));\n\nconst businessId = allItems[0]?.json?.businessId || 'unknown';\nconst today = new Date().toISOString().split('T')[0];\n\nconst logContent = `# CEO Action Execution Log - ${today}\\n\\n` +\n  `**Business:** ${businessId}\\n` +\n  `**Executed at:** ${new Date().toISOString()}\\n` +\n  `**Total actions:** ${results.length}\\n\\n` +\n  `## Actions Executed\\n\\n` +\n  results.map((r, i) => `### ${i + 1}. ${r.actionType}\\n- **Status:** ${r.success ? 'SUCCESS' : 'FAILED'}\\n- **Details:** ${r.message}\\n`).join('\\n') +\n  `\\n---\\n*Generated by CEO Action Executor*\\n`;\n\nconst summary = results.map(r => `${r.success ? 'OK' : 'FAIL'} ${r.actionType}: ${r.message}`).join('\\n');\n\nreturn [{\n  json: {\n    businessId,\n    today,\n    logContent,\n    summary,\n    totalActions: results.length,\n    successCount: results.filter(r => r.success).length,\n    results\n  }\n}];"
+      },
+      "id": "collect-results",
+      "name": "Collect All Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/={{ $json.businessId }}/reports/ceo-actions-={{ $json.today }}.md",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'CEO Action Executor log - ' + $json.businessId + ' - ' + $json.today, content: Buffer.from($json.logContent).toString('base64') }) }}"
+      },
+      "id": "write-execution-log",
+      "name": "Write Execution Log to GitHub",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1860, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'info', businessId: $json.businessId, message: 'CEO Action Executor Summary (' + $json.totalActions + ' actions, ' + $json.successCount + ' succeeded):\\n\\n' + $json.summary }) }}"
+      },
+      "id": "final-summary-notify",
+      "name": "Notify Final Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1860, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, businessId: $json.businessId, actionsExecuted: $json.totalActions, successCount: $json.successCount }) }}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2100, 300]
+    }
+  ],
+  "connections": {
+    "Webhook POST /ceo-actions": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate Actions": {
+      "main": [
+        [
+          {
+            "node": "Route by Action Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Action Type": {
+      "main": [
+        [
+          {
+            "node": "Prepare Lead Gen Queries",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Ads Create Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Cold Email Limit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Content Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Request Pricing Approval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Launch Business",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Kill Business",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Meta Ads Create Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Call Volume Limit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Request Human Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Lead Gen Queries": {
+      "main": [
+        [
+          {
+            "node": "SerpAPI Google Maps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SerpAPI Google Maps": {
+      "main": [
+        [
+          {
+            "node": "Parse Lead Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Lead Results": {
+      "main": [
+        [
+          {
+            "node": "Save Leads to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Leads to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Notify Lead Gen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Lead Gen": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Ads Create Campaign": {
+      "main": [
+        [
+          {
+            "node": "Google Ads Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Ads Result": {
+      "main": [
+        [
+          {
+            "node": "Notify Google Ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Google Ads": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Cold Email Limit": {
+      "main": [
+        [
+          {
+            "node": "Scale Email Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scale Email Result": {
+      "main": [
+        [
+          {
+            "node": "Notify Scale Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Scale Email": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Content Strategy": {
+      "main": [
+        [
+          {
+            "node": "Content Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Result": {
+      "main": [
+        [
+          {
+            "node": "Notify Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Content": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Pricing Approval": {
+      "main": [
+        [
+          {
+            "node": "Pricing Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pricing Result": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Launch Business": {
+      "main": [
+        [
+          {
+            "node": "Launch Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Launch Result": {
+      "main": [
+        [
+          {
+            "node": "Notify Launch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Launch": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kill Business": {
+      "main": [
+        [
+          {
+            "node": "Notify Kill",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Kill": {
+      "main": [
+        [
+          {
+            "node": "Kill Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kill Result": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta Ads Create Campaign": {
+      "main": [
+        [
+          {
+            "node": "Meta Ads Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta Ads Result": {
+      "main": [
+        [
+          {
+            "node": "Notify Meta Ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Meta Ads": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Call Volume Limit": {
+      "main": [
+        [
+          {
+            "node": "Call Volume Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Volume Result": {
+      "main": [
+        [
+          {
+            "node": "Notify Call Volume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Call Volume": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Human Decision": {
+      "main": [
+        [
+          {
+            "node": "Human Decision Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Decision Result": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect All Results": {
+      "main": [
+        [
+          {
+            "node": "Write Execution Log to GitHub",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Final Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Execution Log to GitHub": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

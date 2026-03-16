@@ -1,0 +1,337 @@
+{
+  "name": "Budget Circuit Breaker - Daily Enforcement",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 23 * * *" }]
+        }
+      },
+      "id": "daily-trigger",
+      "name": "Daily 11 PM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?status=neq.killed&status=neq.sold&select=id,business_id,name,status,current_mrr",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-businesses",
+      "name": "Fetch Active Businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare items for SplitInBatches - one item per business\nconst businesses = $input.all().map(item => item.json);\nconst today = new Date().toISOString().split('T')[0];\n\nreturn businesses.map(biz => ({\n  json: {\n    ...biz,\n    today: today\n  }\n}));"
+      },
+      "id": "prepare-loop",
+      "name": "Prepare Business Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-batches",
+      "name": "Loop Each Business",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/budget_tracking?business_id=eq.{{ $json.business_id }}&date=eq.{{ $json.today }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-budget-today",
+      "name": "Fetch Today Budget Entry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/daily_metrics?business_id=eq.{{ $('Loop Each Business').first().json.business_id }}&date=gte.{{ new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0] }}&date=lte.{{ $('Loop Each Business').first().json.today }}&select=date,spend,revenue,organic_traffic,churn_count,active_customers,campaign_spend,campaign_revenue,campaign_started_at",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-7day-metrics",
+      "name": "Fetch 7-Day Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 450],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "combineBySingleField",
+        "mergeByFields": {
+          "values": [{ "field1": "business_id", "field2": "business_id" }]
+        },
+        "options": {}
+      },
+      "id": "merge-data",
+      "name": "Merge Budget + Metrics",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// =========================================================\n// Budget Circuit Breaker - Part XI Operating Bible Logic\n// Pure data logic, no LLM needed\n// =========================================================\n\nconst budgetEntry = $('Fetch Today Budget Entry').first().json;\nconst metricsRaw = $('Fetch 7-Day Metrics').all().map(i => i.json);\nconst biz = $('Loop Each Business').first().json;\n\nconst today = biz.today;\nconst businessId = biz.business_id;\nconst businessName = biz.name;\nconst status = biz.status; // seed, traction, scale, breakout\nconst currentMrr = parseFloat(biz.current_mrr) || 0;\n\n// ---- Budget Tier Limits (Part XI) ----\nconst tierLimits = {\n  seed: 20,\n  traction: 100,\n  scale: 500,\n  breakout: 2000\n};\nconst dailyMax = tierLimits[status] || tierLimits.seed;\n\n// ---- Compute 7-day aggregates ----\nlet totalSpend7d = 0;\nlet totalRevenue7d = 0;\nlet organicTrafficValues = [];\nlet totalChurn = 0;\nlet totalActiveCustomers = 0;\nlet campaigns = []; // { spend, revenue, startedAt }\n\nfor (const day of metricsRaw) {\n  totalSpend7d += parseFloat(day.spend) || 0;\n  totalRevenue7d += parseFloat(day.revenue) || 0;\n  if (day.organic_traffic !== null && day.organic_traffic !== undefined) {\n    organicTrafficValues.push({ date: day.date, value: parseFloat(day.organic_traffic) || 0 });\n  }\n  totalChurn += parseInt(day.churn_count) || 0;\n  totalActiveCustomers = Math.max(totalActiveCustomers, parseInt(day.active_customers) || 0);\n  if (day.campaign_spend) {\n    campaigns.push({\n      spend: parseFloat(day.campaign_spend) || 0,\n      revenue: parseFloat(day.campaign_revenue) || 0,\n      startedAt: day.campaign_started_at\n    });\n  }\n}\n\n// Today's spend from budget entry\nconst todaySpend = parseFloat(budgetEntry.total_spend) || 0;\n\n// ---- Breaker Checks ----\nconst breakers = [];\n\n// 1. 7-day spend > 3x trailing revenue => auto-pause\nconst trailingRevenue = totalRevenue7d;\nif (trailingRevenue > 0 && totalSpend7d > 3 * trailingRevenue) {\n  breakers.push({\n    rule: 'SPEND_3X_REVENUE',\n    severity: 'CRITICAL',\n    message: `7-day spend ($${totalSpend7d.toFixed(2)}) exceeds 3x trailing 7-day revenue ($${trailingRevenue.toFixed(2)}). Auto-pause triggered.`,\n    action: 'pause_all_spend'\n  });\n} else if (trailingRevenue === 0 && totalSpend7d > dailyMax * 7) {\n  // No revenue yet but spending above tier limit over 7 days\n  breakers.push({\n    rule: 'SPEND_3X_REVENUE',\n    severity: 'CRITICAL',\n    message: `7-day spend ($${totalSpend7d.toFixed(2)}) with $0 trailing revenue. Auto-pause triggered.`,\n    action: 'pause_all_spend'\n  });\n}\n\n// 2. Campaign ROAS check: positive ROAS within 72 hours or pause\nconst now = new Date();\nfor (const c of campaigns) {\n  if (c.startedAt) {\n    const started = new Date(c.startedAt);\n    const hoursSinceStart = (now - started) / (1000 * 60 * 60);\n    if (hoursSinceStart >= 72 && c.spend > 0 && c.revenue <= c.spend) {\n      breakers.push({\n        rule: 'CAMPAIGN_ROAS_NEGATIVE',\n        severity: 'HIGH',\n        message: `Campaign running ${Math.round(hoursSinceStart)}h with negative ROAS (spend: $${c.spend.toFixed(2)}, revenue: $${c.revenue.toFixed(2)}). Must pause.`,\n        action: 'pause_campaign'\n      });\n    }\n  }\n}\n\n// 3. Churn > 15% => pause acquisition, redirect to retention\nconst churnRate = totalActiveCustomers > 0 ? (totalChurn / totalActiveCustomers) * 100 : 0;\nif (churnRate > 15) {\n  breakers.push({\n    rule: 'CHURN_ABOVE_15PCT',\n    severity: 'HIGH',\n    message: `Churn rate ${churnRate.toFixed(1)}% (${totalChurn} churned / ${totalActiveCustomers} active) exceeds 15%. Pause acquisition, redirect to retention.`,\n    action: 'pause_acquisition_redirect_retention'\n  });\n}\n\n// 4. Organic traffic drops 40%+ in trailing period\n// Compare first half vs second half of the 7-day window as proxy\nif (organicTrafficValues.length >= 4) {\n  const sorted = organicTrafficValues.sort((a, b) => a.date.localeCompare(b.date));\n  const mid = Math.floor(sorted.length / 2);\n  const firstHalf = sorted.slice(0, mid);\n  const secondHalf = sorted.slice(mid);\n  const avgFirst = firstHalf.reduce((s, v) => s + v.value, 0) / firstHalf.length;\n  const avgSecond = secondHalf.reduce((s, v) => s + v.value, 0) / secondHalf.length;\n  if (avgFirst > 0) {\n    const dropPct = ((avgFirst - avgSecond) / avgFirst) * 100;\n    if (dropPct >= 40) {\n      breakers.push({\n        rule: 'ORGANIC_TRAFFIC_DROP_40PCT',\n        severity: 'HIGH',\n        message: `Organic traffic dropped ${dropPct.toFixed(1)}% (avg ${avgFirst.toFixed(0)} -> ${avgSecond.toFixed(0)}). Emergency review required.`,\n        action: 'emergency_review'\n      });\n    }\n  }\n}\n\n// 5. Daily budget tier limit exceeded\nif (todaySpend > dailyMax) {\n  breakers.push({\n    rule: 'DAILY_TIER_LIMIT_EXCEEDED',\n    severity: 'HIGH',\n    message: `Today's spend ($${todaySpend.toFixed(2)}) exceeds ${status} tier daily max ($${dailyMax}). Overspend by $${(todaySpend - dailyMax).toFixed(2)}.`,\n    action: 'cap_daily_spend'\n  });\n}\n\n// ---- Build output ----\nconst triggered = breakers.length > 0;\nconst reasonSummary = breakers.map(b => `[${b.severity}] ${b.rule}: ${b.message}`).join('\\n');\n\nreturn [{\n  json: {\n    business_id: businessId,\n    business_name: businessName,\n    status: status,\n    today: today,\n    daily_max: dailyMax,\n    today_spend: todaySpend,\n    spend_7d: totalSpend7d,\n    revenue_7d: totalRevenue7d,\n    churn_rate: churnRate,\n    current_mrr: currentMrr,\n    circuit_breaker_triggered: triggered,\n    breaker_count: breakers.length,\n    breakers: breakers,\n    circuit_breaker_reason: reasonSummary || 'All clear - no breakers triggered',\n    summary_line: triggered\n      ? `${businessName}: ${breakers.length} breaker(s) triggered - ${breakers.map(b => b.rule).join(', ')}`\n      : `${businessName}: All clear`\n  }\n}];"
+      },
+      "id": "check-breakers",
+      "name": "Check Circuit Breakers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.circuit_breaker_triggered }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-triggered",
+      "name": "Breaker Triggered?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1750, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/budget_tracking?business_id=eq.{{ $json.business_id }}&date=eq.{{ $json.today }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"circuit_breaker_triggered\": true,\n  \"circuit_breaker_reason\": {{ JSON.stringify($json.circuit_breaker_reason) }}\n}",
+        "options": {}
+      },
+      "id": "patch-budget",
+      "name": "Update Budget Tracking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2050, 150]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "title": "=[CIRCUIT BREAKER] {{ $('Check Circuit Breakers').first().json.business_name }} - {{ $('Check Circuit Breakers').first().json.breaker_count }} breaker(s) triggered",
+        "body": "=## Circuit Breaker Alert\n\n**Business:** {{ $('Check Circuit Breakers').first().json.business_name }} (`{{ $('Check Circuit Breakers').first().json.business_id }}`)\n**Stage:** {{ $('Check Circuit Breakers').first().json.status }}\n**Date:** {{ $('Check Circuit Breakers').first().json.today }}\n\n### Triggered Breakers\n\n{{ $('Check Circuit Breakers').first().json.circuit_breaker_reason }}\n\n### Key Metrics\n- Daily spend today: ${{ $('Check Circuit Breakers').first().json.today_spend }}\n- Daily max ({{ $('Check Circuit Breakers').first().json.status }} tier): ${{ $('Check Circuit Breakers').first().json.daily_max }}\n- 7-day total spend: ${{ $('Check Circuit Breakers').first().json.spend_7d }}\n- 7-day total revenue: ${{ $('Check Circuit Breakers').first().json.revenue_7d }}\n- Churn rate: {{ $('Check Circuit Breakers').first().json.churn_rate }}%\n- Current MRR: ${{ $('Check Circuit Breakers').first().json.current_mrr }}\n\n### Required Actions\n{{ $('Check Circuit Breakers').first().json.breakers.map(b => '- **' + b.rule + '**: ' + b.action).join('\\n') }}\n\n---\n*Auto-generated by Budget Circuit Breaker workflow*",
+        "labels": {
+          "labels": ["circuit-breaker", "urgent"]
+        }
+      },
+      "id": "create-issue",
+      "name": "Create GitHub Issue",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2300, 150]
+    },
+    {
+      "parameters": {
+        "fromEmail": "25shapatel@gmail.com",
+        "toEmail": "25shapatel@gmail.com",
+        "subject": "=[CIRCUIT BREAKER] {{ $('Check Circuit Breakers').first().json.business_name }} - {{ $('Check Circuit Breakers').first().json.breaker_count }} breaker(s) triggered",
+        "emailType": "text",
+        "message": "=BUDGET CIRCUIT BREAKER ALERT\n========================================\n\nBusiness: {{ $('Check Circuit Breakers').first().json.business_name }} ({{ $('Check Circuit Breakers').first().json.business_id }})\nStage: {{ $('Check Circuit Breakers').first().json.status }}\nDate: {{ $('Check Circuit Breakers').first().json.today }}\n\nTRIGGERED BREAKERS:\n{{ $('Check Circuit Breakers').first().json.circuit_breaker_reason }}\n\nKEY METRICS:\n- Daily spend today: ${{ $('Check Circuit Breakers').first().json.today_spend }}\n- Daily max ({{ $('Check Circuit Breakers').first().json.status }} tier): ${{ $('Check Circuit Breakers').first().json.daily_max }}\n- 7-day total spend: ${{ $('Check Circuit Breakers').first().json.spend_7d }}\n- 7-day total revenue: ${{ $('Check Circuit Breakers').first().json.revenue_7d }}\n- Churn rate: {{ $('Check Circuit Breakers').first().json.churn_rate }}%\n- Current MRR: ${{ $('Check Circuit Breakers').first().json.current_mrr }}\n\nREQUIRED ACTIONS:\n{{ $('Check Circuit Breakers').first().json.breakers.map(b => '- ' + b.rule + ': ' + b.action).join('\\n') }}\n\nGitHub Issue created in sluice-orchestration repo.\n\n---\nAuto-generated by Budget Circuit Breaker workflow\nhttps://n8n-production-bb4b.up.railway.app"
+      },
+      "id": "send-alert-email",
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [2550, 150],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-cred",
+          "name": "Gmail SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect summary from the breaker check for this iteration\n// Store in workflow static data for the final summary report\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.summaryLines) staticData.summaryLines = [];\n\nconst data = $('Check Circuit Breakers').first().json;\nstaticData.summaryLines.push(data.summary_line);\n\n// Pass through for loop continuation\nreturn [{ json: { done: true, summary_line: data.summary_line } }];"
+      },
+      "id": "collect-no-trigger",
+      "name": "Collect Summary (No Trigger)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect summary from the breaker check after alert actions\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.summaryLines) staticData.summaryLines = [];\n\nconst data = $('Check Circuit Breakers').first().json;\nstaticData.summaryLines.push(data.summary_line);\n\nreturn [{ json: { done: true, summary_line: data.summary_line } }];"
+      },
+      "id": "collect-triggered",
+      "name": "Collect Summary (Triggered)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2800, 150]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "merge-back",
+      "name": "Merge Back to Loop",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [3050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build final daily summary report from all collected lines\nconst staticData = $getWorkflowStaticData('global');\nconst summaryLines = staticData.summaryLines || ['No businesses processed'];\nconst today = new Date().toISOString().split('T')[0];\n\nconst totalBreakers = summaryLines.filter(l => !l.includes('All clear')).length;\nconst totalClear = summaryLines.filter(l => l.includes('All clear')).length;\n\nconst report = `# Budget Circuit Breaker - Daily Report\n\n**Date:** ${today}\n**Run Time:** ${new Date().toISOString()}\n\n## Summary\n\n- **Businesses checked:** ${summaryLines.length}\n- **Breakers triggered:** ${totalBreakers}\n- **All clear:** ${totalClear}\n\n## Details\n\n${summaryLines.map(l => '- ' + l).join('\\n')}\n\n---\n*Auto-generated by Budget Circuit Breaker workflow*\n`;\n\n// Clear static data for next run\nstaticData.summaryLines = [];\n\nreturn [{ json: { report, today, fileName: 'reports/circuit-breaker-' + today + '.md' } }];"
+      },
+      "id": "build-report",
+      "name": "Build Daily Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3300, 300]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.fileName }}",
+        "fileContent": "={{ $json.report }}",
+        "commitMessage": "=Circuit Breaker daily report - {{ $json.today }}"
+      },
+      "id": "write-report",
+      "name": "Write Report to GitHub",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [3550, 300]
+    }
+  ],
+  "connections": {
+    "Daily 11 PM Trigger": {
+      "main": [[{ "node": "Fetch Active Businesses", "type": "main", "index": 0 }]]
+    },
+    "Fetch Active Businesses": {
+      "main": [[{ "node": "Prepare Business Items", "type": "main", "index": 0 }]]
+    },
+    "Prepare Business Items": {
+      "main": [[{ "node": "Loop Each Business", "type": "main", "index": 0 }]]
+    },
+    "Loop Each Business": {
+      "main": [
+        [
+          { "node": "Fetch Today Budget Entry", "type": "main", "index": 0 },
+          { "node": "Fetch 7-Day Metrics", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Build Daily Summary", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Today Budget Entry": {
+      "main": [[{ "node": "Merge Budget + Metrics", "type": "main", "index": 0 }]]
+    },
+    "Fetch 7-Day Metrics": {
+      "main": [[{ "node": "Merge Budget + Metrics", "type": "main", "index": 1 }]]
+    },
+    "Merge Budget + Metrics": {
+      "main": [[{ "node": "Check Circuit Breakers", "type": "main", "index": 0 }]]
+    },
+    "Check Circuit Breakers": {
+      "main": [[{ "node": "Breaker Triggered?", "type": "main", "index": 0 }]]
+    },
+    "Breaker Triggered?": {
+      "main": [
+        [{ "node": "Update Budget Tracking", "type": "main", "index": 0 }],
+        [{ "node": "Collect Summary (No Trigger)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Budget Tracking": {
+      "main": [[{ "node": "Create GitHub Issue", "type": "main", "index": 0 }]]
+    },
+    "Create GitHub Issue": {
+      "main": [[{ "node": "Send Alert Email", "type": "main", "index": 0 }]]
+    },
+    "Send Alert Email": {
+      "main": [[{ "node": "Collect Summary (Triggered)", "type": "main", "index": 0 }]]
+    },
+    "Collect Summary (No Trigger)": {
+      "main": [[{ "node": "Merge Back to Loop", "type": "main", "index": 1 }]]
+    },
+    "Collect Summary (Triggered)": {
+      "main": [[{ "node": "Merge Back to Loop", "type": "main", "index": 0 }]]
+    },
+    "Merge Back to Loop": {
+      "main": [[{ "node": "Loop Each Business", "type": "main", "index": 0 }]]
+    },
+    "Build Daily Summary": {
+      "main": [[{ "node": "Write Report to GitHub", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

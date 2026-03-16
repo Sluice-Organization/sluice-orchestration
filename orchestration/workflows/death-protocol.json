@@ -1,0 +1,465 @@
+{
+  "name": "Death Protocol - Business Teardown",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kill-business",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Kill Business Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$json.body.businessId}/state.md` }}",
+        "resource": "file",
+        "options": {}
+      },
+      "id": "read-state",
+      "name": "Read State",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [240, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Kill Business Webhook').first().json.body.businessId}/strategy.md` }}",
+        "resource": "file",
+        "options": {}
+      },
+      "id": "read-strategy",
+      "name": "Read Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [480, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Kill Business Webhook').first().json.body.businessId}/weekly-plan.md` }}",
+        "resource": "file",
+        "options": {}
+      },
+      "id": "read-weekly-plan",
+      "name": "Read Weekly Plan",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [720, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Kill Business Webhook').first().json.body.businessId}/content-strategy.md` }}",
+        "resource": "file",
+        "options": {}
+      },
+      "id": "read-content-strategy",
+      "name": "Read Content Strategy",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [960, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Kill Business Webhook').first().json.body.businessId}/support-log.md` }}",
+        "resource": "file",
+        "options": {}
+      },
+      "id": "read-support-log",
+      "name": "Read Support Log",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1200, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhook = $('Kill Business Webhook').first().json;\nconst businessId = webhook.body.businessId;\nconst businessName = webhook.body.businessName;\nconst killReason = webhook.body.reason;\n\n// Safely read content from each GitHub node (may have failed)\nfunction safeContent(nodeName) {\n  try {\n    const item = $(nodeName).first();\n    if (item && item.json && item.json.content) {\n      return Buffer.from(item.json.content, 'base64').toString('utf8');\n    }\n  } catch (e) {}\n  return '[Not available]';\n}\n\nconst stateContent = safeContent('Read State');\nconst stateSha = (() => { try { return $('Read State').first().json.sha || ''; } catch(e) { return ''; } })();\nconst strategyContent = safeContent('Read Strategy');\nconst weeklyPlanContent = safeContent('Read Weekly Plan');\nconst contentStrategyContent = safeContent('Read Content Strategy');\nconst supportLogContent = safeContent('Read Support Log');\n\nconst now = new Date().toISOString();\n\nconst prompt = `You are the CEO Agent for The Forge, an autonomous AI business operating system. A business is being killed and you must generate a comprehensive, structured post-mortem.\n\nBUSINESS BEING KILLED:\n- Business ID: ${businessId}\n- Business Name: ${businessName}\n- Kill Reason: ${killReason}\n- Kill Timestamp: ${now}\n\nBUSINESS STATE:\n${stateContent}\n\nBUSINESS STRATEGY:\n${strategyContent}\n\nWEEKLY PLAN:\n${weeklyPlanContent}\n\nCONTENT STRATEGY:\n${contentStrategyContent}\n\nSUPPORT LOG:\n${supportLogContent}\n\nGenerate a structured post-mortem as a JSON object with ALL of the following fields from the Knowledge Graph post-mortem schema (Part IV Section 4.2 of the Operating Bible). Every field is required. If data is unavailable, provide your best estimate based on the context and note it as estimated.\n\nRequired JSON fields:\n- business_id (string): The business ID\n- business_type (string enum): One of smb_vertical_tool, consumer_app, b2b_saas, marketplace, content_platform, api_service, browser_extension\n- niche (string): The specific niche/vertical\n- launch_date (string ISO date): When the business launched\n- death_date (string ISO date): Today\n- lifetime_days (integer): Days from launch to death\n- peak_mrr (number): Peak monthly recurring revenue achieved\n- peak_users (integer): Peak number of users\n- total_capital_deployed (number): Total capital spent\n- total_revenue_recovered (number): Total revenue earned\n- top_performing_assets (array of objects): Each with type, title, traffic, signups. Best performing content/marketing assets\n- worst_performing_assets (array of objects): Each with type, views, signups, analysis. Worst performing assets with analysis of why\n- cac_trajectory (array of objects): Each with week (integer) and cac (number or null). Weekly CAC progression\n- cause_of_death (string): Detailed narrative of why the business died\n- what_agent_would_do_differently (string): Detailed retrospective on what should have been done differently\n- suggested_adjacent_opportunities (array of strings): Related business ideas that might work based on learnings\n- general_notes (string): Comprehensive unstructured narrative. Write EVERYTHING you would want a future CEO Agent to know. What surprised you, what you learned that doesn't fit other fields, patterns you noticed, intuitions about adjacent opportunities. Length is not a concern - write everything.\n- killed_at (string ISO timestamp): The kill timestamp\n\nRespond with ONLY the JSON object, no markdown fencing, no explanation. The JSON must be valid and parseable.`;\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    killReason,\n    killedAt: now,\n    stateSha,\n    prompt\n  }\n}];"
+      },
+      "id": "build-prompt",
+      "name": "Build Post-Mortem Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 0]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}"
+      },
+      "id": "llm-chain",
+      "name": "CEO Post-Mortem LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [1680, 0]
+    },
+    {
+      "parameters": {
+        "model": "claude-opus-4-6",
+        "options": {
+          "temperature": 0.3,
+          "maxTokensToSample": 4000
+        }
+      },
+      "id": "anthropic-model",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [1680, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const llmOutput = $('CEO Post-Mortem LLM Chain').first().json.text || $('CEO Post-Mortem LLM Chain').first().json.response;\nconst webhookData = $('Build Post-Mortem Prompt').first().json;\n\n// Parse the LLM JSON output\nlet postMortem;\ntry {\n  // Strip any markdown fencing if present\n  let cleaned = llmOutput.trim();\n  if (cleaned.startsWith('```')) {\n    cleaned = cleaned.replace(/^```(?:json)?\\n?/, '').replace(/\\n?```$/, '');\n  }\n  postMortem = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Failed to parse post-mortem JSON from LLM: ' + e.message + '\\nRaw output: ' + llmOutput.substring(0, 500));\n}\n\n// Build the markdown post-mortem for GitHub\nconst md = `# Post-Mortem: ${webhookData.businessName}\n\n**Business ID:** ${postMortem.business_id}\n**Business Type:** ${postMortem.business_type}\n**Niche:** ${postMortem.niche}\n**Launch Date:** ${postMortem.launch_date}\n**Death Date:** ${postMortem.death_date}\n**Lifetime:** ${postMortem.lifetime_days} days\n**Killed At:** ${postMortem.killed_at}\n\n## Financial Summary\n- **Peak MRR:** $${postMortem.peak_mrr}\n- **Peak Users:** ${postMortem.peak_users}\n- **Total Capital Deployed:** $${postMortem.total_capital_deployed}\n- **Total Revenue Recovered:** $${postMortem.total_revenue_recovered}\n\n## Top Performing Assets\n${postMortem.top_performing_assets.map(a => `- **${a.type}**: \"${a.title}\" - ${a.traffic} traffic, ${a.signups} signups`).join('\\n')}\n\n## Worst Performing Assets\n${postMortem.worst_performing_assets.map(a => `- **${a.type}**: ${a.views} views, ${a.signups} signups - ${a.analysis}`).join('\\n')}\n\n## CAC Trajectory\n${postMortem.cac_trajectory.map(c => `- Week ${c.week}: ${c.cac === null ? 'N/A' : '$' + c.cac}`).join('\\n')}\n\n## Cause of Death\n${postMortem.cause_of_death}\n\n## What We Would Do Differently\n${postMortem.what_agent_would_do_differently}\n\n## Suggested Adjacent Opportunities\n${postMortem.suggested_adjacent_opportunities.map(o => `- ${o}`).join('\\n')}\n\n## General Notes\n${postMortem.general_notes}\n`;\n\n// Build updated state.md\nconst killedStateContent = `# ${webhookData.businessName} - Current State\\n\\n## Status: KILLED\\n## Kill Date: ${postMortem.death_date}\\n## Kill Reason: ${webhookData.killReason}\\n\\nThis business has been terminated via Death Protocol.\\nSee post-mortem.md for full analysis.\\n`;\n\nreturn [{\n  json: {\n    businessId: webhookData.businessId,\n    businessName: webhookData.businessName,\n    killedAt: webhookData.killedAt,\n    stateSha: webhookData.stateSha,\n    postMortem,\n    postMortemMarkdown: md,\n    killedStateContent\n  }\n}];"
+      },
+      "id": "parse-post-mortem",
+      "name": "Parse Post-Mortem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1920, 0]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$json.businessId}/post-mortem.md` }}",
+        "fileContent": "={{ $json.postMortemMarkdown }}",
+        "commitMessage": "={{ `Death Protocol: post-mortem for ${$json.businessName}` }}",
+        "resource": "file"
+      },
+      "id": "write-post-mortem",
+      "name": "Write Post-Mortem to GitHub",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2200, -300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/post_mortems",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Parse Post-Mortem').first().json.postMortem) }}"
+      },
+      "id": "insert-kg-post-mortem",
+      "name": "Insert Post-Mortem into Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, -100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ `https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?business_id=eq.${$('Parse Post-Mortem').first().json.businessId}` }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'killed', killed_at: $('Parse Post-Mortem').first().json.killedAt }) }}"
+      },
+      "id": "update-kg-business-status",
+      "name": "Update Business Status in Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Parse Post-Mortem').first().json.businessId}/state.md` }}",
+        "fileContent": "={{ $('Parse Post-Mortem').first().json.killedStateContent }}",
+        "commitMessage": "={{ `Death Protocol: mark ${$('Parse Post-Mortem').first().json.businessName} as KILLED` }}",
+        "additionalParameters": {
+          "sha": "={{ $('Parse Post-Mortem').first().json.stateSha }}"
+        },
+        "resource": "file"
+      },
+      "id": "update-state-killed",
+      "name": "Update state.md to KILLED",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2200, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'success', message: `Death Protocol complete for ${$('Parse Post-Mortem').first().json.businessName}`, businessId: $('Parse Post-Mortem').first().json.businessId, killedAt: $('Parse Post-Mortem').first().json.killedAt, postMortemFields: Object.keys($('Parse Post-Mortem').first().json.postMortem), causeOfDeath: $('Parse Post-Mortem').first().json.postMortem.cause_of_death }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond - Death Protocol Complete",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2500, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Death Protocol', message: 'KILLING BUSINESS: ' + $json.businessName + ' (ID: ' + $json.businessId + '). Reason: ' + $('Build Post-Mortem Prompt').first().json.killReason + '. Cause of death: ' + ($json.postMortem.cause_of_death || 'See post-mortem').substring(0, 300), severity: 'critical', businessId: $json.businessId, requiresResponse: false }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "notify-telegram",
+      "name": "Notify Human (Telegram)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 500],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Kill Business Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read State": {
+      "main": [
+        [
+          {
+            "node": "Read Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Strategy": {
+      "main": [
+        [
+          {
+            "node": "Read Weekly Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Weekly Plan": {
+      "main": [
+        [
+          {
+            "node": "Read Content Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Content Strategy": {
+      "main": [
+        [
+          {
+            "node": "Read Support Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Support Log": {
+      "main": [
+        [
+          {
+            "node": "Build Post-Mortem Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Post-Mortem Prompt": {
+      "main": [
+        [
+          {
+            "node": "CEO Post-Mortem LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "CEO Post-Mortem LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CEO Post-Mortem LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Parse Post-Mortem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Post-Mortem": {
+      "main": [
+        [
+          {
+            "node": "Notify Human (Telegram)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write Post-Mortem to GitHub",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert Post-Mortem into Knowledge Graph",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Business Status in Knowledge Graph",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update state.md to KILLED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Post-Mortem to GitHub": {
+      "main": [
+        [
+          {
+            "node": "Respond - Death Protocol Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Post-Mortem into Knowledge Graph": {
+      "main": [
+        [
+          {
+            "node": "Respond - Death Protocol Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Business Status in Knowledge Graph": {
+      "main": [
+        [
+          {
+            "node": "Respond - Death Protocol Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update state.md to KILLED": {
+      "main": [
+        [
+          {
+            "node": "Respond - Death Protocol Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

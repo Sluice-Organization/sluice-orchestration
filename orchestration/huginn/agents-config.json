@@ -1,0 +1,621 @@
+{
+  "_meta": {
+    "description": "Huginn agent definitions for Forge Discovery Engine monitoring. Import via Huginn Scenario Import or create manually.",
+    "webhook_url": "https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal",
+    "version": "1.0.0"
+  },
+  "schema_version": 1,
+  "agents": [
+    {
+      "name": "Acquire.com - SaaS Listings Feed",
+      "type": "Agents::WebsiteAgent",
+      "schedule": "every_6h",
+      "options": {
+        "url": "https://acquire.com/filters?type=saas&price_min=500000&price_max=5000000",
+        "mode": "on_change",
+        "expected_update_period_in_days": 3,
+        "extract": {
+          "title": { "css": ".listing-card h3", "value": "normalize-space(.)" },
+          "price": { "css": ".listing-card .price", "value": "normalize-space(.)" },
+          "revenue": { "css": ".listing-card .revenue", "value": "normalize-space(.)" },
+          "url": { "css": ".listing-card a", "value": "@href" },
+          "description": { "css": ".listing-card .description", "value": "normalize-space(.)" }
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "CSS selectors need verification against current Acquire.com DOM. Adjust after first run."
+    },
+    {
+      "name": "Acquire.com - Signal to n8n",
+      "type": "Agents::PostAgent",
+      "schedule": "never",
+      "options": {
+        "post_url": "https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal",
+        "expected_receive_period_in_days": 7,
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "source": "acquire.com",
+          "signal_type": "saas_listing",
+          "title": "{{ title }}",
+          "price": "{{ price }}",
+          "revenue": "{{ revenue }}",
+          "url": "{{ url }}",
+          "description": "{{ description }}",
+          "detected_at": "{{ _created_at }}"
+        },
+        "headers": {
+          "X-Forge-Source": "huginn",
+          "X-Signal-Type": "acquisition-candidate"
+        }
+      },
+      "sources": ["Acquire.com - SaaS Listings Feed"],
+      "propagate_immediately": false
+    },
+    {
+      "name": "G2 - Fastest Growing SMB Tools",
+      "type": "Agents::RssAgent",
+      "schedule": "every_12h",
+      "options": {
+        "url": "https://www.g2.com/categories/rss",
+        "expected_update_period_in_days": 3,
+        "clean": false
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "G2 does not offer a public RSS for fastest-growing. Use their RSS where available, or switch to WebsiteAgent scraping their trending/fastest-growing pages. Selectors will need tuning."
+    },
+    {
+      "name": "G2 - Signal to n8n",
+      "type": "Agents::PostAgent",
+      "schedule": "never",
+      "options": {
+        "post_url": "https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal",
+        "expected_receive_period_in_days": 7,
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "source": "g2.com",
+          "signal_type": "trending_tool",
+          "title": "{{ title }}",
+          "url": "{{ url }}",
+          "summary": "{{ description | truncate: 500 }}",
+          "detected_at": "{{ _created_at }}"
+        },
+        "headers": {
+          "X-Forge-Source": "huginn",
+          "X-Signal-Type": "market-trend"
+        }
+      },
+      "sources": ["G2 - Fastest Growing SMB Tools"],
+      "propagate_immediately": false
+    },
+    {
+      "name": "Capterra - Trending SMB Software",
+      "type": "Agents::WebsiteAgent",
+      "schedule": "every_12h",
+      "options": {
+        "url": "https://www.capterra.com/trending-software/",
+        "mode": "on_change",
+        "expected_update_period_in_days": 3,
+        "extract": {
+          "title": { "css": ".product-card h3", "value": "normalize-space(.)" },
+          "category": { "css": ".product-card .category", "value": "normalize-space(.)" },
+          "rating": { "css": ".product-card .rating", "value": "normalize-space(.)" },
+          "url": { "css": ".product-card a", "value": "@href" }
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "CSS selectors need verification against current Capterra DOM."
+    },
+    {
+      "name": "Capterra - Signal to n8n",
+      "type": "Agents::PostAgent",
+      "schedule": "never",
+      "options": {
+        "post_url": "https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal",
+        "expected_receive_period_in_days": 7,
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "source": "capterra.com",
+          "signal_type": "trending_tool",
+          "title": "{{ title }}",
+          "category": "{{ category }}",
+          "rating": "{{ rating }}",
+          "url": "{{ url }}",
+          "detected_at": "{{ _created_at }}"
+        },
+        "headers": {
+          "X-Forge-Source": "huginn",
+          "X-Signal-Type": "market-trend"
+        }
+      },
+      "sources": ["Capterra - Trending SMB Software"],
+      "propagate_immediately": false
+    },
+    {
+      "name": "IndieHackers - Open Revenue Dashboards",
+      "type": "Agents::WebsiteAgent",
+      "schedule": "every_12h",
+      "options": {
+        "url": "https://www.indiehackers.com/products?sorting=newest-revenue",
+        "mode": "on_change",
+        "expected_update_period_in_days": 3,
+        "extract": {
+          "title": { "css": ".product-card__name", "value": "normalize-space(.)" },
+          "revenue": { "css": ".product-card__revenue", "value": "normalize-space(.)" },
+          "url": { "css": ".product-card__name a", "value": "@href" },
+          "description": { "css": ".product-card__description", "value": "normalize-space(.)" }
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "IndieHackers layout changes often. Verify selectors after deploy."
+    },
+    {
+      "name": "IndieHackers - Signal to n8n",
+      "type": "Agents::PostAgent",
+      "schedule": "never",
+      "options": {
+        "post_url": "https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal",
+        "expected_receive_period_in_days": 7,
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "source": "indiehackers.com",
+          "signal_type": "revenue_dashboard",
+          "title": "{{ title }}",
+          "revenue": "{{ revenue }}",
+          "url": "https://www.indiehackers.com{{ url }}",
+          "description": "{{ description | truncate: 500 }}",
+          "detected_at": "{{ _created_at }}"
+        },
+        "headers": {
+          "X-Forge-Source": "huginn",
+          "X-Signal-Type": "revenue-signal"
+        }
+      },
+      "sources": ["IndieHackers - Open Revenue Dashboards"],
+      "propagate_immediately": false
+    },
+    {
+      "name": "Reddit - r/SaaS",
+      "type": "Agents::RssAgent",
+      "schedule": "every_2h",
+      "options": {
+        "url": "https://www.reddit.com/r/SaaS/new.json?limit=50",
+        "expected_update_period_in_days": 1,
+        "clean": false,
+        "headers": {
+          "User-Agent": "Forge-Discovery-Bot/1.0"
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 259200,
+      "notes": "Uses Reddit JSON feed. For higher reliability, switch to RSS at https://www.reddit.com/r/SaaS/new/.rss"
+    },
+    {
+      "name": "Reddit - r/smallbusiness",
+      "type": "Agents::RssAgent",
+      "schedule": "every_2h",
+      "options": {
+        "url": "https://www.reddit.com/r/smallbusiness/new/.rss?limit=50",
+        "expected_update_period_in_days": 1,
+        "clean": false,
+        "headers": {
+          "User-Agent": "Forge-Discovery-Bot/1.0"
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 259200
+    },
+    {
+      "name": "Reddit - r/Entrepreneur",
+      "type": "Agents::RssAgent",
+      "schedule": "every_2h",
+      "options": {
+        "url": "https://www.reddit.com/r/Entrepreneur/new/.rss?limit=50",
+        "expected_update_period_in_days": 1,
+        "clean": false,
+        "headers": {
+          "User-Agent": "Forge-Discovery-Bot/1.0"
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 259200
+    },
+    {
+      "name": "Reddit - Pattern Filter",
+      "type": "Agents::TriggerAgent",
+      "schedule": "never",
+      "options": {
+        "expected_receive_period_in_days": 2,
+        "rules": [
+          {
+            "type": "regex",
+            "value": "(?i)(i wish|does anyone know a tool|looking for a? ?(?:tool|app|software|solution|platform)|is there a|anyone recommend|what do you use for|frustrated with|hate using|switching from)",
+            "path": "title"
+          }
+        ],
+        "must_match": 1
+      },
+      "sources": [
+        "Reddit - r/SaaS",
+        "Reddit - r/smallbusiness",
+        "Reddit - r/Entrepreneur"
+      ],
+      "propagate_immediately": true,
+      "notes": "Filters Reddit posts for demand-signal patterns. Only matching posts pass through to the webhook."
+    },
+    {
+      "name": "Reddit - Signal to n8n",
+      "type": "Agents::PostAgent",
+      "schedule": "never",
+      "options": {
+        "post_url": "https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal",
+        "expected_receive_period_in_days": 7,
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "source": "reddit",
+          "signal_type": "demand_pattern",
+          "title": "{{ title }}",
+          "url": "{{ url }}",
+          "subreddit": "{{ subreddit | default: 'unknown' }}",
+          "body": "{{ content | strip_html | truncate: 1000 }}",
+          "detected_at": "{{ _created_at }}"
+        },
+        "headers": {
+          "X-Forge-Source": "huginn",
+          "X-Signal-Type": "demand-pattern"
+        }
+      },
+      "sources": ["Reddit - Pattern Filter"],
+      "propagate_immediately": false
+    },
+    {
+      "name": "Google Trends - Industry Software Searches",
+      "type": "Agents::WebsiteAgent",
+      "schedule": "every_1d",
+      "options": {
+        "url": "https://trends.google.com/trends/trendingsearches/daily/rss?geo=US",
+        "mode": "on_change",
+        "type": "xml",
+        "expected_update_period_in_days": 2,
+        "extract": {
+          "title": { "xpath": "//item/title", "value": "normalize-space(.)" },
+          "traffic": { "xpath": "//item/ht:approx_traffic", "value": "normalize-space(.)" },
+          "description": { "xpath": "//item/description", "value": "normalize-space(.)" },
+          "url": { "xpath": "//item/link", "value": "normalize-space(.)" }
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "Monitors daily trending searches. Downstream TriggerAgent filters for software-related terms."
+    },
+    {
+      "name": "Google Trends - Software Filter",
+      "type": "Agents::TriggerAgent",
+      "schedule": "never",
+      "options": {
+        "expected_receive_period_in_days": 3,
+        "rules": [
+          {
+            "type": "regex",
+            "value": "(?i)(software|saas|app|platform|tool|crm|erp|pos|inventory|booking|scheduling|invoic|automat|ai \\w+ tool)",
+            "path": "title"
+          }
+        ],
+        "must_match": 1
+      },
+      "sources": ["Google Trends - Industry Software Searches"],
+      "propagate_immediately": true
+    },
+    {
+      "name": "Google Trends - Signal to n8n",
+      "type": "Agents::PostAgent",
+      "schedule": "never",
+      "options": {
+        "post_url": "https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal",
+        "expected_receive_period_in_days": 14,
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "source": "google_trends",
+          "signal_type": "rising_search",
+          "title": "{{ title }}",
+          "traffic": "{{ traffic }}",
+          "description": "{{ description | truncate: 500 }}",
+          "url": "{{ url }}",
+          "detected_at": "{{ _created_at }}"
+        },
+        "headers": {
+          "X-Forge-Source": "huginn",
+          "X-Signal-Type": "search-trend"
+        }
+      },
+      "sources": ["Google Trends - Software Filter"],
+      "propagate_immediately": false
+    },
+    {
+      "name": "Changelog - Shopify",
+      "type": "Agents::RssAgent",
+      "schedule": "every_6h",
+      "options": {
+        "url": "https://changelog.shopify.com/feed.atom",
+        "expected_update_period_in_days": 7,
+        "clean": false
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800
+    },
+    {
+      "name": "Changelog - Stripe",
+      "type": "Agents::RssAgent",
+      "schedule": "every_6h",
+      "options": {
+        "url": "https://stripe.com/blog/feed.rss",
+        "expected_update_period_in_days": 7,
+        "clean": false
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "Stripe's official blog RSS. Also check https://stripe.com/docs/changelog for API changes."
+    },
+    {
+      "name": "Changelog - Vercel",
+      "type": "Agents::RssAgent",
+      "schedule": "every_6h",
+      "options": {
+        "url": "https://vercel.com/atom",
+        "expected_update_period_in_days": 7,
+        "clean": false
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800
+    },
+    {
+      "name": "Changelog - Supabase",
+      "type": "Agents::RssAgent",
+      "schedule": "every_6h",
+      "options": {
+        "url": "https://supabase.com/rss.xml",
+        "expected_update_period_in_days": 7,
+        "clean": false
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800
+    },
+    {
+      "name": "Changelog - Notion",
+      "type": "Agents::WebsiteAgent",
+      "schedule": "every_12h",
+      "options": {
+        "url": "https://www.notion.so/releases",
+        "mode": "on_change",
+        "expected_update_period_in_days": 14,
+        "extract": {
+          "title": { "css": ".release-note h2, .release-note h3", "value": "normalize-space(.)" },
+          "date": { "css": ".release-note time, .release-note .date", "value": "normalize-space(.)" },
+          "description": { "css": ".release-note p", "value": "normalize-space(.)" }
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "Notion has no public RSS. Scrapes releases page; selectors need verification."
+    },
+    {
+      "name": "Changelog - GitHub",
+      "type": "Agents::RssAgent",
+      "schedule": "every_6h",
+      "options": {
+        "url": "https://github.blog/changelog/feed/",
+        "expected_update_period_in_days": 3,
+        "clean": false
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800
+    },
+    {
+      "name": "Changelog - Linear",
+      "type": "Agents::RssAgent",
+      "schedule": "every_12h",
+      "options": {
+        "url": "https://linear.app/changelog.xml",
+        "expected_update_period_in_days": 14,
+        "clean": false
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "Linear changelog RSS. Verify URL is still active."
+    },
+    {
+      "name": "Changelog - Figma",
+      "type": "Agents::WebsiteAgent",
+      "schedule": "every_12h",
+      "options": {
+        "url": "https://www.figma.com/release-notes/",
+        "mode": "on_change",
+        "expected_update_period_in_days": 14,
+        "extract": {
+          "title": { "css": ".release-note h2", "value": "normalize-space(.)" },
+          "date": { "css": ".release-note .date", "value": "normalize-space(.)" },
+          "description": { "css": ".release-note p", "value": "normalize-space(.)" }
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "Figma has no public RSS. Selectors need verification."
+    },
+    {
+      "name": "Changelog - Slack",
+      "type": "Agents::RssAgent",
+      "schedule": "every_12h",
+      "options": {
+        "url": "https://api.slack.com/changelog/feed.rss",
+        "expected_update_period_in_days": 14,
+        "clean": false
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "Slack API changelog. Verify URL."
+    },
+    {
+      "name": "Changelog - HubSpot",
+      "type": "Agents::RssAgent",
+      "schedule": "every_12h",
+      "options": {
+        "url": "https://developers.hubspot.com/changelog/feed.rss",
+        "expected_update_period_in_days": 7,
+        "clean": false
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "HubSpot developer changelog RSS. Verify URL."
+    },
+    {
+      "name": "Changelogs - Signal to n8n",
+      "type": "Agents::PostAgent",
+      "schedule": "never",
+      "options": {
+        "post_url": "https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal",
+        "expected_receive_period_in_days": 14,
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "source": "platform_changelog",
+          "signal_type": "platform_update",
+          "platform": "{{ _source_agent }}",
+          "title": "{{ title }}",
+          "url": "{{ url | default: urls | default: 'N/A' }}",
+          "summary": "{{ description | default: content | strip_html | truncate: 800 }}",
+          "detected_at": "{{ _created_at }}"
+        },
+        "headers": {
+          "X-Forge-Source": "huginn",
+          "X-Signal-Type": "platform-changelog"
+        }
+      },
+      "sources": [
+        "Changelog - Shopify",
+        "Changelog - Stripe",
+        "Changelog - Vercel",
+        "Changelog - Supabase",
+        "Changelog - Notion",
+        "Changelog - GitHub",
+        "Changelog - Linear",
+        "Changelog - Figma",
+        "Changelog - Slack",
+        "Changelog - HubSpot"
+      ],
+      "propagate_immediately": false
+    },
+    {
+      "name": "Chrome Web Store - Low-Rated Extensions",
+      "type": "Agents::WebsiteAgent",
+      "schedule": "every_1d",
+      "options": {
+        "url": "https://chromewebstore.google.com/category/extensions/productivity",
+        "mode": "on_change",
+        "expected_update_period_in_days": 3,
+        "extract": {
+          "title": { "css": ".webstore-test-wall-tile h2, .a-d-cb-Sf", "value": "normalize-space(.)" },
+          "rating": { "css": ".webstore-test-wall-tile .rsw-stars, .Y89Uic", "value": "normalize-space(.)" },
+          "url": { "css": ".webstore-test-wall-tile a, .a-d-cb-Sf a", "value": "@href" },
+          "review_count": { "css": ".webstore-test-wall-tile .e-f-ih, .Y89Uic + span", "value": "normalize-space(.)" }
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "Chrome Web Store DOM changes frequently. Selectors are best-effort. Consider using their undocumented API or a headless browser approach if scraping breaks."
+    },
+    {
+      "name": "Chrome Web Store - Low Rating Filter",
+      "type": "Agents::TriggerAgent",
+      "schedule": "never",
+      "options": {
+        "expected_receive_period_in_days": 7,
+        "rules": [
+          {
+            "type": "regex",
+            "value": "^[12](\\.\\d)?$",
+            "path": "rating"
+          }
+        ],
+        "must_match": 1
+      },
+      "sources": ["Chrome Web Store - Low-Rated Extensions"],
+      "propagate_immediately": true,
+      "notes": "Passes only extensions with 1-2 star ratings."
+    },
+    {
+      "name": "Shopify App Store - Low-Rated Apps",
+      "type": "Agents::WebsiteAgent",
+      "schedule": "every_1d",
+      "options": {
+        "url": "https://apps.shopify.com/browse/store-management",
+        "mode": "on_change",
+        "expected_update_period_in_days": 3,
+        "extract": {
+          "title": { "css": ".ui-app-card__name", "value": "normalize-space(.)" },
+          "rating": { "css": ".ui-star-rating__rating", "value": "normalize-space(.)" },
+          "url": { "css": ".ui-app-card a", "value": "@href" },
+          "review_count": { "css": ".ui-review-count-summary", "value": "normalize-space(.)" }
+        }
+      },
+      "propagate_immediately": true,
+      "keep_events_for": 604800,
+      "notes": "Selectors based on Shopify App Store Polaris components. Verify after deploy."
+    },
+    {
+      "name": "Shopify App Store - Low Rating Filter",
+      "type": "Agents::TriggerAgent",
+      "schedule": "never",
+      "options": {
+        "expected_receive_period_in_days": 7,
+        "rules": [
+          {
+            "type": "regex",
+            "value": "^[12](\\.\\d)?$",
+            "path": "rating"
+          }
+        ],
+        "must_match": 1
+      },
+      "sources": ["Shopify App Store - Low-Rated Apps"],
+      "propagate_immediately": true
+    },
+    {
+      "name": "App Store Reviews - Signal to n8n",
+      "type": "Agents::PostAgent",
+      "schedule": "never",
+      "options": {
+        "post_url": "https://n8n-production-bb4b.up.railway.app/webhook/discovery-signal",
+        "expected_receive_period_in_days": 14,
+        "content_type": "json",
+        "method": "post",
+        "payload": {
+          "source": "app_store_reviews",
+          "signal_type": "low_rated_app",
+          "title": "{{ title }}",
+          "rating": "{{ rating }}",
+          "review_count": "{{ review_count }}",
+          "url": "{{ url }}",
+          "detected_at": "{{ _created_at }}"
+        },
+        "headers": {
+          "X-Forge-Source": "huginn",
+          "X-Signal-Type": "competitor-weakness"
+        }
+      },
+      "sources": [
+        "Chrome Web Store - Low Rating Filter",
+        "Shopify App Store - Low Rating Filter"
+      ],
+      "propagate_immediately": false
+    }
+  ]
+}

@@ -1,0 +1,606 @@
+{
+  "name": "Pre-Launch Quality Gate",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "quality-gate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Quality Gate Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhook = $('Quality Gate Webhook').first().json;\nreturn [{\n  json: {\n    businessId: webhook.body.businessId,\n    businessName: webhook.body.businessName,\n    siteUrl: webhook.body.siteUrl,\n    repoName: webhook.body.repoName\n  }\n}];"
+      },
+      "id": "extract-params",
+      "name": "Extract Parameters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=' + encodeURIComponent($json.siteUrl) + '&strategy=mobile&category=performance&category=accessibility&category=seo' }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "lighthouse-check",
+      "name": "Lighthouse Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Extract Parameters').first().json.siteUrl }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "fetch-site-html",
+      "name": "Fetch Site HTML",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $('Extract Parameters').first().json.repoName }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "check-repo-exists",
+      "name": "Check Repo Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 600],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "github-token",
+          "name": "GitHub Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $('Extract Parameters').first().json.repoName + '/contents/.github/workflows/claude.yml' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "check-claude-workflow",
+      "name": "Check Claude Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 800],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "github-token",
+          "name": "GitHub Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $('Extract Parameters').first().json.repoName + '/contents/CLAUDE.md' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "check-claude-md",
+      "name": "Check CLAUDE.md",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 1000],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "github-token",
+          "name": "GitHub Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Lighthouse results\nconst lighthouseRaw = $('Lighthouse Check').first().json;\nlet lighthouse = { performance: null, accessibility: null, seo: null, error: null };\ntry {\n  if (lighthouseRaw.lighthouseResult) {\n    const cats = lighthouseRaw.lighthouseResult.categories;\n    lighthouse.performance = Math.round((cats.performance?.score || 0) * 100);\n    lighthouse.accessibility = Math.round((cats.accessibility?.score || 0) * 100);\n    lighthouse.seo = Math.round((cats.seo?.score || 0) * 100);\n  } else {\n    lighthouse.error = lighthouseRaw.error?.message || 'Lighthouse returned no results';\n  }\n} catch (e) {\n  lighthouse.error = 'Failed to parse Lighthouse response: ' + e.message;\n}\n\nreturn [{ json: { lighthouse } }];"
+      },
+      "id": "parse-lighthouse",
+      "name": "Parse Lighthouse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fetchResult = $('Fetch Site HTML').first().json;\nconst html = (fetchResult.body || fetchResult.data || '').toString().toLowerCase();\nconst checks = [];\n\nif (!html || html.length < 100) {\n  return [{ json: { slopChecks: [{ check: 'Site Reachable', pass: false, detail: 'Could not fetch site HTML or response too short' }], seoChecks: [] } }];\n}\n\n// --- Slop / Placeholder content checks ---\nconst slopPatterns = [\n  { name: 'Lorem Ipsum', pattern: 'lorem ipsum' },\n  { name: 'example.com link', pattern: 'example.com' },\n  { name: '\"Your Company\" placeholder', pattern: 'your company' },\n  { name: 'Placeholder text', pattern: 'placeholder' },\n  { name: '[insert...] template', pattern: '[insert' },\n  { name: 'TODO marker', pattern: 'todo' }\n];\n\nconst slopChecks = slopPatterns.map(p => {\n  const found = html.includes(p.pattern);\n  return { check: `No ${p.name}`, pass: !found, detail: found ? `Found \"${p.pattern}\" in page HTML` : 'Clean' };\n});\n\n// Check for broken images: <img with empty src or src=\"#\" or src=\"\"\nconst brokenImgRegex = /<img[^>]*src\\s*=\\s*[\"']\\s*[\"'#]/gi;\nconst brokenImgs = (fetchResult.body || fetchResult.data || '').toString().match(brokenImgRegex);\nslopChecks.push({\n  check: 'No broken image tags',\n  pass: !brokenImgs || brokenImgs.length === 0,\n  detail: brokenImgs ? `Found ${brokenImgs.length} broken <img> tag(s)` : 'Clean'\n});\n\n// --- SEO checks ---\nconst fullHtml = (fetchResult.body || fetchResult.data || '').toString();\nconst seoChecks = [];\n\n// Title tag\nconst titleMatch = fullHtml.match(/<title[^>]*>([^<]+)<\\/title>/i);\nseoChecks.push({\n  check: 'Title tag exists',\n  pass: !!titleMatch && titleMatch[1].trim().length > 0,\n  detail: titleMatch ? `Title: \"${titleMatch[1].trim().substring(0, 80)}\"` : 'Missing <title> tag',\n  critical: true\n});\n\n// Meta description\nconst metaDescMatch = fullHtml.match(/<meta[^>]*name\\s*=\\s*[\"']description[\"'][^>]*content\\s*=\\s*[\"']([^\"']+)[\"']/i)\n  || fullHtml.match(/<meta[^>]*content\\s*=\\s*[\"']([^\"']+)[\"'][^>]*name\\s*=\\s*[\"']description[\"']/i);\nseoChecks.push({\n  check: 'Meta description exists',\n  pass: !!metaDescMatch,\n  detail: metaDescMatch ? `Description: \"${metaDescMatch[1].substring(0, 80)}...\"` : 'Missing meta description',\n  critical: true\n});\n\n// OG image\nconst ogImageMatch = fullHtml.match(/<meta[^>]*property\\s*=\\s*[\"']og:image[\"'][^>]*>/i);\nseoChecks.push({\n  check: 'OG image exists',\n  pass: !!ogImageMatch,\n  detail: ogImageMatch ? 'Found og:image tag' : 'Missing og:image meta tag',\n  critical: false\n});\n\n// Favicon\nconst faviconMatch = fullHtml.match(/<link[^>]*rel\\s*=\\s*[\"'](icon|shortcut icon|apple-touch-icon)[\"'][^>]*>/i);\nseoChecks.push({\n  check: 'Favicon exists',\n  pass: !!faviconMatch,\n  detail: faviconMatch ? 'Found favicon link' : 'Missing favicon link tag',\n  critical: false\n});\n\n// Structured data (JSON-LD)\nconst jsonLdMatch = fullHtml.match(/<script[^>]*type\\s*=\\s*[\"']application\\/ld\\+json[\"'][^>]*>/i);\nseoChecks.push({\n  check: 'Structured data (JSON-LD) exists',\n  pass: !!jsonLdMatch,\n  detail: jsonLdMatch ? 'Found JSON-LD structured data' : 'Missing JSON-LD structured data',\n  critical: false\n});\n\n// H1 tag\nconst h1Match = fullHtml.match(/<h1[^>]*>/i);\nseoChecks.push({\n  check: 'At least one H1 tag',\n  pass: !!h1Match,\n  detail: h1Match ? 'Found H1 tag' : 'Missing H1 tag',\n  critical: true\n});\n\nreturn [{ json: { slopChecks, seoChecks } }];"
+      },
+      "id": "parse-html-checks",
+      "name": "Parse HTML Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const repoResult = $('Check Repo Exists').first().json;\nconst claudeWorkflow = $('Check Claude Workflow').first().json;\nconst claudeMd = $('Check CLAUDE.md').first().json;\n\nconst githubChecks = [];\n\n// Repo exists\ngithubChecks.push({\n  check: 'GitHub repo exists',\n  pass: !!repoResult.id && !repoResult.message,\n  detail: repoResult.id ? `Repo ID: ${repoResult.id}` : (repoResult.message || 'Repo not found'),\n  critical: true\n});\n\n// Claude workflow exists\ngithubChecks.push({\n  check: 'Claude Code workflow (.github/workflows/claude.yml)',\n  pass: !!claudeWorkflow.name && !claudeWorkflow.message,\n  detail: claudeWorkflow.name ? 'Found claude.yml' : 'Missing .github/workflows/claude.yml',\n  critical: true\n});\n\n// CLAUDE.md exists\ngithubChecks.push({\n  check: 'CLAUDE.md exists',\n  pass: !!claudeMd.name && !claudeMd.message,\n  detail: claudeMd.name ? 'Found CLAUDE.md' : 'Missing CLAUDE.md',\n  critical: true\n});\n\nreturn [{ json: { githubChecks } }];"
+      },
+      "id": "parse-github-checks",
+      "name": "Parse GitHub Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, 700]
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $('Extract Parameters').first().json;\nconst lighthouse = $('Parse Lighthouse').first().json.lighthouse;\nconst { slopChecks, seoChecks } = $('Parse HTML Checks').first().json;\nconst { githubChecks } = $('Parse GitHub Checks').first().json;\n\nconst today = new Date().toISOString().split('T')[0];\nconst allChecks = [];\nconst failures = [];\n\n// --- Lighthouse ---\nif (lighthouse.error) {\n  allChecks.push({ category: 'Lighthouse', check: 'Lighthouse Audit', pass: false, detail: lighthouse.error, critical: true });\n  failures.push({ category: 'Lighthouse', check: 'Lighthouse Audit', detail: lighthouse.error });\n} else {\n  const perfPass = lighthouse.performance >= 50;\n  const a11yPass = lighthouse.accessibility >= 80;\n  const seoPass = lighthouse.seo >= 80;\n\n  allChecks.push({ category: 'Lighthouse', check: 'Performance >= 50', pass: perfPass, detail: `Score: ${lighthouse.performance}`, critical: true });\n  allChecks.push({ category: 'Lighthouse', check: 'Accessibility >= 80', pass: a11yPass, detail: `Score: ${lighthouse.accessibility}`, critical: true });\n  allChecks.push({ category: 'Lighthouse', check: 'SEO >= 80', pass: seoPass, detail: `Score: ${lighthouse.seo}`, critical: true });\n\n  if (!perfPass) failures.push({ category: 'Lighthouse', check: 'Performance >= 50', detail: `Score: ${lighthouse.performance}` });\n  if (!a11yPass) failures.push({ category: 'Lighthouse', check: 'Accessibility >= 80', detail: `Score: ${lighthouse.accessibility}` });\n  if (!seoPass) failures.push({ category: 'Lighthouse', check: 'SEO >= 80', detail: `Score: ${lighthouse.seo}` });\n}\n\n// --- Slop checks ---\nfor (const c of slopChecks) {\n  allChecks.push({ category: 'Content Quality', ...c, critical: true });\n  if (!c.pass) failures.push({ category: 'Content Quality', check: c.check, detail: c.detail });\n}\n\n// --- SEO checks ---\nfor (const c of seoChecks) {\n  allChecks.push({ category: 'SEO', ...c });\n  if (!c.pass && c.critical) failures.push({ category: 'SEO', check: c.check, detail: c.detail });\n}\n\n// --- GitHub checks ---\nfor (const c of githubChecks) {\n  allChecks.push({ category: 'GitHub', ...c });\n  if (!c.pass && c.critical) failures.push({ category: 'GitHub', check: c.check, detail: c.detail });\n}\n\n// Score\nconst totalChecks = allChecks.length;\nconst passedChecks = allChecks.filter(c => c.pass).length;\nconst criticalFailures = failures.length;\nconst verdict = criticalFailures === 0 ? 'PASS' : 'FAIL';\n\n// Build report\nlet report = `# Quality Gate Report: ${params.businessName}\\n\\n`;\nreport += `**Date:** ${today}\\n`;\nreport += `**Site:** ${params.siteUrl}\\n`;\nreport += `**Repo:** ShalinPatel670/${params.repoName}\\n`;\nreport += `**Verdict:** ${verdict}\\n`;\nreport += `**Score:** ${passedChecks}/${totalChecks} checks passed\\n\\n`;\n\nif (lighthouse.performance !== null) {\n  report += `## Lighthouse Scores\\n`;\n  report += `- Performance: ${lighthouse.performance}/100\\n`;\n  report += `- Accessibility: ${lighthouse.accessibility}/100\\n`;\n  report += `- SEO: ${lighthouse.seo}/100\\n\\n`;\n}\n\nconst categories = ['Lighthouse', 'Content Quality', 'SEO', 'GitHub'];\nfor (const cat of categories) {\n  const catChecks = allChecks.filter(c => c.category === cat);\n  if (catChecks.length === 0) continue;\n  report += `## ${cat}\\n`;\n  for (const c of catChecks) {\n    report += `- ${c.pass ? 'PASS' : 'FAIL'} | ${c.check} | ${c.detail}\\n`;\n  }\n  report += `\\n`;\n}\n\nif (failures.length > 0) {\n  report += `## Failures Requiring Action\\n`;\n  for (const f of failures) {\n    report += `- [${f.category}] ${f.check}: ${f.detail}\\n`;\n  }\n}\n\nreturn [{\n  json: {\n    businessId: params.businessId,\n    businessName: params.businessName,\n    siteUrl: params.siteUrl,\n    repoName: params.repoName,\n    verdict,\n    passedChecks,\n    totalChecks,\n    criticalFailures,\n    failures,\n    report,\n    today\n  }\n}];"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "verdict-check",
+              "leftValue": "={{ $json.verdict }}",
+              "rightValue": "PASS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-pass",
+      "name": "IF Passed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1260, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Aggregate Results').first().json.businessId}/quality-gate-passed.md` }}",
+        "fileContent": "={{ $('Aggregate Results').first().json.report }}",
+        "commitMessage": "={{ `Quality gate PASSED for ${$('Aggregate Results').first().json.businessName}` }}",
+        "resource": "file"
+      },
+      "id": "write-pass-report",
+      "name": "Write Pass Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1520, 100],
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Aggregate Results').first().json.businessId}/state.md` }}",
+        "fileContent": "={{ $('Aggregate Results').first().json.report + '\\n\\n---\\n\\n**Quality Gate Status: PASSED** on ' + $('Aggregate Results').first().json.today + '\\nReady for launch.' }}",
+        "commitMessage": "={{ `Update state: quality gate PASSED for ${$('Aggregate Results').first().json.businessName}` }}",
+        "resource": "file"
+      },
+      "id": "update-state-pass",
+      "name": "Update State - Passed",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1760, 100],
+      "continueOnFail": true,
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'PASS', message: 'Quality gate passed - ready for launch', businessId: $('Aggregate Results').first().json.businessId, businessName: $('Aggregate Results').first().json.businessName, passedChecks: $('Aggregate Results').first().json.passedChecks, totalChecks: $('Aggregate Results').first().json.totalChecks }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-pass",
+      "name": "Respond - Pass",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2000, 100]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ `memory-bank/businesses/${$('Aggregate Results').first().json.businessId}/quality-gate-failed.md` }}",
+        "fileContent": "={{ $('Aggregate Results').first().json.report }}",
+        "commitMessage": "={{ `Quality gate FAILED for ${$('Aggregate Results').first().json.businessName} (${$('Aggregate Results').first().json.criticalFailures} failures)` }}",
+        "resource": "file"
+      },
+      "id": "write-fail-report",
+      "name": "Write Fail Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1520, 500],
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $('Aggregate Results').first().json;\nconst issues = results.failures.map((f, i) => ({\n  json: {\n    title: `[Quality Gate] ${f.check}`,\n    body: `**Category:** ${f.category}\\n**Check:** ${f.check}\\n**Detail:** ${f.detail}\\n\\n**Business:** ${results.businessName}\\n**Site:** ${results.siteUrl}\\n\\nThis issue was auto-created by the Pre-Launch Quality Gate workflow.`,\n    repoName: results.repoName,\n    businessName: results.businessName,\n    businessId: results.businessId,\n    index: i\n  }\n}));\nreturn issues;"
+      },
+      "id": "prepare-issues",
+      "name": "Prepare GitHub Issues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $json.repoName + '/issues' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $json.title, body: $json.body, labels: ['quality-gate', 'automated'] }) }}",
+        "options": {}
+      },
+      "id": "create-github-issues",
+      "name": "Create GitHub Issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 400],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "github-token",
+          "name": "GitHub Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "25shapatel@gmail.com",
+        "toEmail": "25shapatel@gmail.com",
+        "subject": "={{ `Quality Gate FAILED: ${$('Aggregate Results').first().json.businessName} (${$('Aggregate Results').first().json.criticalFailures} failures)` }}",
+        "emailType": "text",
+        "message": "={{ $('Aggregate Results').first().json.report + '\\n\\nGitHub issues have been created for each failure in repo: ShalinPatel670/' + $('Aggregate Results').first().json.repoName }}"
+      },
+      "id": "send-fail-email",
+      "name": "Send Failure Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1760, 650],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-cred",
+          "name": "Gmail SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'FAIL', message: 'Quality gate failed - see report for details', businessId: $('Aggregate Results').first().json.businessId, businessName: $('Aggregate Results').first().json.businessName, passedChecks: $('Aggregate Results').first().json.passedChecks, totalChecks: $('Aggregate Results').first().json.totalChecks, criticalFailures: $('Aggregate Results').first().json.criticalFailures, failures: $('Aggregate Results').first().json.failures }) }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "respond-fail",
+      "name": "Respond - Fail",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2240, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Quality Gate', message: 'QUALITY GATE FAILED for ' + $('Aggregate Results').first().json.businessName + '. ' + $('Aggregate Results').first().json.criticalFailures + ' critical failures: ' + $('Aggregate Results').first().json.failures.map(f => f.check).join(', '), severity: 'critical', businessId: $('Aggregate Results').first().json.businessId, requiresResponse: false }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "notify-telegram",
+      "name": "Notify Human (Telegram)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1520, 800],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Quality Gate Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Parameters": {
+      "main": [
+        [
+          {
+            "node": "Lighthouse Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Site HTML",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Repo Exists",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Claude Workflow",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check CLAUDE.md",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lighthouse Check": {
+      "main": [
+        [
+          {
+            "node": "Parse Lighthouse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Site HTML": {
+      "main": [
+        [
+          {
+            "node": "Parse HTML Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Repo Exists": {
+      "main": [
+        [
+          {
+            "node": "Parse GitHub Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Claude Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse GitHub Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check CLAUDE.md": {
+      "main": [
+        [
+          {
+            "node": "Parse GitHub Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Lighthouse": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse HTML Checks": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse GitHub Checks": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "IF Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Passed": {
+      "main": [
+        [
+          {
+            "node": "Write Pass Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write Fail Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Failure Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Human (Telegram)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Pass Report": {
+      "main": [
+        [
+          {
+            "node": "Update State - Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update State - Passed": {
+      "main": [
+        [
+          {
+            "node": "Respond - Pass",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Fail Report": {
+      "main": [
+        [
+          {
+            "node": "Prepare GitHub Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare GitHub Issues": {
+      "main": [
+        [
+          {
+            "node": "Create GitHub Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GitHub Issues": {
+      "main": [
+        [
+          {
+            "node": "Respond - Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Failure Email": {
+      "main": [
+        [
+          {
+            "node": "Respond - Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

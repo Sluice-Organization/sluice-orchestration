@@ -1,0 +1,282 @@
+{
+  "name": "Cold Email Metrics - Daily Performance Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-daily",
+      "name": "Daily 6AM Metrics Pull",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?select=status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_ANON_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "query-lead-status",
+      "name": "Query Lead Status Counts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 200],
+      "continueOnFail": true,
+      "notes": "Fetches all leads with status field to count by status (new, contacted, replied, positive, demo_booked, converted, bounced)"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_log?select=sent_at,status,region&sent_at=gte.{{ $now.minus(7, 'days').toISO() }}&order=sent_at.desc",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_ANON_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "query-email-log",
+      "name": "Query Email Log (7 Days)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 450],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// This node waits for both queries to arrive\n// n8n merges the inputs - we process in the next node\nreturn [$input.item];"
+      },
+      "id": "wait-for-queries",
+      "name": "Wait for Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const leadItems = $('Query Lead Status Counts').all().map(i => i.json);\nconst emailLogItems = $('Query Email Log (7 Days)').all().map(i => i.json);\n\n// Flatten arrays if nested\nconst leads = leadItems.flat();\nconst emailLogs = emailLogItems.flat();\n\n// Count leads by status\nconst statusCounts = {};\nfor (const lead of leads) {\n  const s = lead.status || 'unknown';\n  statusCounts[s] = (statusCounts[s] || 0) + 1;\n}\n\n// Calculate 7-day email metrics\nconst totalSent7d = emailLogs.length;\nconst replied = emailLogs.filter(e => ['replied', 'positive', 'demo_booked', 'converted'].includes(e.status)).length;\nconst positive = emailLogs.filter(e => ['positive', 'demo_booked', 'converted'].includes(e.status)).length;\nconst demoBooked = emailLogs.filter(e => e.status === 'demo_booked' || e.status === 'converted').length;\nconst converted = emailLogs.filter(e => e.status === 'converted').length;\n\n// By region breakdown\nconst byRegion = {};\nfor (const log of emailLogs) {\n  const region = log.region || 'unknown';\n  if (!byRegion[region]) {\n    byRegion[region] = { sent: 0, replied: 0, positive: 0 };\n  }\n  byRegion[region].sent++;\n  if (['replied', 'positive', 'demo_booked', 'converted'].includes(log.status)) byRegion[region].replied++;\n  if (['positive', 'demo_booked', 'converted'].includes(log.status)) byRegion[region].positive++;\n}\n\nconst metrics = {\n  emails_sent_7d: totalSent7d,\n  reply_rate: totalSent7d > 0 ? (replied / totalSent7d * 100).toFixed(1) + '%' : '0%',\n  positive_rate: totalSent7d > 0 ? (positive / totalSent7d * 100).toFixed(1) + '%' : '0%',\n  demo_book_rate: totalSent7d > 0 ? (demoBooked / totalSent7d * 100).toFixed(1) + '%' : '0%',\n  conversion_rate: totalSent7d > 0 ? (converted / totalSent7d * 100).toFixed(1) + '%' : '0%',\n  by_region: byRegion,\n  lead_pipeline: statusCounts,\n  total_leads: Object.values(statusCounts).reduce((a, b) => a + b, 0),\n  calculated_at: new Date().toISOString()\n};\n\nreturn [{ json: metrics }];"
+      },
+      "id": "calculate-metrics",
+      "name": "Calculate Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/system_context",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ context_key: 'email_metrics', context_value: JSON.stringify($json), updated_at: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "upsert-system-context",
+      "name": "Upsert to system_context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/reports/cold-email-metrics-latest.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'chore: update cold email metrics ' + new Date().toISOString().split('T')[0], content: Buffer.from(JSON.stringify($json, null, 2)).toString('base64'), sha: '' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "write-github-report",
+      "name": "Write Report to GitHub",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 450],
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub API"
+        }
+      },
+      "continueOnFail": true,
+      "notes": "First run will need to use POST to create the file. Subsequent runs use PUT with SHA. continueOnFail handles gracefully."
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Calculate Metrics').first().json;\n\nconst regionReport = Object.entries(m.by_region || {}).map(([region, data]) => {\n  return `  ${region}: ${data.sent} sent, ${data.replied} replied, ${data.positive} positive`;\n}).join('\\n');\n\nconst pipelineReport = Object.entries(m.lead_pipeline || {}).map(([status, count]) => {\n  return `  ${status}: ${count}`;\n}).join('\\n');\n\nconst report = `Cold Email Metrics (7-Day)\\n` +\n  `==========================\\n` +\n  `Sent: ${m.emails_sent_7d}\\n` +\n  `Reply Rate: ${m.reply_rate}\\n` +\n  `Positive Rate: ${m.positive_rate}\\n` +\n  `Demo Book Rate: ${m.demo_book_rate}\\n` +\n  `Conversion Rate: ${m.conversion_rate}\\n` +\n  `Total Pipeline Leads: ${m.total_leads}\\n\\n` +\n  `By Region:\\n${regionReport || '  No regional data'}\\n\\n` +\n  `Pipeline:\\n${pipelineReport || '  No pipeline data'}`;\n\nreturn [{ json: { report, ...m } }];"
+      },
+      "id": "build-report-text",
+      "name": "Build Report Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'cold-email-metrics', level: 'info', message: $json.report }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "notify-telegram",
+      "name": "Notify: Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 300],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Daily 6AM Metrics Pull": {
+      "main": [
+        [
+          {
+            "node": "Query Lead Status Counts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Query Email Log (7 Days)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Lead Status Counts": {
+      "main": [
+        [
+          {
+            "node": "Wait for Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Email Log (7 Days)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Queries": {
+      "main": [
+        [
+          {
+            "node": "Calculate Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Metrics": {
+      "main": [
+        [
+          {
+            "node": "Upsert to system_context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write Report to GitHub",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Report Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Report Text": {
+      "main": [
+        [
+          {
+            "node": "Notify: Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
