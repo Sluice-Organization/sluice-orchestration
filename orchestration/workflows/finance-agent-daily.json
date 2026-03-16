@@ -184,6 +184,31 @@
       "typeVersion": 4.2,
       "position": [1540, 200],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/budget_tracking",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "resolution=merge-duplicates,return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $json[0].id, date: $('Parse Metrics').first().json.date, stage: 'seed', daily_budget_limit: 20, content_seo_spend: 0, paid_ads_spend: $('Parse Metrics').first().json.metrics.ad_spend || 0, product_spend: 0, ai_api_spend: $('Parse Metrics').first().json.metrics.ai_api_cost || 0, total_spend: ($('Parse Metrics').first().json.metrics.ad_spend || 0) + ($('Parse Metrics').first().json.metrics.ai_api_cost || 0), revenue: $('Parse Metrics').first().json.metrics.mrr / 30, balance: 0 }) }}",
+        "options": {}
+      },
+      "id": "insert-budget-tracking",
+      "name": "Insert Budget Tracking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 400],
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -212,7 +237,8 @@
       "main": [[
         { "node": "Write Finance Report", "type": "main", "index": 0 },
         { "node": "Insert Daily Metrics", "type": "main", "index": 0 },
-        { "node": "Update Business MRR", "type": "main", "index": 0 }
+        { "node": "Update Business MRR", "type": "main", "index": 0 },
+        { "node": "Insert Budget Tracking", "type": "main", "index": 0 }
       ]]
     }
   },
