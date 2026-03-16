@@ -1,5 +1,5 @@
 {
-  "name": "AI Voice Caller - Retell AI - BayFlow",
+  "name": "AI Voice Caller - Retell AI - Multi-Business",
   "nodes": [
     {
       "parameters": {
@@ -84,6 +84,16 @@
     },
     {
       "parameters": {
+        "jsCode": "// Look up the business's retell_agent_id from the businesses table\n// Falls back to $env.RETELL_AGENT_ID for BayFlow (manually configured)\n\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU';\n\nconst lead = $input.first().json;\nconst businessId = lead.business_id || lead.businessId || '';\n\nlet retellAgentId = '';\nlet businessSiteUrl = '';\nlet businessCalUrl = 'https://cal.com/shalinp';\nlet businessDisplayName = lead.business_name || 'your business';\n\n// Query the businesses table for this lead's business retell_agent_id\nif (businessId) {\n  try {\n    const response = await fetch(\n      `${SUPABASE_URL}/rest/v1/businesses?business_id=eq.${encodeURIComponent(businessId)}&select=retell_agent_id,name,site_url,cal_booking_url`,\n      {\n        headers: {\n          'apikey': SUPABASE_ANON_KEY,\n          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,\n          'Content-Type': 'application/json'\n        }\n      }\n    );\n    const businesses = await response.json();\n    if (businesses && businesses.length > 0) {\n      const biz = businesses[0];\n      if (biz.retell_agent_id) {\n        retellAgentId = biz.retell_agent_id;\n      }\n      if (biz.name) {\n        businessDisplayName = biz.name;\n      }\n      if (biz.site_url) {\n        businessSiteUrl = biz.site_url;\n      }\n      if (biz.cal_booking_url) {\n        businessCalUrl = biz.cal_booking_url;\n      }\n    }\n  } catch (err) {\n    // Silently fall back to env variable\n  }\n}\n\n// Fallback: use global RETELL_AGENT_ID env var (for BayFlow or manually configured agents)\n// Note: in n8n Code nodes, env vars are accessed via $env\n// but we pass it through as a flag so the HTTP node can use {{ $env.RETELL_AGENT_ID }}\nconst useEnvFallback = !retellAgentId;\n\nreturn [{\n  json: {\n    ...lead,\n    _retell_agent_id: retellAgentId,\n    _use_env_fallback: useEnvFallback,\n    _business_site_url: businessSiteUrl,\n    _business_cal_url: businessCalUrl,\n    _business_display_name: businessDisplayName\n  }\n}];"
+      },
+      "id": "lookup-business-agent",
+      "name": "Lookup Business Agent ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 0]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://api.retellai.com/v2/create-phone-call",
         "sendHeaders": true,
@@ -95,7 +105,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"from_number\": \"{{ $env.RETELL_FROM_NUMBER }}\",\n  \"to_number\": \"{{ $json.phone }}\",\n  \"agent_id\": \"{{ $env.RETELL_AGENT_ID }}\",\n  \"metadata\": {\n    \"lead_email\": \"{{ $json.email }}\",\n    \"business_name\": \"{{ $json.business_name }}\",\n    \"first_name\": \"{{ $json.first_name }}\",\n    \"booking_url\": \"https://cal.com/shalinp\"\n  },\n  \"retell_llm_dynamic_variables\": {\n    \"prospect_name\": \"{{ $json.first_name }}\",\n    \"prospect_business\": \"{{ $json.business_name }}\",\n    \"booking_link\": \"https://cal.com/shalinp\"\n  }\n}",
+        "jsonBody": "={\n  \"from_number\": \"{{ $env.RETELL_FROM_NUMBER }}\",\n  \"to_number\": \"{{ $json.phone }}\",\n  \"agent_id\": \"{{ $json._retell_agent_id || $env.RETELL_AGENT_ID }}\",\n  \"metadata\": {\n    \"lead_email\": \"{{ $json.email }}\",\n    \"business_name\": \"{{ $json._business_display_name || $json.business_name }}\",\n    \"first_name\": \"{{ $json.first_name }}\",\n    \"booking_url\": \"{{ $json._business_cal_url || 'https://cal.com/shalinp' }}\",\n    \"business_id\": \"{{ $json.business_id || $json.businessId || '' }}\"\n  },\n  \"retell_llm_dynamic_variables\": {\n    \"prospect_name\": \"{{ $json.first_name }}\",\n    \"prospect_business\": \"{{ $json.business_name }}\",\n    \"booking_link\": \"{{ $json._business_cal_url || 'https://cal.com/shalinp' }}\"\n  }\n}",
         "options": {
           "timeout": 30000
         }
@@ -104,7 +114,7 @@
       "name": "Create Retell AI Call",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 0],
+      "position": [1140, 0],
       "continueOnFail": true
     },
     {
@@ -129,7 +139,7 @@
       "name": "Update Lead: Call Initiated",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1180, 0],
+      "position": [1360, 0],
       "continueOnFail": true
     },
     {
@@ -148,7 +158,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { email, phone, business_name, first_name } = body;\n\nif (!phone || !email) {\n  return [{ json: { _error: true, message: 'Missing required fields: email and phone' } }];\n}\n\nreturn [{\n  json: {\n    email,\n    phone,\n    business_name: business_name || 'your shop',\n    first_name: first_name || 'there'\n  }\n}];"
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { email, phone, business_name, first_name, business_id } = body;\n\nif (!phone || !email) {\n  return [{ json: { _error: true, message: 'Missing required fields: email and phone' } }];\n}\n\nreturn [{\n  json: {\n    email,\n    phone,\n    business_name: business_name || 'your shop',\n    first_name: first_name || 'there',\n    business_id: business_id || ''\n  }\n}];"
       },
       "id": "parse-manual-trigger",
       "name": "Parse Manual Trigger Data",
@@ -184,7 +194,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const payload = $input.first().json.body || $input.first().json;\n\n// Retell webhook payload structure\nconst callId = payload.call_id || payload.call?.call_id || '';\nconst callStatus = payload.call_status || payload.call?.status || 'unknown';\nconst duration = payload.duration_ms || payload.call?.duration_ms || 0;\nconst transcript = payload.transcript || payload.call?.transcript || '';\nconst disconnectReason = payload.disconnect_reason || payload.call?.disconnect_reason || '';\nconst metadata = payload.metadata || payload.call?.metadata || {};\n\n// Determine call outcome\nlet callOutcome = 'unknown';\nlet bookingMade = false;\nlet isVoicemail = false;\nlet notInterested = false;\n\n// Check transcript for booking signals\nconst transcriptLower = (typeof transcript === 'string' ? transcript : JSON.stringify(transcript)).toLowerCase();\n\nif (transcriptLower.includes('book') || transcriptLower.includes('schedule') || transcriptLower.includes('demo') || transcriptLower.includes('set up') || transcriptLower.includes('sounds good') || transcriptLower.includes('let\\'s do it')) {\n  callOutcome = 'interested_booking';\n  bookingMade = true;\n} else if (disconnectReason === 'voicemail_reached' || transcriptLower.includes('voicemail') || transcriptLower.includes('leave a message') || duration < 15000) {\n  callOutcome = 'voicemail';\n  isVoicemail = true;\n} else if (transcriptLower.includes('not interested') || transcriptLower.includes('no thanks') || transcriptLower.includes('don\\'t call') || transcriptLower.includes('remove me') || transcriptLower.includes('stop calling')) {\n  callOutcome = 'not_interested';\n  notInterested = true;\n} else if (transcriptLower.includes('call back') || transcriptLower.includes('busy right now') || transcriptLower.includes('not a good time')) {\n  callOutcome = 'callback_requested';\n} else {\n  callOutcome = 'completed_no_action';\n}\n\nreturn [{\n  json: {\n    call_id: callId,\n    call_status: callStatus,\n    call_outcome: callOutcome,\n    duration_seconds: Math.round(duration / 1000),\n    transcript: typeof transcript === 'string' ? transcript : JSON.stringify(transcript),\n    disconnect_reason: disconnectReason,\n    booking_made: bookingMade,\n    is_voicemail: isVoicemail,\n    not_interested: notInterested,\n    lead_email: metadata.lead_email || '',\n    business_name: metadata.business_name || '',\n    first_name: metadata.first_name || '',\n    booking_url: metadata.booking_url || 'https://cal.com/shalinp',\n    raw_payload: payload\n  }\n}];"
+        "jsCode": "const payload = $input.first().json.body || $input.first().json;\n\n// Retell webhook payload structure\nconst callId = payload.call_id || payload.call?.call_id || '';\nconst callStatus = payload.call_status || payload.call?.status || 'unknown';\nconst duration = payload.duration_ms || payload.call?.duration_ms || 0;\nconst transcript = payload.transcript || payload.call?.transcript || '';\nconst disconnectReason = payload.disconnect_reason || payload.call?.disconnect_reason || '';\nconst metadata = payload.metadata || payload.call?.metadata || {};\n\n// Determine call outcome\nlet callOutcome = 'unknown';\nlet bookingMade = false;\nlet isVoicemail = false;\nlet notInterested = false;\n\n// Check transcript for booking signals\nconst transcriptLower = (typeof transcript === 'string' ? transcript : JSON.stringify(transcript)).toLowerCase();\n\nif (transcriptLower.includes('book') || transcriptLower.includes('schedule') || transcriptLower.includes('demo') || transcriptLower.includes('set up') || transcriptLower.includes('sounds good') || transcriptLower.includes('let\\'s do it')) {\n  callOutcome = 'interested_booking';\n  bookingMade = true;\n} else if (disconnectReason === 'voicemail_reached' || transcriptLower.includes('voicemail') || transcriptLower.includes('leave a message') || duration < 15000) {\n  callOutcome = 'voicemail';\n  isVoicemail = true;\n} else if (transcriptLower.includes('not interested') || transcriptLower.includes('no thanks') || transcriptLower.includes('don\\'t call') || transcriptLower.includes('remove me') || transcriptLower.includes('stop calling')) {\n  callOutcome = 'not_interested';\n  notInterested = true;\n} else if (transcriptLower.includes('call back') || transcriptLower.includes('busy right now') || transcriptLower.includes('not a good time')) {\n  callOutcome = 'callback_requested';\n} else {\n  callOutcome = 'completed_no_action';\n}\n\nreturn [{\n  json: {\n    call_id: callId,\n    call_status: callStatus,\n    call_outcome: callOutcome,\n    duration_seconds: Math.round(duration / 1000),\n    transcript: typeof transcript === 'string' ? transcript : JSON.stringify(transcript),\n    disconnect_reason: disconnectReason,\n    booking_made: bookingMade,\n    is_voicemail: isVoicemail,\n    not_interested: notInterested,\n    lead_email: metadata.lead_email || '',\n    business_name: metadata.business_name || '',\n    first_name: metadata.first_name || '',\n    booking_url: metadata.booking_url || 'https://cal.com/shalinp',\n    business_id: metadata.business_id || '',\n    raw_payload: payload\n  }\n}];"
       },
       "id": "parse-retell-webhook",
       "name": "Parse Retell Call Result",
@@ -430,8 +440,13 @@
     },
     "Has Leads?": {
       "main": [
-        [{ "node": "Create Retell AI Call", "type": "main", "index": 0 }],
+        [{ "node": "Lookup Business Agent ID", "type": "main", "index": 0 }],
         [{ "node": "No Leads Today", "type": "main", "index": 0 }]
+      ]
+    },
+    "Lookup Business Agent ID": {
+      "main": [
+        [{ "node": "Create Retell AI Call", "type": "main", "index": 0 }]
       ]
     },
     "Create Retell AI Call": {
@@ -447,7 +462,7 @@
     "Parse Manual Trigger Data": {
       "main": [
         [
-          { "node": "Create Retell AI Call", "type": "main", "index": 0 },
+          { "node": "Lookup Business Agent ID", "type": "main", "index": 0 },
           { "node": "Respond: Call Queued", "type": "main", "index": 0 }
         ]
       ]
@@ -493,14 +508,14 @@
   },
   "staticData": null,
   "tags": [
-    { "name": "bayflow" },
+    { "name": "multi-business" },
     { "name": "voice-calling" },
     { "name": "retell-ai" },
     { "name": "sales" }
   ],
   "triggerCount": 3,
-  "updatedAt": "2026-03-15T00:00:00.000Z",
-  "versionId": "1",
+  "updatedAt": "2026-03-16T00:00:00.000Z",
+  "versionId": "2",
   "meta": {
     "notes": [
       {
@@ -508,14 +523,14 @@
         "type": "sticky",
         "position": [0, 1100],
         "size": [600, 500],
-        "content": "## Retell AI Agent Prompt\n\nYou are calling on behalf of BayFlow, software built specifically for independent auto repair shops. You're calling {prospect_name} at {prospect_business}.\n\nYour goal: Book a 15-minute demo at {booking_link}\n\nKey points:\n- BayFlow handles scheduling, digital inspections, invoicing, and customer management\n- $49/month, 14-day free trial, no credit card needed\n- Digital inspections: techs snap photos, customers approve work from their phone\n- Shops save about 5 hours a week on paperwork\n\nIf they're interested: \"Great, I can get you set up with a quick 15-minute walkthrough. Would [suggest two specific times this week] work for you?\"\n\nIf voicemail: \"Hey {prospect_name}, this is a quick call about BayFlow — we built shop management software specifically for independent repair shops like {prospect_business}. If you're curious, check out bayflow.com or I'll try you again in a couple days.\"\n\nIf not interested: \"No problem at all. If things change, we're at bayflow.com. Have a great day.\"\n\nBe natural, conversational, not salesy. Get to the point fast — shop owners are busy."
+        "content": "## Retell AI Agent Prompt (Per-Business)\n\nVoice agents are now created automatically per-business during the Birth Protocol (deploy-business workflow).\n\nThe agent prompt is generated from each business's PRD, including:\n- Business name and one-line description\n- Top 3-4 features extracted from PRD\n- Pricing and trial info\n- Persona-appropriate voice selection\n- Dynamic variables: {prospect_name}, {prospect_business}, {booking_link}\n\nVoice mapping:\n- Auto/mechanic/construction/plumbing/hvac -> Professional Male (35-50)\n- Salon/spa/beauty/yoga/fitness/wellness -> Friendly Female (25-35)\n- Law/legal/accounting/financial/consulting -> Authoritative Male (45-60)\n- Tutor/coach/teacher/education -> Warm Female (28-40)\n- Photography/creative/design/marketing -> Energetic Female (25-35)\n- Default -> Professional Male (30-40)\n\nNote: Voice IDs are descriptive placeholders. Configure actual Retell voice IDs in Retell dashboard and update the deploy-business workflow."
       },
       {
         "id": "setup-instructions",
         "type": "sticky",
         "position": [700, 1100],
         "size": [500, 400],
-        "content": "## Setup Instructions\n\n1. Replace RETELL_API_KEY with your Retell AI API key\n2. Replace RETELL_AGENT_ID with the agent ID from Retell dashboard\n3. Replace +1XXXXXXXXXX with your Retell phone number\n4. Update Supabase anon key placeholders with real key\n5. Configure Retell webhook URL to point to: {n8n_base_url}/webhook/retell-call-complete\n6. Create voice_call_log table in Supabase:\n   - call_id TEXT PRIMARY KEY\n   - lead_email TEXT\n   - business_name TEXT\n   - call_outcome TEXT\n   - call_duration_seconds INTEGER\n   - transcript TEXT\n   - booking_made BOOLEAN DEFAULT false\n   - disconnect_reason TEXT\n   - created_at TIMESTAMPTZ DEFAULT now()\n7. Add columns to cold_email_leads if missing:\n   - call_status TEXT\n   - call_outcome TEXT\n   - call_transcript TEXT\n   - call_duration_seconds INTEGER\n   - call_attempts INTEGER DEFAULT 0\n   - next_call_date DATE\n   - last_call_date TIMESTAMPTZ\n   - retell_call_id TEXT\n8. Rate limit: 50 calls/day enforced by LIMIT 50 in lead query"
+        "content": "## Setup Instructions\n\n1. Set RETELL_API_KEY env var with your Retell AI API key\n2. Set RETELL_AGENT_ID env var as fallback for BayFlow (manually configured agent)\n3. Set RETELL_FROM_NUMBER with your Retell phone number\n4. Per-business agent IDs are stored in businesses.retell_agent_id\n5. The Lookup Business Agent ID node queries businesses table for each lead\n6. Falls back to $env.RETELL_AGENT_ID if no per-business agent found\n7. Configure Retell webhook URL to point to: {n8n_base_url}/webhook/retell-call-complete\n8. Create voice_call_log table in Supabase (see schema.sql)\n9. Run retell-schema.sql to add retell columns to businesses table\n10. Rate limit: 50 calls/day enforced by LIMIT 50 in lead query"
       }
     ]
   }
