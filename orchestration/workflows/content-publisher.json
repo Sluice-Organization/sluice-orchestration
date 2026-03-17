@@ -24,7 +24,37 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ `https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/bayflow/reports/content-${$now.toFormat('yyyy-MM-dd')}.md` }}",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?status=not.in.(killed,sold)&select=business_id,name,site_url,repo_name",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-active-businesses",
+      "name": "Fetch Active Businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, -200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.all().map(i => i.json);\nconst businesses = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;\nconst results = [];\nfor (const biz of businesses) {\n  const id = biz.business_id || biz.name;\n  if (!id || id === '_template') continue;\n  results.push({ json: { businessId: id, businessName: biz.name || id, businessPath: 'memory-bank/businesses/' + id, repo_name: biz.repo_name || id } });\n}\nif (results.length === 0) results.push({ json: { businessId: 'bayflow', businessName: 'BayFlow', businessPath: 'memory-bank/businesses/bayflow', repo_name: 'bayflow' } });\nreturn results;"
+      },
+      "id": "split-businesses",
+      "name": "Split Into Businesses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, -200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ `https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/${$json.businessPath}/reports/content-${$now.toFormat('yyyy-MM-dd')}.md` }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -116,7 +146,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ `https://api.github.com/repos/ShalinPatel670/bayflow/contents/src/content/blog/${$json.slug}.md` }}",
+        "url": "={{ `https://api.github.com/repos/ShalinPatel670/${$('Split Into Businesses').first().json.repo_name}/contents/src/content/blog/${$json.slug}.md` }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -160,7 +190,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ `https://api.github.com/repos/ShalinPatel670/bayflow/contents/src/content/blog/${$json.slug}.md` }}",
+        "url": "={{ `https://api.github.com/repos/ShalinPatel670/${$('Split Into Businesses').first().json.repo_name}/contents/src/content/blog/${$json.slug}.md` }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -193,7 +223,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const slug = $('Step 3b - Prepare Commit Payload').first().json.slug;\nconst blogUrl = `https://bayflow.app/blog/${slug}`;\n\nreturn [{\n  json: {\n    slug,\n    blogUrl,\n    indexingPayload: JSON.stringify({\n      url: blogUrl,\n      type: 'URL_UPDATED'\n    })\n  }\n}];"
+        "jsCode": "const slug = $('Step 3b - Prepare Commit Payload').first().json.slug;\nconst siteUrl = $('Split Into Businesses').first().json.site_url || 'https://bayflow.app';\nconst blogUrl = `${siteUrl}/blog/${slug}`;\n\nreturn [{\n  json: {\n    slug,\n    blogUrl,\n    indexingPayload: JSON.stringify({\n      url: blogUrl,\n      type: 'URL_UPDATED'\n    })\n  }\n}];"
       },
       "id": "prepare-indexing",
       "name": "Step 4a - Prepare Indexing Request",
@@ -240,7 +270,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Collect results from all processed blog posts\nconst items = $input.all();\nconst today = $now.toFormat('yyyy-MM-dd');\n\nconst publishedPosts = [];\nfor (const item of items) {\n  publishedPosts.push({\n    slug: item.json.slug || 'unknown',\n    url: item.json.blogUrl || 'unknown',\n    indexingSubmitted: !item.json.error\n  });\n}\n\nconst report = `# Content Publisher Report - ${today}\\n\\n## Status: SUCCESS\\n\\n## Published Blog Posts\\n\\n${publishedPosts.map((p, i) => `### ${i + 1}. ${p.slug}\\n- **URL**: ${p.url}\\n- **Committed to**: src/content/blog/${p.slug}.md\\n- **Google Indexing**: ${p.indexingSubmitted ? 'Submitted' : 'Skipped (API not configured)'}\\n`).join('\\n')}\\n\\n## Summary\\n- **Total posts published**: ${publishedPosts.length}\\n- **Target repo**: ShalinPatel670/bayflow\\n- **Vercel auto-deploy**: Triggered by commit\\n- **Timestamp**: ${new Date().toISOString()}\\n`;\n\nconst reportB64 = Buffer.from(report, 'utf-8').toString('base64');\n\nreturn [{\n  json: {\n    report,\n    reportPayload: JSON.stringify({\n      message: `Content Publisher report - ${today}`,\n      content: reportB64\n    })\n  }\n}];"
+        "jsCode": "// Collect results from all processed blog posts\nconst items = $input.all();\nconst today = $now.toFormat('yyyy-MM-dd');\n\nconst publishedPosts = [];\nfor (const item of items) {\n  publishedPosts.push({\n    slug: item.json.slug || 'unknown',\n    url: item.json.blogUrl || 'unknown',\n    indexingSubmitted: !item.json.error\n  });\n}\n\nconst report = `# Content Publisher Report - ${today}\\n\\n## Status: SUCCESS\\n\\n## Published Blog Posts\\n\\n${publishedPosts.map((p, i) => `### ${i + 1}. ${p.slug}\\n- **URL**: ${p.url}\\n- **Committed to**: src/content/blog/${p.slug}.md\\n- **Google Indexing**: ${p.indexingSubmitted ? 'Submitted' : 'Skipped (API not configured)'}\\n`).join('\\n')}\\n\\n## Summary\\n- **Total posts published**: ${publishedPosts.length}\\n- **Target repo**: ShalinPatel670/${$('Split Into Businesses').first().json.repo_name}\\n- **Vercel auto-deploy**: Triggered by commit\\n- **Timestamp**: ${new Date().toISOString()}\\n`;\n\nconst reportB64 = Buffer.from(report, 'utf-8').toString('base64');\n\nreturn [{\n  json: {\n    report,\n    reportPayload: JSON.stringify({\n      message: `Content Publisher report - ${today}`,\n      content: reportB64\n    })\n  }\n}];"
       },
       "id": "build-report",
       "name": "Step 5a - Build Publish Report",
@@ -254,7 +284,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ `https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/bayflow/reports/publish-${$now.toFormat('yyyy-MM-dd')}.md` }}",
+        "url": "={{ `https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/${$('Split Into Businesses').first().json.businessPath}/reports/publish-${$now.toFormat('yyyy-MM-dd')}.md` }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -314,6 +344,28 @@
   ],
   "connections": {
     "Monday 9:30 AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Businesses": {
+      "main": [
+        [
+          {
+            "node": "Split Into Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Businesses": {
       "main": [
         [
           {

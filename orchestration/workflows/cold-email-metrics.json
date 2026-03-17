@@ -52,7 +52,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_log?select=sent_at,status,region&sent_at=gte.{{ $now.minus(7, 'days').toISO() }}&order=sent_at.desc",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_log?select=sent_at,status,region&sent_at=gte.{{ $now.minus({days: 7}).toISO() }}&order=sent_at.desc",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,

@@ -25,7 +25,7 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "business_id", "value": "eq.bayflow" }
+            { "name": "select", "value": "*" }
           ]
         },
         "sendHeaders": true,
@@ -51,7 +51,7 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "business_id", "value": "eq.bayflow" }
+            { "name": "select", "value": "*" }
           ]
         },
         "sendHeaders": true,
@@ -99,17 +99,27 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { name: 'bayflow', path: 'memory-bank/businesses/bayflow' } }];"
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?status=not.in.(killed,sold)&select=business_id,name,site_url,repo_name",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
       },
       "id": "list-businesses",
       "name": "List Business Directories",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [260, 400]
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 400],
+      "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const businesses = $input.all();\nconst results = [];\nfor (const biz of businesses) {\n  if (biz.json.name === '_template') continue;\n  results.push({ json: { businessId: biz.json.name, businessPath: 'memory-bank/businesses/' + biz.json.name } });\n}\nreturn results;"
+        "jsCode": "const raw = $input.all().map(i => i.json);\nconst businesses = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;\nconst results = [];\nfor (const biz of businesses) {\n  const id = biz.business_id || biz.name;\n  if (!id || id === '_template') continue;\n  results.push({ json: { businessId: id, businessPath: 'memory-bank/businesses/' + id, site_url: biz.site_url || '', repo_name: biz.repo_name || '' } });\n}\nif (results.length === 0) results.push({ json: { businessId: 'bayflow', businessPath: 'memory-bank/businesses/bayflow', site_url: '', repo_name: 'bayflow' } });\nreturn results;"
       },
       "id": "filter-businesses",
       "name": "Filter Active Businesses",
@@ -311,7 +321,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const parsed = $('Parse CEO Output').first().json;\nconst actions = parsed.actions || [];\nconst businessId = parsed.businessId || 'bayflow';\nif (actions.length === 0) {\n  return [{ json: { skip: true, message: 'No actions to execute', businessId, actions: [], totalActions: 0 } }];\n}\nreturn [{ json: { skip: false, businessId, actions, totalActions: actions.length } }];"
+        "jsCode": "const parsed = $('Parse CEO Output').first().json;\nconst actions = parsed.actions || [];\nconst businessId = parsed.businessId || 'unknown';\nif (actions.length === 0) {\n  return [{ json: { skip: true, message: 'No actions to execute', businessId, actions: [], totalActions: 0 } }];\n}\nreturn [{ json: { skip: false, businessId, actions, totalActions: actions.length } }];"
       },
       "id": "prepare-actions",
       "name": "Prepare Actions",

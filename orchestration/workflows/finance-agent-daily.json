@@ -15,17 +15,48 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?status=not.in.(killed,sold)&select=business_id,name,site_url,repo_name",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-active-businesses",
+      "name": "Fetch Active Businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.all().map(i => i.json);\nconst businesses = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;\nconst results = [];\nfor (const biz of businesses) {\n  const id = biz.business_id || biz.name;\n  if (!id || id === '_template') continue;\n  results.push({ json: { businessId: id, businessName: biz.name || id, businessPath: 'memory-bank/businesses/' + id, site_url: biz.site_url || '', repo_name: biz.repo_name || id } });\n}\nif (results.length === 0) results.push({ json: { businessId: 'bayflow', businessName: 'BayFlow', businessPath: 'memory-bank/businesses/bayflow', site_url: '', repo_name: 'bayflow' } });\nreturn results;"
+      },
+      "id": "split-businesses",
+      "name": "Split Into Businesses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
         "resource": "file",
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/state.md"
+        "filePath": "={{ $json.businessPath }}/state.md"
       },
       "id": "read-state",
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, 0]
+      "position": [660, -100],
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -33,17 +64,18 @@
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/strategy.md"
+        "filePath": "={{ $('Split Into Businesses').first().json.businessPath }}/strategy.md"
       },
       "id": "read-strategy",
       "name": "Read Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [440, 0]
+      "position": [660, 100],
+      "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\n\nreturn [{\n  json: {\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow',\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Finance Agent for BayFlow (auto repair shop software).\n\nYour responsibilities: daily reconciliation, weekly P&L with channel attribution, CAC/LTV/payback tracking, monthly treasury.\n\n## Current State\n${state}\n\n## Strategy (for pricing/budget context)\n${strategy}\n\nPerform your daily financial review:\n\n1. **Revenue Check:** Current MRR, any new subscriptions, any churned customers. Revenue by channel if available (organic, paid, direct, referral).\n\n2. **Expense Tracking:** Current monthly costs breakdown (Supabase, Vercel, Railway, domains, AI API costs, any ad spend). Compare against budget tier allocation.\n\n3. **Budget Compliance:** Are we within the seed stage daily max ($20)? Content/SEO 60%, Product 25%, Reserve 15%. Flag any overspend.\n\n4. **Circuit Breaker Check:** 7-day spend vs 3x trailing revenue. Any campaigns needing ROAS check.\n\n5. **Token Budget:** Estimated AI API costs for this business this cycle. Are we within seed tier (50K tokens/cycle, $30-50/month)?\n\n6. **Metrics:** CAC (if applicable), projected LTV, payback period.\n\nOutput your report in the structured format: Agent name, business, date, status (GREEN/YELLOW/RED), key metrics with trends, actions taken, issues detected, recommendations, needs from CEO Agent.\n\nIMPORTANT: At the very end of your response, output a JSON block with today's metrics delimited by special markers. Use exactly this format:\n\n===METRICS_JSON_START===\n{\n  \"mrr\": 0,\n  \"revenue_organic\": 0,\n  \"revenue_paid\": 0,\n  \"revenue_direct\": 0,\n  \"revenue_referral\": 0,\n  \"traffic_total\": 0,\n  \"traffic_organic\": 0,\n  \"traffic_paid\": 0,\n  \"traffic_direct\": 0,\n  \"traffic_referral\": 0,\n  \"signups\": 0,\n  \"trials\": 0,\n  \"conversions\": 0,\n  \"churn_count\": 0,\n  \"churn_mrr\": 0,\n  \"support_tickets\": 0,\n  \"support_auto_resolved\": 0,\n  \"ad_spend\": 0,\n  \"ai_api_cost\": 0\n}\n===METRICS_JSON_END===\n\nFill in all values with real numbers from the data you have. Use 0 for any metric you cannot determine. The JSON must be valid and contain all fields listed above.`\n  }\n}];"
+        "jsCode": "const state = $('Read State').first().json.content || '';\nconst strategy = $('Read Strategy').first().json.content || '';\nconst bizInfo = $('Split Into Businesses').first().json;\n\nreturn [{\n  json: {\n    businessId: bizInfo.businessId,\n    businessPath: bizInfo.businessPath,\n    prompt: `Today is ${new Date().toISOString().split('T')[0]}. You are the Finance Agent for ${bizInfo.businessName} (business ID: ${bizInfo.businessId}).\n\nYour responsibilities: daily reconciliation, weekly P&L with channel attribution, CAC/LTV/payback tracking, monthly treasury.\n\n## Current State\n${state}\n\n## Strategy (for pricing/budget context)\n${strategy}\n\nPerform your daily financial review:\n\n1. **Revenue Check:** Current MRR, any new subscriptions, any churned customers. Revenue by channel if available (organic, paid, direct, referral).\n\n2. **Expense Tracking:** Current monthly costs breakdown (Supabase, Vercel, Railway, domains, AI API costs, any ad spend). Compare against budget tier allocation.\n\n3. **Budget Compliance:** Are we within the seed stage daily max ($20)? Content/SEO 60%, Product 25%, Reserve 15%. Flag any overspend.\n\n4. **Circuit Breaker Check:** 7-day spend vs 3x trailing revenue. Any campaigns needing ROAS check.\n\n5. **Token Budget:** Estimated AI API costs for this business this cycle. Are we within seed tier (50K tokens/cycle, $30-50/month)?\n\n6. **Metrics:** CAC (if applicable), projected LTV, payback period.\n\nOutput your report in the structured format: Agent name, business, date, status (GREEN/YELLOW/RED), key metrics with trends, actions taken, issues detected, recommendations, needs from CEO Agent.\n\nIMPORTANT: At the very end of your response, output a JSON block with today's metrics delimited by special markers. Use exactly this format:\n\n===METRICS_JSON_START===\n{\n  \"mrr\": 0,\n  \"revenue_organic\": 0,\n  \"revenue_paid\": 0,\n  \"revenue_direct\": 0,\n  \"revenue_referral\": 0,\n  \"traffic_total\": 0,\n  \"traffic_organic\": 0,\n  \"traffic_paid\": 0,\n  \"traffic_direct\": 0,\n  \"traffic_referral\": 0,\n  \"signups\": 0,\n  \"trials\": 0,\n  \"conversions\": 0,\n  \"churn_count\": 0,\n  \"churn_mrr\": 0,\n  \"support_tickets\": 0,\n  \"support_auto_resolved\": 0,\n  \"ad_spend\": 0,\n  \"ai_api_cost\": 0\n}\n===METRICS_JSON_END===\n\nFill in all values with real numbers from the data you have. Use 0 for any metric you cannot determine. The JSON must be valid and contain all fields listed above.`\n  }\n}];"
       },
       "id": "build-prompt",
       "name": "Build Finance Prompt",
@@ -93,7 +125,7 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "business_id", "value": "eq.bayflow" },
+            { "name": "business_id", "value": "=eq.{{ $('Split Into Businesses').first().json.businessId }}" },
             { "name": "select", "value": "id" }
           ]
         },
@@ -119,9 +151,9 @@
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/reports/finance-{{ $now.toFormat('yyyy-MM-dd') }}.md",
+        "filePath": "={{ $('Split Into Businesses').first().json.businessPath }}/reports/finance-{{ $now.toFormat('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $('Parse Metrics').first().json.reportText }}",
-        "commitMessage": "Finance Agent daily report - bayflow - {{ $now.toFormat('yyyy-MM-dd') }}"
+        "commitMessage": "=Finance Agent daily report - {{ $('Split Into Businesses').first().json.businessId }} - {{ $now.toFormat('yyyy-MM-dd') }}"
       },
       "id": "write-report",
       "name": "Write Finance Report",
@@ -161,7 +193,7 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "business_id", "value": "eq.bayflow" }
+            { "name": "business_id", "value": "=eq.{{ $('Split Into Businesses').first().json.businessId }}" }
           ]
         },
         "sendHeaders": true,
@@ -213,10 +245,16 @@
   ],
   "connections": {
     "Daily 7 AM Trigger": {
-      "main": [[{ "node": "Read State", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Fetch Active Businesses", "type": "main", "index": 0 }]]
+    },
+    "Fetch Active Businesses": {
+      "main": [[{ "node": "Split Into Businesses", "type": "main", "index": 0 }]]
+    },
+    "Split Into Businesses": {
+      "main": [[{ "node": "Read State", "type": "main", "index": 0 }, { "node": "Read Strategy", "type": "main", "index": 0 }]]
     },
     "Read State": {
-      "main": [[{ "node": "Read Strategy", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Build Finance Prompt", "type": "main", "index": 0 }]]
     },
     "Read Strategy": {
       "main": [[{ "node": "Build Finance Prompt", "type": "main", "index": 0 }]]
