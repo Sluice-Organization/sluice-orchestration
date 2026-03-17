@@ -53,6 +53,12 @@ CREATE TABLE IF NOT EXISTS outreach_intelligence (
   call_connected boolean DEFAULT false,
   voicemail_left boolean DEFAULT false,
 
+  -- Freeform notes (LLM reads these for context)
+  notes text, -- "Shop owner mentioned switching from Mitchell 1, frustrated with pricing"
+  what_worked text, -- "Mentioning digital inspections got immediate interest"
+  what_didnt_work text, -- "ROI angle fell flat, they care more about time savings"
+  learnings text, -- "Auto repair shops in rural areas respond better to casual tone"
+
   -- Reference back to lead
   lead_id uuid,
   lead_email text,
