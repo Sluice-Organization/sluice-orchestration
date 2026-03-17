@@ -1,5 +1,5 @@
 {
-  "name": "Review & Testimonial Collector - BayFlow",
+  "name": "Review & Testimonial Collector - Multi-Business",
   "nodes": [
     {
       "parameters": {
@@ -16,72 +16,80 @@
       "name": "Weekly Wednesday 10 AM",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, 0]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "https://qmwiahstuzcqmdksrzxe.supabase.co/rest/v1/customers?select=id,email,name,created_at,last_login_at,review_requested_at,churn_risk_status&status=eq.active&order=created_at.asc&limit=50",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "status", "value": "not.in.(killed,sold)" },
+            { "name": "select", "value": "id,business_id,name,site_url,supabase_url,supabase_anon_key" }
+          ]
+        },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
-            }
+            { "name": "apikey", "value": "{{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_ANON_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-businesses",
+      "name": "Fetch All Businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const businesses = $input.all().map(i => i.json);\nconst flat = Array.isArray(businesses[0]) ? businesses[0] : businesses;\n\n// Output each business that has its own Supabase instance for customer data\nreturn flat.filter(b => b.supabase_url).map(b => ({\n  json: {\n    businessId: b.business_id,\n    businessName: b.name,\n    siteUrl: b.site_url || '',\n    supabaseUrl: b.supabase_url,\n    supabaseAnonKey: b.supabase_anon_key || '{{ $env.SUPABASE_ANON_KEY }}'\n  }\n}));"
+      },
+      "id": "split-businesses",
+      "name": "Split Per Business",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.supabaseUrl + '/rest/v1/customers?select=id,email,name,created_at,last_login_at,review_requested_at,churn_risk_status&status=eq.active&order=created_at.asc&limit=50' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
           ]
         },
         "options": {}
       },
       "id": "fetch-customers",
-      "name": "Fetch Active Customers",
+      "name": "Fetch Active Customers (Per Business)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        220,
-        0
-      ],
+      "position": [660, 0],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const customers = $input.all().map(i => i.json);\nconst allCustomers = Array.isArray(customers[0]) ? customers[0] : customers;\n\nconst now = new Date();\nconst thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);\nconst ninetyDaysAgo = new Date(now - 90 * 24 * 60 * 60 * 1000);\nconst fourteenDaysAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);\n\nconst eligible = [];\n\nfor (const c of allCustomers) {\n  if (!c.email || !c.name) continue;\n\n  // Must be paying for 30+ days\n  const createdAt = new Date(c.created_at);\n  if (createdAt > thirtyDaysAgo) continue;\n\n  // Must not be in churn risk\n  if (c.churn_risk_status === 'high' || c.churn_risk_status === 'churned') continue;\n\n  // Must not have been asked in last 90 days\n  if (c.review_requested_at) {\n    const lastAsked = new Date(c.review_requested_at);\n    if (lastAsked > ninetyDaysAgo) continue;\n  }\n\n  // Should have logged in within last 14 days (active user)\n  if (c.last_login_at) {\n    const lastLogin = new Date(c.last_login_at);\n    if (lastLogin < fourteenDaysAgo) continue;\n  }\n\n  const daysSinceSignup = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));\n\n  eligible.push({\n    json: {\n      id: c.id,\n      email: c.email,\n      name: c.name,\n      daysSinceSignup\n    }\n  });\n\n  // Cap at 10 per week to avoid looking spammy\n  if (eligible.length >= 10) break;\n}\n\nif (eligible.length === 0) {\n  return [{ json: { _noEligible: true, count: 0 } }];\n}\n\nreturn eligible;"
+        "jsCode": "const customers = $input.all().map(i => i.json);\nconst allCustomers = Array.isArray(customers[0]) ? customers[0] : customers;\nconst bizData = $('Split Per Business').item.json;\n\nconst now = new Date();\nconst thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);\nconst ninetyDaysAgo = new Date(now - 90 * 24 * 60 * 60 * 1000);\nconst fourteenDaysAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);\n\nconst eligible = [];\n\nfor (const c of allCustomers) {\n  if (!c.email || !c.name) continue;\n  const createdAt = new Date(c.created_at);\n  if (createdAt > thirtyDaysAgo) continue;\n  if (c.churn_risk_status === 'high' || c.churn_risk_status === 'churned') continue;\n  if (c.review_requested_at) {\n    const lastAsked = new Date(c.review_requested_at);\n    if (lastAsked > ninetyDaysAgo) continue;\n  }\n  if (c.last_login_at) {\n    const lastLogin = new Date(c.last_login_at);\n    if (lastLogin < fourteenDaysAgo) continue;\n  }\n\n  const daysSinceSignup = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));\n  eligible.push({\n    json: {\n      id: c.id,\n      email: c.email,\n      name: c.name,\n      daysSinceSignup,\n      businessId: bizData.businessId,\n      businessName: bizData.businessName,\n      siteUrl: bizData.siteUrl,\n      supabaseUrl: bizData.supabaseUrl\n    }\n  });\n  if (eligible.length >= 10) break;\n}\n\nif (eligible.length === 0) {\n  return [{ json: { _noEligible: true, count: 0, businessId: bizData.businessId, businessName: bizData.businessName } }];\n}\n\nreturn eligible;"
       },
       "id": "filter-eligible",
       "name": "Filter Eligible Customers",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        440,
-        0
-      ]
+      "position": [880, 0]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "has-eligible",
-              "leftValue": "={{ $json._noEligible }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ],
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "has-eligible", "leftValue": "={{ $json._noEligible }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }],
           "combinator": "and"
         },
         "options": {}
@@ -90,23 +98,17 @@
       "name": "Has Eligible Customers?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        660,
-        0
-      ]
+      "position": [1100, 0]
     },
     {
       "parameters": {
-        "jsCode": "const { name, email, daysSinceSignup } = $input.first().json;\n\nconst timePhrase = daysSinceSignup > 60\n  ? 'a couple months'\n  : 'about a month';\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <style>\n    body { margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Arial, sans-serif; }\n    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; }\n    .header { background: linear-gradient(135deg, #dc2626, #991b1b); padding: 32px; text-align: center; }\n    .header h1 { color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; }\n    .body { padding: 32px; }\n    .body p { color: #3f3f46; font-size: 15px; line-height: 1.7; margin: 0 0 16px; }\n    .review-links { margin: 24px 0; }\n    .review-btn { display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 6px 8px 6px 0; }\n    .review-btn.secondary { background: #18181b; }\n    .footer { padding: 20px 32px; background: #fafafa; text-align: center; }\n    .footer p { color: #a1a1aa; font-size: 12px; margin: 0; }\n    .footer a { color: #dc2626; text-decoration: none; }\n  </style>\n</head>\n<body>\n  <div style=\"padding: 24px;\">\n    <div class=\"container\">\n      <div class=\"header\">\n        <h1>BayFlow</h1>\n      </div>\n      <div class=\"body\">\n        <p>Hey ${name},</p>\n        <p>You've been on BayFlow for ${timePhrase} now. If it's been useful for your shop, would you mind leaving a quick review? Takes about 60 seconds and it really helps other shop owners find us.</p>\n        <div class=\"review-links\">\n          <a href=\"https://www.g2.com/products/bayflow/reviews\" class=\"review-btn\">Leave a review on G2</a>\n          <a href=\"https://www.capterra.com/p/bayflow/reviews/new\" class=\"review-btn secondary\">Leave a review on Capterra</a>\n        </div>\n        <p><strong>But if something's not working right, just reply to this email instead.</strong> I'd way rather fix it than have you leave a bad review.</p>\n        <p>Thanks,<br>Shalin</p>\n      </div>\n      <div class=\"footer\">\n        <p>BayFlow - Shop management that actually works</p>\n        <p><a href=\"https://bayflow.com\">bayflow.com</a></p>\n      </div>\n    </div>\n  </div>\n</body>\n</html>\n`.trim();\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    emailSubject: `Quick favor, ${name}?`,\n    emailHtml: html\n  }\n}];"
+        "jsCode": "const { name, email, daysSinceSignup, businessName, siteUrl } = $input.first().json;\nconst domain = (siteUrl || '').replace(/^https?:\\/\\//, '').replace(/\\/.*$/, '');\n\nconst timePhrase = daysSinceSignup > 60 ? 'a couple months' : 'about a month';\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <style>\n    body { margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Arial, sans-serif; }\n    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; }\n    .header { background: linear-gradient(135deg, #dc2626, #991b1b); padding: 32px; text-align: center; }\n    .header h1 { color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; }\n    .body { padding: 32px; }\n    .body p { color: #3f3f46; font-size: 15px; line-height: 1.7; margin: 0 0 16px; }\n    .review-links { margin: 24px 0; }\n    .review-btn { display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 6px 8px 6px 0; }\n    .review-btn.secondary { background: #18181b; }\n    .footer { padding: 20px 32px; background: #fafafa; text-align: center; }\n    .footer p { color: #a1a1aa; font-size: 12px; margin: 0; }\n    .footer a { color: #dc2626; text-decoration: none; }\n  </style>\n</head>\n<body>\n  <div style=\"padding: 24px;\">\n    <div class=\"container\">\n      <div class=\"header\">\n        <h1>${businessName}</h1>\n      </div>\n      <div class=\"body\">\n        <p>Hey ${name},</p>\n        <p>You've been on ${businessName} for ${timePhrase} now. If it's been useful, would you mind leaving a quick review? Takes about 60 seconds and it really helps other people find us.</p>\n        <div class=\"review-links\">\n          <a href=\"https://www.g2.com/products/${domain}/reviews\" class=\"review-btn\">Leave a review on G2</a>\n          <a href=\"https://www.capterra.com/p/${domain}/reviews/new\" class=\"review-btn secondary\">Leave a review on Capterra</a>\n        </div>\n        <p><strong>But if something's not working right, just reply to this email instead.</strong> I'd way rather fix it than have you leave a bad review.</p>\n        <p>Thanks,<br>Shalin</p>\n      </div>\n      <div class=\"footer\">\n        <p>${businessName}</p>\n        <p><a href=\"${siteUrl || '#'}\">${domain}</a></p>\n      </div>\n    </div>\n  </div>\n</body>\n</html>\n`.trim();\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    emailSubject: 'Quick favor, ' + name + '?',\n    emailHtml: html\n  }\n}];"
       },
       "id": "build-review-email",
       "name": "Build Review Request Email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        880,
-        -100
-      ]
+      "position": [1320, -100]
     },
     {
       "parameters": {
@@ -115,63 +117,42 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.RESEND_API_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "Authorization", "value": "Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$json.email], reply_to: 'shalin@bayflow.com', subject: $json.emailSubject, html: $json.emailHtml }) }}",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at ' + $json.businessName + ' <shalin@' + ($json.siteUrl || '').replace(/^https?:\\/\\//, '').replace(/\\/.*$/, '') + '>', to: [$json.email], reply_to: 'shalin@' + ($json.siteUrl || '').replace(/^https?:\\/\\//, '').replace(/\\/.*$/, ''), subject: $json.emailSubject, html: $json.emailHtml }) }}",
         "options": {}
       },
       "id": "send-review-email",
       "name": "Send Review Request Email",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1100,
-        -100
-      ],
+      "position": [1540, -100],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const customer = $('Build Review Request Email').first().json;\nconst resendResponse = $input.first().json;\nconst sent = !!(resendResponse.id);\n\nreturn [{\n  json: {\n    customerId: customer.id,\n    email: customer.email,\n    name: customer.name,\n    sent,\n    resendId: resendResponse.id || null,\n    error: resendResponse.error || null\n  }\n}];"
+        "jsCode": "const customer = $('Build Review Request Email').first().json;\nconst resendResponse = $input.first().json;\nconst sent = !!(resendResponse.id);\nreturn [{ json: { customerId: customer.id, email: customer.email, name: customer.name, sent, resendId: resendResponse.id || null, error: resendResponse.error || null, businessId: customer.businessId, businessName: customer.businessName, supabaseUrl: customer.supabaseUrl } }];"
       },
       "id": "track-send-result",
       "name": "Track Send Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1320,
-        -100
-      ]
+      "position": [1760, -100]
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ 'https://qmwiahstuzcqmdksrzxe.supabase.co/rest/v1/customers?id=eq.' + $json.customerId }}",
+        "url": "={{ $json.supabaseUrl + '/rest/v1/customers?id=eq.' + $json.customerId }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "apikey", "value": "{{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
@@ -180,41 +161,28 @@
         "options": {}
       },
       "id": "update-review-requested",
-      "name": "Mark Review Requested (Supabase)",
+      "name": "Mark Review Requested (Dynamic Supabase)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1540,
-        -100
-      ],
+      "position": [1980, -100],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "// Collect all results from the batch\nconst items = $input.all();\nlet sentCount = 0;\nlet failedCount = 0;\nconst names = [];\n\nfor (const item of items) {\n  const data = item.json;\n  // Check if this was a successful send from earlier node\n  if (data.sent || data.resendId) {\n    sentCount++;\n    if (data.name) names.push(data.name);\n  } else if (data.error) {\n    failedCount++;\n  }\n}\n\n// If we came from the no-eligible path\nif (sentCount === 0 && failedCount === 0) {\n  sentCount = 0;\n}\n\nconst nameList = names.length > 0 ? names.join(', ') : 'none';\n\nconst message = `📋 *Review Collector Weekly Summary*\\n\\n` +\n  `Review requests sent: *${sentCount}*\\n` +\n  (failedCount > 0 ? `Failed to send: *${failedCount}*\\n` : '') +\n  (names.length > 0 ? `Customers contacted: ${nameList}\\n` : '') +\n  `\\nWeek of ${new Date().toISOString().split('T')[0]}`;\n\nreturn [{\n  json: {\n    text: message,\n    sentCount,\n    failedCount\n  }\n}];"
+        "jsCode": "const items = $input.all();\nlet sentCount = 0, failedCount = 0;\nconst names = [];\nconst businessesSeen = new Set();\n\nfor (const item of items) {\n  const data = item.json;\n  if (data.sent || data.resendId) {\n    sentCount++;\n    if (data.name) names.push(data.name);\n    if (data.businessName) businessesSeen.add(data.businessName);\n  } else if (data.error) {\n    failedCount++;\n  }\n}\n\nconst message = '*Review Collector Weekly Summary*\\n\\n' +\n  'Review requests sent: *' + sentCount + '*\\n' +\n  (failedCount > 0 ? 'Failed to send: *' + failedCount + '*\\n' : '') +\n  (names.length > 0 ? 'Customers contacted: ' + names.join(', ') + '\\n' : '') +\n  'Businesses: ' + Array.from(businessesSeen).join(', ') + '\\n' +\n  '\\nWeek of ' + new Date().toISOString().split('T')[0];\n\nreturn [{ json: { text: message, sentCount, failedCount } }];"
       },
       "id": "build-summary",
       "name": "Build Weekly Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1760,
-        0
-      ]
+      "position": [2200, 0]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "={{ $env.TELEGRAM_AGENT_NOTIFY_WEBHOOK || 'https://n8n-production-bb4b.up.railway.app/webhook/agent-notify' }}",
         "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ source: 'review-collector', message: $json.text }) }}",
@@ -224,24 +192,18 @@
       "name": "Notify Telegram Summary",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1980,
-        0
-      ],
+      "position": [2420, 0],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "// No eligible customers this week\nreturn [{\n  json: {\n    sent: false,\n    sentCount: 0,\n    text: '📋 *Review Collector Weekly Summary*\\n\\nNo eligible customers to request reviews from this week.\\n\\nWeek of ' + new Date().toISOString().split('T')[0]\n  }\n}];"
+        "jsCode": "return [{ json: { sent: false, sentCount: 0, text: '*Review Collector Weekly Summary*\\n\\nNo eligible customers to request reviews from this week.\\n\\nWeek of ' + new Date().toISOString().split('T')[0] } }];"
       },
       "id": "no-eligible-summary",
       "name": "No Eligible - Build Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        880,
-        200
-      ]
+      "position": [1320, 200]
     },
     {
       "parameters": {
@@ -254,43 +216,23 @@
       "name": "Review Received Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        0,
-        500
-      ]
+      "position": [0, 500]
     },
     {
       "parameters": {
-        "jsCode": "const payload = $input.first().json.body || $input.first().json;\n\nconst customerId = payload.customerId || payload.customer_id || '';\nconst email = payload.email || '';\nconst name = payload.name || 'there';\nconst platform = payload.platform || 'unknown';\nconst rating = payload.rating || 0;\nconst reviewText = payload.review_text || '';\n\nif (!email && !customerId) {\n  throw new Error('Missing required field: email or customerId');\n}\n\nreturn [{\n  json: {\n    customerId,\n    email,\n    name,\n    platform,\n    rating,\n    reviewText,\n    isPositive: rating >= 4\n  }\n}];"
+        "jsCode": "const payload = $input.first().json.body || $input.first().json;\nconst customerId = payload.customerId || payload.customer_id || '';\nconst email = payload.email || '';\nconst name = payload.name || 'there';\nconst platform = payload.platform || 'unknown';\nconst rating = payload.rating || 0;\nconst reviewText = payload.review_text || '';\nconst businessId = payload.business_id || 'unknown';\n\nif (!email && !customerId) throw new Error('Missing required field: email or customerId');\n\nreturn [{ json: { customerId, email, name, platform, rating, reviewText, isPositive: rating >= 4, businessId } }];"
       },
       "id": "parse-review",
       "name": "Parse Review Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        220,
-        500
-      ]
+      "position": [220, 500]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "is-positive",
-              "leftValue": "={{ $json.isPositive }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true"
-              }
-            }
-          ],
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "is-positive", "leftValue": "={{ $json.isPositive }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }],
           "combinator": "and"
         },
         "options": {}
@@ -299,23 +241,17 @@
       "name": "Is Positive Review?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        440,
-        500
-      ]
+      "position": [440, 500]
     },
     {
       "parameters": {
-        "jsCode": "const { name, email, platform, rating } = $input.first().json;\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <style>\n    body { margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Arial, sans-serif; }\n    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; }\n    .header { background: linear-gradient(135deg, #dc2626, #991b1b); padding: 32px; text-align: center; }\n    .header h1 { color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; }\n    .body { padding: 32px; }\n    .body p { color: #3f3f46; font-size: 15px; line-height: 1.7; margin: 0 0 16px; }\n    .testimonial-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0; }\n    .testimonial-box p { color: #991b1b; font-size: 14px; margin: 0 0 12px; }\n    .testimonial-box a { display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; }\n    .footer { padding: 20px 32px; background: #fafafa; text-align: center; }\n    .footer p { color: #a1a1aa; font-size: 12px; margin: 0; }\n  </style>\n</head>\n<body>\n  <div style=\"padding: 24px;\">\n    <div class=\"container\">\n      <div class=\"header\">\n        <h1>Thank You!</h1>\n      </div>\n      <div class=\"body\">\n        <p>Hey ${name},</p>\n        <p>Just saw your ${rating}-star review on ${platform}. Seriously, thank you. That means a lot.</p>\n        <p>One more quick ask (promise this is the last one). Would you be open to a short testimonial? Just a sentence or two, or a quick 30-second phone video if you're feeling generous. We'd feature it on our site so other shop owners can hear from someone who actually uses BayFlow.</p>\n        <div class=\"testimonial-box\">\n          <p>Just reply to this email with a sentence or two about your experience, or shoot a quick phone video and send it over.</p>\n          <a href=\"mailto:shalin@bayflow.com?subject=BayFlow Testimonial\">Reply with Testimonial</a>\n        </div>\n        <p>Either way, I appreciate it. Your review helps us keep building.</p>\n        <p>Thanks,<br>Shalin</p>\n      </div>\n      <div class=\"footer\">\n        <p>BayFlow - Shop management that actually works</p>\n      </div>\n    </div>\n  </div>\n</body>\n</html>\n`.trim();\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    thankYouSubject: `Thanks for the review, ${name}!`,\n    thankYouHtml: html\n  }\n}];"
+        "jsCode": "const { name, email, platform, rating, businessId } = $input.first().json;\n\nconst html = `\n<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><style>\n  body { margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Arial, sans-serif; }\n  .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; }\n  .header { background: linear-gradient(135deg, #dc2626, #991b1b); padding: 32px; text-align: center; }\n  .header h1 { color: #ffffff; margin: 0; font-size: 22px; }\n  .body { padding: 32px; }\n  .body p { color: #3f3f46; font-size: 15px; line-height: 1.7; margin: 0 0 16px; }\n</style></head>\n<body><div style=\"padding: 24px;\"><div class=\"container\">\n  <div class=\"header\"><h1>Thank You!</h1></div>\n  <div class=\"body\">\n    <p>Hey ${name},</p>\n    <p>Just saw your ${rating}-star review on ${platform}. Seriously, thank you.</p>\n    <p>Would you be open to a short testimonial? Just a sentence or two about your experience.</p>\n    <p>Thanks,<br>Shalin</p>\n  </div>\n</div></div></body></html>`.trim();\n\nreturn [{ json: { ...$input.first().json, thankYouSubject: 'Thanks for the review, ' + name + '!', thankYouHtml: html } }];"
       },
       "id": "build-thank-you-email",
       "name": "Build Thank You + Testimonial Ask",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        660,
-        400
-      ]
+      "position": [660, 400]
     },
     {
       "parameters": {
@@ -324,299 +260,101 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.RESEND_API_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "Authorization", "value": "Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$json.email], reply_to: 'shalin@bayflow.com', subject: $json.thankYouSubject, html: $json.thankYouHtml }) }}",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin <noreply@forgetech.dev>', to: [$json.email], reply_to: '25shapatel@gmail.com', subject: $json.thankYouSubject, html: $json.thankYouHtml }) }}",
         "options": {}
       },
       "id": "send-thank-you",
       "name": "Send Thank You Email",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        880,
-        400
-      ],
+      "position": [880, 400],
       "continueOnFail": true
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://qmwiahstuzcqmdksrzxe.supabase.co/rest/v1/content_performance",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/content_performance",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
-            }
+            { "name": "apikey", "value": "{{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ business_id: 'bayflow', content_type: 'review', platform: $('Parse Review Data').first().json.platform, title: $('Parse Review Data').first().json.name + ' - ' + $('Parse Review Data').first().json.rating + ' star review', content_text: $('Parse Review Data').first().json.reviewText, status: 'published', metadata: { customer_id: $('Parse Review Data').first().json.customerId, rating: $('Parse Review Data').first().json.rating, testimonial_requested: true }, created_at: new Date().toISOString() }) }}",
+        "jsonBody": "={{ JSON.stringify({ business_id: $('Parse Review Data').first().json.businessId, content_type: 'review', platform: $('Parse Review Data').first().json.platform, title: $('Parse Review Data').first().json.name + ' - ' + $('Parse Review Data').first().json.rating + ' star review', content_text: $('Parse Review Data').first().json.reviewText, status: 'published', metadata: { customer_id: $('Parse Review Data').first().json.customerId, rating: $('Parse Review Data').first().json.rating, testimonial_requested: true }, created_at: new Date().toISOString() }) }}",
         "options": {}
       },
       "id": "log-marketing-asset",
-      "name": "Log as Marketing Asset (Supabase)",
+      "name": "Log as Marketing Asset",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1100,
-        400
-      ],
+      "position": [1100, 400],
       "continueOnFail": true
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ JSON.stringify({ status: 'ok', positive: $('Parse Review Data').first().json.isPositive, thankYouSent: true, loggedAsAsset: !$json.error }) }}",
-        "options": {
-          "responseCode": 200
-        }
+        "options": { "responseCode": 200 }
       },
       "id": "respond-review-ok",
       "name": "Respond Review OK",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        1320,
-        400
-      ]
+      "position": [1320, 400]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ JSON.stringify({ status: 'ok', positive: false, noted: true }) }}",
-        "options": {
-          "responseCode": 200
-        }
+        "options": { "responseCode": 200 }
       },
       "id": "respond-negative-ok",
       "name": "Respond Negative Review OK",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        660,
-        650
-      ]
+      "position": [660, 650]
     }
   ],
   "connections": {
-    "Weekly Wednesday 10 AM": {
-      "main": [
-        [
-          {
-            "node": "Fetch Active Customers",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Active Customers": {
-      "main": [
-        [
-          {
-            "node": "Filter Eligible Customers",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Filter Eligible Customers": {
-      "main": [
-        [
-          {
-            "node": "Has Eligible Customers?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
+    "Weekly Wednesday 10 AM": { "main": [[ { "node": "Fetch All Businesses", "type": "main", "index": 0 } ]] },
+    "Fetch All Businesses": { "main": [[ { "node": "Split Per Business", "type": "main", "index": 0 } ]] },
+    "Split Per Business": { "main": [[ { "node": "Fetch Active Customers (Per Business)", "type": "main", "index": 0 } ]] },
+    "Fetch Active Customers (Per Business)": { "main": [[ { "node": "Filter Eligible Customers", "type": "main", "index": 0 } ]] },
+    "Filter Eligible Customers": { "main": [[ { "node": "Has Eligible Customers?", "type": "main", "index": 0 } ]] },
     "Has Eligible Customers?": {
       "main": [
-        [
-          {
-            "node": "Build Review Request Email",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "No Eligible - Build Summary",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [ { "node": "Build Review Request Email", "type": "main", "index": 0 } ],
+        [ { "node": "No Eligible - Build Summary", "type": "main", "index": 0 } ]
       ]
     },
-    "Build Review Request Email": {
-      "main": [
-        [
-          {
-            "node": "Send Review Request Email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send Review Request Email": {
-      "main": [
-        [
-          {
-            "node": "Track Send Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Track Send Result": {
-      "main": [
-        [
-          {
-            "node": "Mark Review Requested (Supabase)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mark Review Requested (Supabase)": {
-      "main": [
-        [
-          {
-            "node": "Build Weekly Summary",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Weekly Summary": {
-      "main": [
-        [
-          {
-            "node": "Notify Telegram Summary",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "No Eligible - Build Summary": {
-      "main": [
-        [
-          {
-            "node": "Notify Telegram Summary",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Review Received Webhook": {
-      "main": [
-        [
-          {
-            "node": "Parse Review Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Review Data": {
-      "main": [
-        [
-          {
-            "node": "Is Positive Review?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
+    "Build Review Request Email": { "main": [[ { "node": "Send Review Request Email", "type": "main", "index": 0 } ]] },
+    "Send Review Request Email": { "main": [[ { "node": "Track Send Result", "type": "main", "index": 0 } ]] },
+    "Track Send Result": { "main": [[ { "node": "Mark Review Requested (Dynamic Supabase)", "type": "main", "index": 0 } ]] },
+    "Mark Review Requested (Dynamic Supabase)": { "main": [[ { "node": "Build Weekly Summary", "type": "main", "index": 0 } ]] },
+    "Build Weekly Summary": { "main": [[ { "node": "Notify Telegram Summary", "type": "main", "index": 0 } ]] },
+    "No Eligible - Build Summary": { "main": [[ { "node": "Notify Telegram Summary", "type": "main", "index": 0 } ]] },
+    "Review Received Webhook": { "main": [[ { "node": "Parse Review Data", "type": "main", "index": 0 } ]] },
+    "Parse Review Data": { "main": [[ { "node": "Is Positive Review?", "type": "main", "index": 0 } ]] },
     "Is Positive Review?": {
       "main": [
-        [
-          {
-            "node": "Build Thank You + Testimonial Ask",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Respond Negative Review OK",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [ { "node": "Build Thank You + Testimonial Ask", "type": "main", "index": 0 } ],
+        [ { "node": "Respond Negative Review OK", "type": "main", "index": 0 } ]
       ]
     },
-    "Build Thank You + Testimonial Ask": {
-      "main": [
-        [
-          {
-            "node": "Send Thank You Email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send Thank You Email": {
-      "main": [
-        [
-          {
-            "node": "Log as Marketing Asset (Supabase)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Log as Marketing Asset (Supabase)": {
-      "main": [
-        [
-          {
-            "node": "Respond Review OK",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+    "Build Thank You + Testimonial Ask": { "main": [[ { "node": "Send Thank You Email", "type": "main", "index": 0 } ]] },
+    "Send Thank You Email": { "main": [[ { "node": "Log as Marketing Asset", "type": "main", "index": 0 } ]] },
+    "Log as Marketing Asset": { "main": [[ { "node": "Respond Review OK", "type": "main", "index": 0 } ]] }
   },
-  "settings": {
-    "executionOrder": "v1"
-  }
+  "settings": { "executionOrder": "v1" }
 }

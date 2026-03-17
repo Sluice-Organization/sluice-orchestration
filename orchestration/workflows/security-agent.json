@@ -1,5 +1,5 @@
 {
-  "name": "Security Agent - Daily Audit",
+  "name": "Security Agent - Daily Audit (Multi-Business)",
   "nodes": [
     {
       "parameters": {
@@ -20,13 +20,40 @@
     },
     {
       "parameters": {
-        "jsCode": "const today = new Date().toISOString().split('T')[0];\nreturn [{\n  json: {\n    date: today,\n    supabaseUrl: 'https://wjukfdziomnejtlmegvv.supabase.co',\n    supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU',\n    githubOwner: 'ShalinPatel670',\n    repos: ['bayflow-app', 'sluice-orchestration'],\n    n8nUrl: 'https://n8n-production-bb4b.up.railway.app',\n    tables: ['businesses', 'users', 'repair_orders', 'customers', 'invoices', 'line_items', 'inspections', 'inspection_items']\n  }\n}];"
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "status", "value": "not.in.(killed,sold)" },
+            { "name": "select", "value": "id,business_id,name,repo_name" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-businesses",
+      "name": "Fetch All Businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const businesses = $input.all().map(i => i.json);\nconst flat = Array.isArray(businesses[0]) ? businesses[0] : businesses;\n\nconst today = new Date().toISOString().split('T')[0];\n\n// Build dynamic repos list from businesses + always include sluice-orchestration\nconst repos = ['sluice-orchestration'];\nfor (const b of flat) {\n  if (b.repo_name && !repos.includes(b.repo_name)) {\n    repos.push(b.repo_name);\n  }\n}\n\n// Build dynamic RLS tables list\n// Core tables that always need checking + business-specific ones\nconst tables = ['businesses', 'users', 'repair_orders', 'customers', 'invoices', 'line_items', 'inspections', 'inspection_items'];\n\nreturn [{\n  json: {\n    date: today,\n    supabaseUrl: 'https://wjukfdziomnejtlmegvv.supabase.co',\n    supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU',\n    githubOwner: 'ShalinPatel670',\n    repos: repos,\n    n8nUrl: 'https://n8n-production-bb4b.up.railway.app',\n    tables: tables,\n    businesses: flat\n  }\n}];"
       },
       "id": "setup-config",
-      "name": "Setup Config",
+      "name": "Setup Config (Dynamic)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 300]
+      "position": [440, 300]
     },
     {
       "parameters": {
@@ -45,7 +72,7 @@
       "name": "Check RLS - businesses",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, -200],
+      "position": [700, -200],
       "continueOnFail": true
     },
     {
@@ -55,8 +82,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
-            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+            { "name": "apikey", "value": "={{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" }
           ]
         },
         "options": { "timeout": 10000 }
@@ -65,7 +92,7 @@
       "name": "Check RLS - users",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, -50],
+      "position": [700, -50],
       "continueOnFail": true
     },
     {
@@ -75,8 +102,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
-            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+            { "name": "apikey", "value": "={{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" }
           ]
         },
         "options": { "timeout": 10000 }
@@ -85,7 +112,7 @@
       "name": "Check RLS - repair_orders",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 100],
+      "position": [700, 100],
       "continueOnFail": true
     },
     {
@@ -95,8 +122,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
-            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+            { "name": "apikey", "value": "={{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" }
           ]
         },
         "options": { "timeout": 10000 }
@@ -105,7 +132,7 @@
       "name": "Check RLS - customers",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 250],
+      "position": [700, 250],
       "continueOnFail": true
     },
     {
@@ -115,8 +142,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
-            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+            { "name": "apikey", "value": "={{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" }
           ]
         },
         "options": { "timeout": 10000 }
@@ -125,7 +152,7 @@
       "name": "Check RLS - invoices",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 400],
+      "position": [700, 400],
       "continueOnFail": true
     },
     {
@@ -135,8 +162,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('Setup Config').first().json.supabaseAnonKey }}" },
-            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config').first().json.supabaseAnonKey }}" }
+            { "name": "apikey", "value": "={{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $('Setup Config (Dynamic)').first().json.supabaseAnonKey }}" }
           ]
         },
         "options": { "timeout": 10000 }
@@ -145,35 +172,23 @@
       "name": "Check RLS - inspections",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 550],
+      "position": [700, 550],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://api.github.com/repos/ShalinPatel670/bayflow-app/contents/.env",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Accept", "value": "application/vnd.github.v3+json" }
-          ]
-        },
-        "options": { "timeout": 10000 }
+        "jsCode": "// Dynamic .env check - check all repos from businesses table\nconst config = $('Setup Config (Dynamic)').first().json;\nconst repos = config.repos || [];\nconst results = [];\n\n// We output each repo as an item for the next node to check\nreturn repos.map(repo => ({ json: { repo, owner: config.githubOwner } }));"
       },
-      "id": "check-env-bayflow",
-      "name": "Check .env - bayflow-app",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [500, 750],
-      "continueOnFail": true,
-      "credentials": {
-        "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
-      }
+      "id": "build-env-checks",
+      "name": "Build Dynamic Env Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 750]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/.env",
+        "url": "={{ 'https://api.github.com/repos/' + $json.owner + '/' + $json.repo + '/contents/.env' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -182,11 +197,11 @@
         },
         "options": { "timeout": 10000 }
       },
-      "id": "check-env-sluice",
-      "name": "Check .env - sluice-orchestration",
+      "id": "check-env-dynamic",
+      "name": "Check .env (Dynamic Repos)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 900],
+      "position": [920, 750],
       "continueOnFail": true,
       "credentials": {
         "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
@@ -208,7 +223,7 @@
       "name": "Check Secrets in Code",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 1050],
+      "position": [700, 1050],
       "continueOnFail": true,
       "credentials": {
         "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
@@ -224,7 +239,7 @@
       "name": "Check n8n Settings Exposed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 1200],
+      "position": [700, 1200],
       "continueOnFail": true
     },
     {
@@ -242,13 +257,23 @@
       "name": "Check n8n Setup Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 1350],
+      "position": [700, 1350],
       "continueOnFail": true
     },
     {
       "parameters": {
+        "jsCode": "// Dynamic CLAUDE.md check for all repos\nconst config = $('Setup Config (Dynamic)').first().json;\nreturn config.repos.map(repo => ({ json: { repo, owner: config.githubOwner } }));"
+      },
+      "id": "build-claude-checks",
+      "name": "Build Dynamic CLAUDE.md Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 1500]
+    },
+    {
+      "parameters": {
         "method": "GET",
-        "url": "https://api.github.com/repos/ShalinPatel670/bayflow-app/contents/CLAUDE.md",
+        "url": "={{ 'https://api.github.com/repos/' + $json.owner + '/' + $json.repo + '/contents/CLAUDE.md' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -257,11 +282,11 @@
         },
         "options": { "timeout": 10000 }
       },
-      "id": "check-claude-md-bayflow",
-      "name": "Check CLAUDE.md - bayflow",
+      "id": "check-claude-md-dynamic",
+      "name": "Check CLAUDE.md (Dynamic Repos)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 1500],
+      "position": [920, 1500],
       "continueOnFail": true,
       "credentials": {
         "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
@@ -269,35 +294,13 @@
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/CLAUDE.md",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Accept", "value": "application/vnd.github.v3+json" }
-          ]
-        },
-        "options": { "timeout": 10000 }
-      },
-      "id": "check-claude-md-sluice",
-      "name": "Check CLAUDE.md - sluice",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [500, 1650],
-      "continueOnFail": true,
-      "credentials": {
-        "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Phase 2: Analyze all security check results\nconst findings = [];\nconst config = $('Setup Config').first().json;\nconst date = config.date;\n\nfunction addFinding(severity, category, title, detail, remediation) {\n  findings.push({ severity, category, title, detail, remediation });\n}\n\n// --- 1. RLS Checks ---\nconst rlsNodes = [\n  { name: 'Check RLS - businesses', table: 'businesses' },\n  { name: 'Check RLS - users', table: 'users' },\n  { name: 'Check RLS - repair_orders', table: 'repair_orders' },\n  { name: 'Check RLS - customers', table: 'customers' },\n  { name: 'Check RLS - invoices', table: 'invoices' },\n  { name: 'Check RLS - inspections', table: 'inspections' }\n];\n\nfor (const rls of rlsNodes) {\n  try {\n    const result = $(rls.name).first().json;\n    const hasError = result.error || result.message || result.code;\n    // If we got actual data back (array with items), RLS is too permissive\n    if (Array.isArray(result) && result.length > 0) {\n      addFinding('CRITICAL', 'RLS', `RLS bypass on ${rls.table}`,\n        `Anon key returned data from ${rls.table} table. Row Level Security is not blocking unauthenticated reads.`,\n        `Enable RLS on ${rls.table}: ALTER TABLE ${rls.table} ENABLE ROW LEVEL SECURITY; then add appropriate policies.`);\n    }\n    // Also check if n8n unwrapped the array into multiple items\n    const allItems = $(rls.name).all();\n    if (allItems.length > 1) {\n      addFinding('CRITICAL', 'RLS', `RLS bypass on ${rls.table}`,\n        `Anon key returned ${allItems.length} rows from ${rls.table}. RLS is not enabled or policies are too permissive.`,\n        `Enable RLS: ALTER TABLE ${rls.table} ENABLE ROW LEVEL SECURITY;`);\n    } else if (allItems.length === 1 && !hasError) {\n      // Single item returned - could be data leak if it has actual data fields\n      const keys = Object.keys(result);\n      const nonErrorKeys = keys.filter(k => !['error', 'message', 'code', 'hint', 'details', 'statusCode'].includes(k));\n      if (nonErrorKeys.length > 0 && result.id !== undefined) {\n        addFinding('CRITICAL', 'RLS', `RLS bypass on ${rls.table}`,\n          `Anon key returned record data from ${rls.table} (fields: ${nonErrorKeys.join(', ')}). RLS may be too permissive.`,\n          `Enable RLS on ${rls.table}: ALTER TABLE ${rls.table} ENABLE ROW LEVEL SECURITY;`);\n      }\n    }\n  } catch (e) {\n    // Node errored entirely - likely blocked, which is good\n  }\n}\n\n// --- 2. Exposed .env files ---\nconst envChecks = [\n  { name: 'Check .env - bayflow-app', repo: 'bayflow-app' },\n  { name: 'Check .env - sluice-orchestration', repo: 'sluice-orchestration' }\n];\n\nfor (const env of envChecks) {\n  try {\n    const result = $(env.name).first().json;\n    if (result.content || result.sha || result.name === '.env') {\n      addFinding('CRITICAL', 'SECRETS', `Exposed .env in ${env.repo}`,\n        `.env file found committed in ${env.repo} repository. This likely contains API keys and secrets.`,\n        `Remove .env from repo: git rm --cached .env && add .env to .gitignore && rotate all exposed credentials.`);\n    }\n  } catch (e) { /* 404 or error - good */ }\n}\n\n// --- 3. Secrets in code search ---\ntry {\n  const codeSearch = $('Check Secrets in Code').first().json;\n  if (codeSearch.total_count && codeSearch.total_count > 0) {\n    const items = codeSearch.items || [];\n    const fileList = items.slice(0, 10).map(i => `${i.repository.full_name}/${i.path}`).join(', ');\n    addFinding('CRITICAL', 'SECRETS', 'API keys/secrets found in code',\n      `GitHub code search found ${codeSearch.total_count} file(s) potentially containing secrets: ${fileList}`,\n      'Audit each file. Remove secrets, use environment variables instead, and rotate any exposed credentials.');\n  }\n} catch (e) { /* search failed or no results */ }\n\n// --- 4. CLAUDE.md secrets check ---\nconst claudeChecks = [\n  { name: 'Check CLAUDE.md - bayflow', repo: 'bayflow-app' },\n  { name: 'Check CLAUDE.md - sluice', repo: 'sluice-orchestration' }\n];\n\nfor (const cc of claudeChecks) {\n  try {\n    const result = $(cc.name).first().json;\n    if (result.content) {\n      const decoded = Buffer.from(result.content, 'base64').toString('utf8');\n      const secretPatterns = [\n        { pat: /sk-ant-[a-zA-Z0-9-]+/, label: 'Anthropic API key' },\n        { pat: /SUPABASE_SERVICE_ROLE[=:]/, label: 'Supabase service role key' },\n        { pat: /ghp_[a-zA-Z0-9]+/, label: 'GitHub personal access token' },\n        { pat: /password\\s*[=:]\\s*['\"][^'\"]+['\"]/i, label: 'Hardcoded password' },\n        { pat: /sk_live_[a-zA-Z0-9]+/, label: 'Stripe live key' },\n        { pat: /sk_test_[a-zA-Z0-9]+/, label: 'Stripe test key' },\n        { pat: /PRIVATE_KEY/, label: 'Private key reference' }\n      ];\n      for (const { pat, label } of secretPatterns) {\n        if (pat.test(decoded)) {\n          addFinding('CRITICAL', 'SECRETS', `Secret in CLAUDE.md (${cc.repo})`,\n            `CLAUDE.md in ${cc.repo} contains what appears to be a ${label}.`,\n            'Remove secrets from CLAUDE.md. Use n8n credentials or environment variables instead.');\n          break;\n        }\n      }\n    }\n  } catch (e) { /* file not found or error */ }\n}\n\n// --- 5. n8n exposure checks ---\ntry {\n  const settingsResult = $('Check n8n Settings Exposed').first().json;\n  if (settingsResult && !settingsResult.error && !settingsResult.statusCode && settingsResult.data) {\n    addFinding('HIGH', 'N8N', 'n8n settings endpoint exposed',\n      'The /rest/settings endpoint returned data without authentication. n8n admin API may be publicly accessible.',\n      'Ensure N8N_BASIC_AUTH_ACTIVE=true or use proper authentication. Check Railway environment variables.');\n  }\n} catch (e) { /* blocked - good */ }\n\ntry {\n  const setupResult = $('Check n8n Setup Page').first().json;\n  if (setupResult && !setupResult.error) {\n    const body = JSON.stringify(setupResult);\n    if ((body.includes('setup') || body.includes('owner') || body.includes('Create')) && body.length > 100) {\n      addFinding('HIGH', 'N8N', 'n8n setup page accessible',\n        'The /setup endpoint appears to be accessible. An attacker could potentially create an admin account.',\n        'Ensure n8n is properly configured and initial setup is complete. Set N8N_USER_MANAGEMENT_DISABLED if needed.');\n    }\n  }\n} catch (e) { /* blocked - good */ }\n\n// --- Deduplicate findings by title ---\nconst seen = new Set();\nconst dedupedFindings = findings.filter(f => {\n  if (seen.has(f.title)) return false;\n  seen.add(f.title);\n  return true;\n});\n\n// --- Build severity summary ---\nconst critical = dedupedFindings.filter(f => f.severity === 'CRITICAL');\nconst high = dedupedFindings.filter(f => f.severity === 'HIGH');\nconst medium = dedupedFindings.filter(f => f.severity === 'MEDIUM');\nconst low = dedupedFindings.filter(f => f.severity === 'LOW');\n\n// --- Build markdown report ---\nlet report = `# Security Audit Report - ${date}\\n\\n`;\nreport += `**Run time:** ${new Date().toISOString()}\\n`;\nreport += `**Agent:** Security Agent v1.0\\n\\n`;\nreport += `## Summary\\n\\n`;\nreport += `| Severity | Count |\\n|----------|-------|\\n`;\nreport += `| CRITICAL | ${critical.length} |\\n`;\nreport += `| HIGH | ${high.length} |\\n`;\nreport += `| MEDIUM | ${medium.length} |\\n`;\nreport += `| LOW | ${low.length} |\\n`;\nreport += `| **Total** | **${dedupedFindings.length}** |\\n\\n`;\n\nif (dedupedFindings.length === 0) {\n  report += `**All checks passed. No security issues detected.**\\n\\n`;\n} else {\n  report += `## Findings\\n\\n`;\n  for (const f of dedupedFindings) {\n    report += `### [${f.severity}] ${f.title}\\n\\n`;\n    report += `- **Category:** ${f.category}\\n`;\n    report += `- **Detail:** ${f.detail}\\n`;\n    report += `- **Remediation:** ${f.remediation}\\n\\n`;\n  }\n}\n\nreport += `## Checks Performed\\n\\n`;\nreport += `- [x] Supabase RLS verification (6 tables)\\n`;\nreport += `- [x] GitHub .env file exposure (2 repos)\\n`;\nreport += `- [x] GitHub code secret scan\\n`;\nreport += `- [x] CLAUDE.md secret scan (2 repos)\\n`;\nreport += `- [x] n8n admin API exposure\\n`;\nreport += `- [x] n8n setup page exposure\\n`;\n\nreturn [{\n  json: {\n    date,\n    report,\n    findings: dedupedFindings,\n    criticalCount: critical.length,\n    highCount: high.length,\n    mediumCount: medium.length,\n    lowCount: low.length,\n    totalFindings: dedupedFindings.length,\n    hasCritical: critical.length > 0,\n    hasHigh: high.length > 0,\n    needsAlert: critical.length > 0 || high.length > 0,\n    needsIssues: critical.length > 0 || high.length > 0,\n    criticalFindings: critical,\n    highFindings: high\n  }\n}];"
+        "jsCode": "const findings = [];\nconst config = $('Setup Config (Dynamic)').first().json;\nconst date = config.date;\n\nfunction addFinding(severity, category, title, detail, remediation) {\n  findings.push({ severity, category, title, detail, remediation });\n}\n\n// --- 1. RLS Checks ---\nconst rlsNodes = [\n  { name: 'Check RLS - businesses', table: 'businesses' },\n  { name: 'Check RLS - users', table: 'users' },\n  { name: 'Check RLS - repair_orders', table: 'repair_orders' },\n  { name: 'Check RLS - customers', table: 'customers' },\n  { name: 'Check RLS - invoices', table: 'invoices' },\n  { name: 'Check RLS - inspections', table: 'inspections' }\n];\n\nfor (const rls of rlsNodes) {\n  try {\n    const result = $(rls.name).first().json;\n    const hasError = result.error || result.message || result.code;\n    if (Array.isArray(result) && result.length > 0) {\n      addFinding('CRITICAL', 'RLS', 'RLS bypass on ' + rls.table,\n        'Anon key returned data from ' + rls.table + ' table.',\n        'Enable RLS on ' + rls.table + ': ALTER TABLE ' + rls.table + ' ENABLE ROW LEVEL SECURITY;');\n    }\n    const allItems = $(rls.name).all();\n    if (allItems.length > 1) {\n      addFinding('CRITICAL', 'RLS', 'RLS bypass on ' + rls.table,\n        'Anon key returned ' + allItems.length + ' rows from ' + rls.table + '.',\n        'Enable RLS: ALTER TABLE ' + rls.table + ' ENABLE ROW LEVEL SECURITY;');\n    } else if (allItems.length === 1 && !hasError) {\n      const keys = Object.keys(result);\n      const nonErrorKeys = keys.filter(k => !['error', 'message', 'code', 'hint', 'details', 'statusCode'].includes(k));\n      if (nonErrorKeys.length > 0 && result.id !== undefined) {\n        addFinding('CRITICAL', 'RLS', 'RLS bypass on ' + rls.table,\n          'Anon key returned record data from ' + rls.table + '.',\n          'Enable RLS on ' + rls.table + '.');\n      }\n    }\n  } catch (e) { /* blocked - good */ }\n}\n\n// --- 2. Dynamic .env file checks ---\ntry {\n  const envResults = $('Check .env (Dynamic Repos)').all();\n  const envRepos = $('Build Dynamic Env Checks').all();\n  for (let i = 0; i < envResults.length; i++) {\n    const result = envResults[i].json;\n    const repoInfo = envRepos[i] ? envRepos[i].json : {};\n    const repo = repoInfo.repo || 'unknown';\n    if (result.content || result.sha || result.name === '.env') {\n      addFinding('CRITICAL', 'SECRETS', 'Exposed .env in ' + repo,\n        '.env file found committed in ' + repo + ' repository.',\n        'Remove .env from repo: git rm --cached .env && add .env to .gitignore && rotate all exposed credentials.');\n    }\n  }\n} catch (e) { /* no results */ }\n\n// --- 3. Secrets in code search ---\ntry {\n  const codeSearch = $('Check Secrets in Code').first().json;\n  if (codeSearch.total_count && codeSearch.total_count > 0) {\n    const items = codeSearch.items || [];\n    const fileList = items.slice(0, 10).map(i => i.repository.full_name + '/' + i.path).join(', ');\n    addFinding('CRITICAL', 'SECRETS', 'API keys/secrets found in code',\n      'GitHub code search found ' + codeSearch.total_count + ' file(s) potentially containing secrets: ' + fileList,\n      'Audit each file. Remove secrets, use environment variables instead.');\n  }\n} catch (e) { /* search failed */ }\n\n// --- 4. Dynamic CLAUDE.md secrets check ---\ntry {\n  const claudeResults = $('Check CLAUDE.md (Dynamic Repos)').all();\n  const claudeRepos = $('Build Dynamic CLAUDE.md Checks').all();\n  for (let i = 0; i < claudeResults.length; i++) {\n    const result = claudeResults[i].json;\n    const repoInfo = claudeRepos[i] ? claudeRepos[i].json : {};\n    const repo = repoInfo.repo || 'unknown';\n    if (result.content) {\n      const decoded = Buffer.from(result.content, 'base64').toString('utf8');\n      const secretPatterns = [\n        { pat: /sk-ant-[a-zA-Z0-9-]+/, label: 'Anthropic API key' },\n        { pat: /SUPABASE_SERVICE_ROLE[=:]/, label: 'Supabase service role key' },\n        { pat: /ghp_[a-zA-Z0-9]+/, label: 'GitHub personal access token' },\n        { pat: /password\\s*[=:]\\s*['\"][^'\"]+['\"]/i, label: 'Hardcoded password' },\n        { pat: /sk_live_[a-zA-Z0-9]+/, label: 'Stripe live key' },\n        { pat: /sk_test_[a-zA-Z0-9]+/, label: 'Stripe test key' },\n        { pat: /PRIVATE_KEY/, label: 'Private key reference' }\n      ];\n      for (const { pat, label } of secretPatterns) {\n        if (pat.test(decoded)) {\n          addFinding('CRITICAL', 'SECRETS', 'Secret in CLAUDE.md (' + repo + ')',\n            'CLAUDE.md in ' + repo + ' contains a ' + label + '.',\n            'Remove secrets from CLAUDE.md.');\n          break;\n        }\n      }\n    }\n  }\n} catch (e) { /* no results */ }\n\n// --- 5. n8n exposure checks ---\ntry {\n  const settingsResult = $('Check n8n Settings Exposed').first().json;\n  if (settingsResult && !settingsResult.error && !settingsResult.statusCode && settingsResult.data) {\n    addFinding('HIGH', 'N8N', 'n8n settings endpoint exposed',\n      'The /rest/settings endpoint returned data without authentication.',\n      'Ensure N8N_BASIC_AUTH_ACTIVE=true.');\n  }\n} catch (e) { /* blocked - good */ }\n\ntry {\n  const setupResult = $('Check n8n Setup Page').first().json;\n  if (setupResult && !setupResult.error) {\n    const body = JSON.stringify(setupResult);\n    if ((body.includes('setup') || body.includes('owner') || body.includes('Create')) && body.length > 100) {\n      addFinding('HIGH', 'N8N', 'n8n setup page accessible',\n        'The /setup endpoint appears to be accessible.',\n        'Ensure n8n is properly configured and initial setup is complete.');\n    }\n  }\n} catch (e) { /* blocked - good */ }\n\n// --- Deduplicate ---\nconst seen = new Set();\nconst dedupedFindings = findings.filter(f => {\n  if (seen.has(f.title)) return false;\n  seen.add(f.title);\n  return true;\n});\n\nconst critical = dedupedFindings.filter(f => f.severity === 'CRITICAL');\nconst high = dedupedFindings.filter(f => f.severity === 'HIGH');\nconst medium = dedupedFindings.filter(f => f.severity === 'MEDIUM');\nconst low = dedupedFindings.filter(f => f.severity === 'LOW');\n\nlet report = '# Security Audit Report - ' + date + '\\n\\n';\nreport += '**Run time:** ' + new Date().toISOString() + '\\n';\nreport += '**Agent:** Security Agent v2.0 (Multi-Business)\\n';\nreport += '**Repos scanned:** ' + config.repos.join(', ') + '\\n\\n';\nreport += '## Summary\\n\\n';\nreport += '| Severity | Count |\\n|----------|-------|\\n';\nreport += '| CRITICAL | ' + critical.length + ' |\\n';\nreport += '| HIGH | ' + high.length + ' |\\n';\nreport += '| MEDIUM | ' + medium.length + ' |\\n';\nreport += '| LOW | ' + low.length + ' |\\n';\nreport += '| **Total** | **' + dedupedFindings.length + '** |\\n\\n';\n\nif (dedupedFindings.length === 0) {\n  report += '**All checks passed. No security issues detected.**\\n\\n';\n} else {\n  report += '## Findings\\n\\n';\n  for (const f of dedupedFindings) {\n    report += '### [' + f.severity + '] ' + f.title + '\\n\\n';\n    report += '- **Category:** ' + f.category + '\\n';\n    report += '- **Detail:** ' + f.detail + '\\n';\n    report += '- **Remediation:** ' + f.remediation + '\\n\\n';\n  }\n}\n\nreport += '## Checks Performed\\n\\n';\nreport += '- [x] Supabase RLS verification (6 tables)\\n';\nreport += '- [x] GitHub .env file exposure (' + config.repos.length + ' repos - dynamic)\\n';\nreport += '- [x] GitHub code secret scan\\n';\nreport += '- [x] CLAUDE.md secret scan (' + config.repos.length + ' repos - dynamic)\\n';\nreport += '- [x] n8n admin API exposure\\n';\nreport += '- [x] n8n setup page exposure\\n';\n\nreturn [{\n  json: {\n    date,\n    report,\n    findings: dedupedFindings,\n    criticalCount: critical.length,\n    highCount: high.length,\n    mediumCount: medium.length,\n    lowCount: low.length,\n    totalFindings: dedupedFindings.length,\n    hasCritical: critical.length > 0,\n    hasHigh: high.length > 0,\n    needsAlert: critical.length > 0 || high.length > 0,\n    needsIssues: critical.length > 0 || high.length > 0,\n    criticalFindings: critical,\n    highFindings: high\n  }\n}];"
       },
       "id": "analyze-results",
       "name": "Analyze Security Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [800, 550]
+      "position": [1100, 550]
     },
     {
       "parameters": {
@@ -322,7 +325,7 @@
       "name": "Write Report to GitHub",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1050, 400],
+      "position": [1350, 400],
       "continueOnFail": true,
       "credentials": {
         "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
@@ -331,21 +334,13 @@
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [
             {
               "id": "needs-alert",
               "leftValue": "={{ $json.needsAlert }}",
               "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals",
-                "singleValue": true
-              }
+              "operator": { "type": "boolean", "operation": "equals", "singleValue": true }
             }
           ],
           "combinator": "and"
@@ -355,7 +350,7 @@
       "name": "Has Critical/High?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1050, 700]
+      "position": [1350, 700]
     },
     {
       "parameters": {
@@ -363,13 +358,13 @@
         "toEmail": "25shapatel@gmail.com",
         "subject": "=[SECURITY ALERT] {{ $('Analyze Security Results').first().json.criticalCount }} Critical, {{ $('Analyze Security Results').first().json.highCount }} High findings - {{ $('Analyze Security Results').first().json.date }}",
         "emailType": "text",
-        "message": "=FORGE SECURITY AGENT - ALERT\n=============================\n\nDate: {{ $('Analyze Security Results').first().json.date }}\nCritical: {{ $('Analyze Security Results').first().json.criticalCount }}\nHigh: {{ $('Analyze Security Results').first().json.highCount }}\n\nCRITICAL FINDINGS:\n{{ $('Analyze Security Results').first().json.criticalFindings.map(f => '- ' + f.title + ': ' + f.detail).join('\\n') }}\n\nHIGH FINDINGS:\n{{ $('Analyze Security Results').first().json.highFindings.map(f => '- ' + f.title + ': ' + f.detail).join('\\n') }}\n\nFull report committed to: memory-bank/system/reports/security-{{ $('Analyze Security Results').first().json.date }}.md\n\nn8n: https://n8n-production-bb4b.up.railway.app"
+        "message": "=FORGE SECURITY AGENT - ALERT\n=============================\n\nDate: {{ $('Analyze Security Results').first().json.date }}\nCritical: {{ $('Analyze Security Results').first().json.criticalCount }}\nHigh: {{ $('Analyze Security Results').first().json.highCount }}\n\nCRITICAL FINDINGS:\n{{ $('Analyze Security Results').first().json.criticalFindings.map(f => '- ' + f.title + ': ' + f.detail).join('\\n') }}\n\nHIGH FINDINGS:\n{{ $('Analyze Security Results').first().json.highFindings.map(f => '- ' + f.title + ': ' + f.detail).join('\\n') }}\n\nFull report committed to: memory-bank/system/reports/security-{{ $('Analyze Security Results').first().json.date }}.md"
       },
       "id": "send-alert-email",
       "name": "Send Alert Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1300, 600],
+      "position": [1600, 600],
       "credentials": {
         "smtp": { "id": "smtp-cred", "name": "Gmail SMTP" }
       },
@@ -377,31 +372,24 @@
     },
     {
       "parameters": {
-        "jsCode": "const data = $('Analyze Security Results').first().json;\nconst issues = [];\n\nconst actionableFindings = [...data.criticalFindings, ...data.highFindings];\n\nfor (const finding of actionableFindings) {\n  let repo = 'sluice-orchestration';\n  if (finding.detail.includes('bayflow')) repo = 'bayflow-app';\n  if (finding.category === 'RLS') repo = 'bayflow-app';\n\n  const body = `## Security Finding: ${finding.title}\\n\\n`\n    + `**Severity:** ${finding.severity}\\n`\n    + `**Category:** ${finding.category}\\n`\n    + `**Detected:** ${data.date}\\n\\n`\n    + `### Detail\\n${finding.detail}\\n\\n`\n    + `### Remediation\\n${finding.remediation}\\n\\n`\n    + `---\\n`\n    + `*Auto-generated by Security Agent. @claude please investigate and fix.*`;\n\n  issues.push({\n    json: {\n      repo,\n      title: `[${finding.severity}] ${finding.title}`,\n      body,\n      labels: ['security', 'automated']\n    }\n  });\n}\n\nif (issues.length === 0) {\n  return [{ json: { skip: true, message: 'No issues to create' } }];\n}\n\nreturn issues;"
+        "jsCode": "const data = $('Analyze Security Results').first().json;\nconst config = $('Setup Config (Dynamic)').first().json;\nconst issues = [];\n\nconst actionableFindings = [...data.criticalFindings, ...data.highFindings];\n\nfor (const finding of actionableFindings) {\n  // Determine which repo to file the issue against\n  let repo = 'sluice-orchestration';\n  // Check if finding mentions a specific business repo\n  for (const r of config.repos) {\n    if (finding.detail.includes(r) || finding.title.includes(r)) {\n      repo = r;\n      break;\n    }\n  }\n  if (finding.category === 'RLS') repo = config.repos.find(r => r !== 'sluice-orchestration') || 'sluice-orchestration';\n\n  const body = '## Security Finding: ' + finding.title + '\\n\\n'\n    + '**Severity:** ' + finding.severity + '\\n'\n    + '**Category:** ' + finding.category + '\\n'\n    + '**Detected:** ' + data.date + '\\n\\n'\n    + '### Detail\\n' + finding.detail + '\\n\\n'\n    + '### Remediation\\n' + finding.remediation + '\\n\\n'\n    + '---\\n'\n    + '*Auto-generated by Security Agent. @claude please investigate and fix.*';\n\n  issues.push({\n    json: {\n      repo,\n      title: '[' + finding.severity + '] ' + finding.title,\n      body,\n      labels: ['security', 'automated']\n    }\n  });\n}\n\nif (issues.length === 0) {\n  return [{ json: { skip: true, message: 'No issues to create' } }];\n}\n\nreturn issues;"
       },
       "id": "build-issues",
       "name": "Build GitHub Issues",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1300, 800]
+      "position": [1600, 800]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [
             {
               "id": "has-issue",
               "leftValue": "={{ $json.skip }}",
               "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notEquals"
-              }
+              "operator": { "type": "boolean", "operation": "notEquals" }
             }
           ],
           "combinator": "and"
@@ -411,7 +399,7 @@
       "name": "Has Issues to Create?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1500, 800]
+      "position": [1800, 800]
     },
     {
       "parameters": {
@@ -432,7 +420,7 @@
       "name": "Create GitHub Issue",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1700, 700],
+      "position": [2000, 700],
       "continueOnFail": true,
       "credentials": {
         "httpHeaderAuth": { "id": "github-token", "name": "GitHub Token" }
@@ -457,7 +445,7 @@
       "name": "Notify Telegram (Security)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1500, 600],
+      "position": [1800, 600],
       "continueOnFail": true
     },
     {
@@ -466,7 +454,7 @@
       "name": "No Alert Needed",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1300, 950]
+      "position": [1600, 950]
     },
     {
       "parameters": {},
@@ -474,82 +462,49 @@
       "name": "No Issues Needed",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1700, 950]
+      "position": [2000, 950]
     }
   ],
   "connections": {
     "Daily 5 AM Trigger": {
-      "main": [
-        [
-          { "node": "Setup Config", "type": "main", "index": 0 }
-        ]
-      ]
+      "main": [[ { "node": "Fetch All Businesses", "type": "main", "index": 0 } ]]
     },
-    "Setup Config": {
-      "main": [
-        [
-          { "node": "Check RLS - businesses", "type": "main", "index": 0 },
-          { "node": "Check RLS - users", "type": "main", "index": 0 },
-          { "node": "Check RLS - repair_orders", "type": "main", "index": 0 },
-          { "node": "Check RLS - customers", "type": "main", "index": 0 },
-          { "node": "Check RLS - invoices", "type": "main", "index": 0 },
-          { "node": "Check RLS - inspections", "type": "main", "index": 0 },
-          { "node": "Check .env - bayflow-app", "type": "main", "index": 0 },
-          { "node": "Check .env - sluice-orchestration", "type": "main", "index": 0 },
-          { "node": "Check Secrets in Code", "type": "main", "index": 0 },
-          { "node": "Check n8n Settings Exposed", "type": "main", "index": 0 },
-          { "node": "Check n8n Setup Page", "type": "main", "index": 0 },
-          { "node": "Check CLAUDE.md - bayflow", "type": "main", "index": 0 },
-          { "node": "Check CLAUDE.md - sluice", "type": "main", "index": 0 }
-        ]
-      ]
+    "Fetch All Businesses": {
+      "main": [[ { "node": "Setup Config (Dynamic)", "type": "main", "index": 0 } ]]
     },
-    "Check RLS - businesses": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
+    "Setup Config (Dynamic)": {
+      "main": [[
+        { "node": "Check RLS - businesses", "type": "main", "index": 0 },
+        { "node": "Check RLS - users", "type": "main", "index": 0 },
+        { "node": "Check RLS - repair_orders", "type": "main", "index": 0 },
+        { "node": "Check RLS - customers", "type": "main", "index": 0 },
+        { "node": "Check RLS - invoices", "type": "main", "index": 0 },
+        { "node": "Check RLS - inspections", "type": "main", "index": 0 },
+        { "node": "Build Dynamic Env Checks", "type": "main", "index": 0 },
+        { "node": "Check Secrets in Code", "type": "main", "index": 0 },
+        { "node": "Check n8n Settings Exposed", "type": "main", "index": 0 },
+        { "node": "Check n8n Setup Page", "type": "main", "index": 0 },
+        { "node": "Build Dynamic CLAUDE.md Checks", "type": "main", "index": 0 }
+      ]]
     },
-    "Check RLS - users": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check RLS - repair_orders": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check RLS - customers": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check RLS - invoices": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check RLS - inspections": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check .env - bayflow-app": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check .env - sluice-orchestration": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check Secrets in Code": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check n8n Settings Exposed": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check n8n Setup Page": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check CLAUDE.md - bayflow": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
-    "Check CLAUDE.md - sluice": {
-      "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]]
-    },
+    "Check RLS - businesses": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Check RLS - users": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Check RLS - repair_orders": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Check RLS - customers": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Check RLS - invoices": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Check RLS - inspections": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Build Dynamic Env Checks": { "main": [[ { "node": "Check .env (Dynamic Repos)", "type": "main", "index": 0 } ]] },
+    "Check .env (Dynamic Repos)": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Check Secrets in Code": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Check n8n Settings Exposed": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Check n8n Setup Page": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
+    "Build Dynamic CLAUDE.md Checks": { "main": [[ { "node": "Check CLAUDE.md (Dynamic Repos)", "type": "main", "index": 0 } ]] },
+    "Check CLAUDE.md (Dynamic Repos)": { "main": [[ { "node": "Analyze Security Results", "type": "main", "index": 0 } ]] },
     "Analyze Security Results": {
-      "main": [
-        [
-          { "node": "Write Report to GitHub", "type": "main", "index": 0 },
-          { "node": "Has Critical/High?", "type": "main", "index": 0 }
-        ]
-      ]
+      "main": [[
+        { "node": "Write Report to GitHub", "type": "main", "index": 0 },
+        { "node": "Has Critical/High?", "type": "main", "index": 0 }
+      ]]
     },
     "Has Critical/High?": {
       "main": [
@@ -558,32 +513,18 @@
           { "node": "Build GitHub Issues", "type": "main", "index": 0 },
           { "node": "Notify Telegram (Security)", "type": "main", "index": 0 }
         ],
-        [
-          { "node": "No Alert Needed", "type": "main", "index": 0 }
-        ]
+        [ { "node": "No Alert Needed", "type": "main", "index": 0 } ]
       ]
     },
-    "Build GitHub Issues": {
-      "main": [
-        [
-          { "node": "Has Issues to Create?", "type": "main", "index": 0 }
-        ]
-      ]
-    },
+    "Build GitHub Issues": { "main": [[ { "node": "Has Issues to Create?", "type": "main", "index": 0 } ]] },
     "Has Issues to Create?": {
       "main": [
-        [
-          { "node": "Create GitHub Issue", "type": "main", "index": 0 }
-        ],
-        [
-          { "node": "No Issues Needed", "type": "main", "index": 0 }
-        ]
+        [ { "node": "Create GitHub Issue", "type": "main", "index": 0 } ],
+        [ { "node": "No Issues Needed", "type": "main", "index": 0 } ]
       ]
     }
   },
-  "settings": {
-    "executionOrder": "v1"
-  },
+  "settings": { "executionOrder": "v1" },
   "tags": [
     { "name": "security" },
     { "name": "daily" }

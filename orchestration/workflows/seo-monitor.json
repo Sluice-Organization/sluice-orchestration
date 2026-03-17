@@ -1,5 +1,5 @@
 {
-  "name": "SEO Monitor - Weekly Keyword Tracker",
+  "name": "SEO Monitor - Weekly Keyword Tracker (Multi-Business)",
   "nodes": [
     {
       "parameters": {
@@ -21,12 +21,49 @@
     {
       "parameters": {
         "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "status", "value": "not.in.(killed,sold)" },
+            { "name": "select", "value": "id,business_id,name,site_url" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-businesses",
+      "name": "Fetch All Businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const businesses = $input.all().map(i => i.json);\nconst flat = Array.isArray(businesses[0]) ? businesses[0] : businesses;\nreturn flat.filter(b => b.site_url).map(b => {\n  const domain = (b.site_url || '').replace(/^https?:\\/\\//, '').replace(/\\/.*$/, '');\n  return { json: { businessUuid: b.id, businessId: b.business_id, businessName: b.name, siteUrl: b.site_url, domain: domain } };\n});"
+      },
+      "id": "split-businesses",
+      "name": "Split Per Business",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
         "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/keyword_performance",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             { "name": "select", "value": "*" },
-            { "name": "business_id", "value": "eq.bayflow" },
+            { "name": "business_id", "value": "={{ $json.businessId }}" },
             { "name": "is_active", "value": "eq.true" }
           ]
         },
@@ -40,21 +77,21 @@
         "options": {}
       },
       "id": "fetch-keywords",
-      "name": "Fetch Keywords",
+      "name": "Fetch Keywords (Per Business)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [260, 300],
+      "position": [720, 300],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const keywords = $input.all().map(i => i.json);\nconst flat = Array.isArray(keywords[0]) ? keywords[0] : keywords;\n\n// Output each keyword as a separate item for SplitInBatches-like processing\nreturn flat.filter(k => k.keyword).map(k => ({ json: k }));"
+        "jsCode": "const keywords = $input.all().map(i => i.json);\nconst flat = Array.isArray(keywords[0]) ? keywords[0] : keywords;\nconst bizData = $('Split Per Business').item.json;\n\nreturn flat.filter(k => k.keyword).map(k => ({ json: { ...k, domain: bizData.domain, businessId: bizData.businessId, businessName: bizData.businessName } }));"
       },
       "id": "prepare-keywords",
       "name": "Prepare Keywords",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [520, 300]
+      "position": [940, 300]
     },
     {
       "parameters": {
@@ -76,18 +113,18 @@
       "name": "Check SERP Ranking",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [780, 300],
+      "position": [1160, 300],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const serpData = $json;\nconst keyword = $('Prepare Keywords').item.json;\nconst organicResults = serpData.organic_results || [];\n\nlet position = null;\nlet url = null;\nconst domain = 'bayflow.com';\n\nfor (let i = 0; i < organicResults.length; i++) {\n  const link = (organicResults[i].link || '').toLowerCase();\n  if (link.includes(domain)) {\n    position = i + 1;\n    url = organicResults[i].link;\n    break;\n  }\n}\n\nconst previousPosition = keyword.current_position || null;\nconst change = (previousPosition && position) ? previousPosition - position : null;\nconst isSignificant = change !== null && Math.abs(change) >= 5;\n\nreturn [{\n  json: {\n    keyword_id: keyword.id,\n    keyword: keyword.keyword,\n    previous_position: previousPosition,\n    current_position: position,\n    change: change,\n    url: url,\n    is_significant: isSignificant,\n    checked_at: $now.toISO()\n  }\n}];"
+        "jsCode": "const serpData = $json;\nconst keyword = $('Prepare Keywords').item.json;\nconst organicResults = serpData.organic_results || [];\nconst domain = keyword.domain;\n\nlet position = null;\nlet url = null;\n\nfor (let i = 0; i < organicResults.length; i++) {\n  const link = (organicResults[i].link || '').toLowerCase();\n  if (link.includes(domain)) {\n    position = i + 1;\n    url = organicResults[i].link;\n    break;\n  }\n}\n\nconst previousPosition = keyword.current_position || null;\nconst change = (previousPosition && position) ? previousPosition - position : null;\nconst isSignificant = change !== null && Math.abs(change) >= 5;\n\nreturn [{\n  json: {\n    keyword_id: keyword.id,\n    keyword: keyword.keyword,\n    previous_position: previousPosition,\n    current_position: position,\n    change: change,\n    url: url,\n    is_significant: isSignificant,\n    checked_at: $now.toISO(),\n    domain: domain,\n    businessId: keyword.businessId,\n    businessName: keyword.businessName\n  }\n}];"
       },
       "id": "parse-ranking",
       "name": "Parse Ranking",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1040, 300]
+      "position": [1380, 300]
     },
     {
       "parameters": {
@@ -110,41 +147,18 @@
       "name": "Update Position in Supabase",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1300, 200],
+      "position": [1600, 200],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://www.googleapis.com/webmasters/v3/sites/https%3A%2F%2Fbayflow.com/searchAnalytics/query",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.GOOGLE_SEARCH_CONSOLE_TOKEN }}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ startDate: $now.minus({ days: 7 }).toFormat('yyyy-MM-dd'), endDate: $now.toFormat('yyyy-MM-dd'), dimensions: ['query'], rowLimit: 25, dataState: 'final' }) }}",
-        "options": {}
-      },
-      "id": "check-gsc",
-      "name": "Check Google Search Console",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [260, 600],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const rankings = $('Parse Ranking').all().map(i => i.json);\nconst gscData = $('Check Google Search Console').first().json;\nconst date = $now.toFormat('yyyy-MM-dd');\n\nlet report = `# SEO Monitor Report - BayFlow - ${date}\\n\\n`;\n\n// Keyword rankings\nreport += `## Keyword Rankings\\n\\n`;\nreport += `| Keyword | Position | Previous | Change |\\n|---------|----------|----------|--------|\\n`;\n\nconst significant = [];\nfor (const r of rankings) {\n  const pos = r.current_position !== null ? r.current_position : 'Not found';\n  const prev = r.previous_position !== null ? r.previous_position : '-';\n  const ch = r.change !== null ? (r.change > 0 ? '+' + r.change : String(r.change)) : '-';\n  report += `| ${r.keyword} | ${pos} | ${prev} | ${ch} |\\n`;\n  if (r.is_significant) significant.push(r);\n}\nreport += `\\n`;\n\n// GSC data if available\nconst gscRows = gscData.rows || [];\nif (gscRows.length > 0) {\n  report += `## Google Search Console - Top Queries (7 days)\\n\\n`;\n  report += `| Query | Clicks | Impressions | CTR | Position |\\n|-------|--------|-------------|-----|----------|\\n`;\n  for (const row of gscRows.slice(0, 20)) {\n    const query = row.keys ? row.keys[0] : '';\n    report += `| ${query} | ${row.clicks || 0} | ${row.impressions || 0} | ${((row.ctr || 0) * 100).toFixed(1)}% | ${(row.position || 0).toFixed(1)} |\\n`;\n  }\n  report += `\\n`;\n}\n\nreport += `---\\n*Generated by SEO Monitor at ${new Date().toISOString()}*\\n`;\n\nreturn [{ json: { report, date, significant, significantCount: significant.length } }];"
+        "jsCode": "const rankings = $('Parse Ranking').all().map(i => i.json);\nconst date = $now.toFormat('yyyy-MM-dd');\n\n// Group rankings by business\nconst byBusiness = {};\nfor (const r of rankings) {\n  const bid = r.businessId || 'unknown';\n  if (!byBusiness[bid]) byBusiness[bid] = { name: r.businessName || bid, domain: r.domain, rankings: [] };\n  byBusiness[bid].rankings.push(r);\n}\n\nlet report = `# SEO Monitor Report - Portfolio - ${date}\\n\\n`;\n\nconst allSignificant = [];\nfor (const [bid, data] of Object.entries(byBusiness)) {\n  report += `## ${data.name} (${data.domain})\\n\\n`;\n  report += `| Keyword | Position | Previous | Change |\\n|---------|----------|----------|--------|\\n`;\n  for (const r of data.rankings) {\n    const pos = r.current_position !== null ? r.current_position : 'Not found';\n    const prev = r.previous_position !== null ? r.previous_position : '-';\n    const ch = r.change !== null ? (r.change > 0 ? '+' + r.change : String(r.change)) : '-';\n    report += `| ${r.keyword} | ${pos} | ${prev} | ${ch} |\\n`;\n    if (r.is_significant) allSignificant.push(r);\n  }\n  report += `\\n`;\n}\n\nreport += `---\\n*Generated by SEO Monitor at ${new Date().toISOString()}*\\n`;\n\nreturn [{ json: { report, date, significant: allSignificant, significantCount: allSignificant.length } }];"
       },
       "id": "build-report",
       "name": "Build SEO Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1560, 300]
+      "position": [1820, 300]
     },
     {
       "parameters": {
@@ -152,15 +166,15 @@
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "={{ 'memory-bank/businesses/bayflow/reports/seo-' + $json.date + '.md' }}",
+        "filePath": "={{ 'memory-bank/system/reports/seo-' + $json.date + '.md' }}",
         "fileContent": "={{ $json.report }}",
-        "commitMessage": "={{ 'SEO Monitor report - bayflow - ' + $json.date }}"
+        "commitMessage": "={{ 'SEO Monitor report - portfolio - ' + $json.date }}"
       },
       "id": "write-report",
       "name": "Write Report to GitHub",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1820, 200],
+      "position": [2080, 200],
       "continueOnFail": true
     },
     {
@@ -182,7 +196,7 @@
       "name": "Significant Changes?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1820, 400]
+      "position": [2080, 400]
     },
     {
       "parameters": {
@@ -196,25 +210,30 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ message: 'SEO Monitor: ' + $json.significantCount + ' keywords with significant ranking changes (5+ positions). Check the report.', source: 'seo-monitor' }) }}",
+        "jsonBody": "={{ JSON.stringify({ message: 'SEO Monitor: ' + $json.significantCount + ' keywords with significant ranking changes (5+ positions) across portfolio. Check the report.', source: 'seo-monitor' }) }}",
         "options": {}
       },
       "id": "notify-telegram",
       "name": "Notify Telegram",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2080, 400],
+      "position": [2340, 400],
       "continueOnFail": true
     }
   ],
   "connections": {
     "Weekly Monday 5 AM": {
       "main": [[
-        { "node": "Fetch Keywords", "type": "main", "index": 0 },
-        { "node": "Check Google Search Console", "type": "main", "index": 0 }
+        { "node": "Fetch All Businesses", "type": "main", "index": 0 }
       ]]
     },
-    "Fetch Keywords": {
+    "Fetch All Businesses": {
+      "main": [[{ "node": "Split Per Business", "type": "main", "index": 0 }]]
+    },
+    "Split Per Business": {
+      "main": [[{ "node": "Fetch Keywords (Per Business)", "type": "main", "index": 0 }]]
+    },
+    "Fetch Keywords (Per Business)": {
       "main": [[{ "node": "Prepare Keywords", "type": "main", "index": 0 }]]
     },
     "Prepare Keywords": {

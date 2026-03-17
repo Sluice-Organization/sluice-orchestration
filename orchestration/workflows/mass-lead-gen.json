@@ -1,5 +1,5 @@
 {
-  "name": "Mass Lead Generator - Apollo.io",
+  "name": "Mass Lead Generator - Apollo.io (Multi-Business)",
   "nodes": [
     {
       "parameters": {
@@ -33,13 +33,40 @@
     },
     {
       "parameters": {
-        "jsCode": "// Build Apollo search parameters from trigger context\nconst webhookData = $input.first().json;\nconst isWebhook = !!(webhookData.body && (webhookData.body.regions || webhookData.body.queries || webhookData.body.audience_type));\n\n// Default search config for auto repair vertical\nlet industryTags = ['auto_repair'];\nlet employeeRanges = ['1,10', '11,20', '21,50'];\nlet locations = ['United States'];\nlet personTitles = ['owner', 'manager', 'general manager', 'service manager', 'shop owner'];\nlet perPage = 100;\n\nif (isWebhook) {\n  const body = webhookData.body;\n\n  // Override industry/audience if provided\n  if (body.audience_type) {\n    const audienceMap = {\n      'auto_repair': ['auto_repair'],\n      'salon': ['beauty_salon', 'hair_salon'],\n      'hvac': ['hvac'],\n      'plumbing': ['plumbing'],\n      'dental': ['dental_practice'],\n      'fitness': ['fitness', 'gym']\n    };\n    industryTags = audienceMap[body.audience_type] || [body.audience_type];\n  }\n\n  // Override locations if regions provided\n  if (body.regions && body.regions.length > 0) {\n    // Apollo accepts state names directly\n    locations = body.regions.map(r => r + ', United States');\n  }\n\n  // Override person titles if queries suggest different roles\n  if (body.queries && body.queries.length > 0) {\n    // Treat queries as additional title search terms\n    personTitles = [...new Set([...personTitles, ...body.queries])];\n  }\n}\n\n// Track pagination via static data\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.apolloPage) staticData.apolloPage = 1;\nif (!staticData.totalOrgsProcessed) staticData.totalOrgsProcessed = 0;\nif (!staticData.lastRunDate) staticData.lastRunDate = '';\n\n// Reset page counter each week (new run)\nconst today = $now.toFormat('yyyy-MM-dd');\nif (staticData.lastRunDate !== today) {\n  staticData.apolloPage = 1;\n  staticData.lastRunDate = today;\n}\n\nconst currentPage = staticData.apolloPage;\n\nreturn [{\n  json: {\n    industryTags,\n    employeeRanges,\n    locations,\n    personTitles,\n    perPage,\n    currentPage,\n    isWebhook\n  }\n}];"
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "status", "value": "not.in.(killed,sold)" },
+            { "name": "select", "value": "id,business_id,name,category" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-businesses",
+      "name": "Fetch All Businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Apollo search parameters dynamically per business\nconst webhookData = $input.first().json;\nconst isWebhook = !!(webhookData.body && (webhookData.body.regions || webhookData.body.queries || webhookData.body.audience_type));\n\n// Fetch businesses from upstream node\nlet businesses = [];\ntry {\n  const bizItems = $('Fetch All Businesses').all().map(i => i.json);\n  businesses = Array.isArray(bizItems[0]) ? bizItems[0] : bizItems;\n} catch(e) {\n  businesses = [];\n}\n\n// Category to Apollo industry tag mapping\nconst categoryToIndustry = {\n  'auto_repair': { tags: ['auto_repair'], titles: ['owner', 'manager', 'general manager', 'service manager', 'shop owner'] },\n  'salon': { tags: ['beauty_salon', 'hair_salon'], titles: ['owner', 'manager', 'salon owner', 'studio owner'] },\n  'hvac': { tags: ['hvac'], titles: ['owner', 'manager', 'general manager', 'service manager'] },\n  'plumbing': { tags: ['plumbing'], titles: ['owner', 'manager', 'general manager'] },\n  'dental': { tags: ['dental_practice'], titles: ['owner', 'practice manager', 'office manager', 'dentist'] },\n  'fitness': { tags: ['fitness', 'gym'], titles: ['owner', 'manager', 'gym owner', 'studio owner'] },\n  'restaurant': { tags: ['restaurant', 'food_service'], titles: ['owner', 'manager', 'general manager'] },\n  'cleaning': { tags: ['cleaning_service', 'janitorial'], titles: ['owner', 'manager', 'operations manager'] },\n  'landscaping': { tags: ['landscaping'], titles: ['owner', 'manager', 'operations manager'] },\n  'pet_care': { tags: ['veterinary', 'pet_care'], titles: ['owner', 'manager', 'practice manager'] }\n};\n\nlet employeeRanges = ['1,10', '11,20', '21,50'];\nlet locations = ['United States'];\nlet perPage = 100;\n\n// If webhook override, use those params\nif (isWebhook) {\n  const body = webhookData.body;\n  if (body.regions && body.regions.length > 0) {\n    locations = body.regions.map(r => r + ', United States');\n  }\n  \n  // If webhook specifies audience_type, just run that one\n  if (body.audience_type) {\n    const config = categoryToIndustry[body.audience_type] || { tags: [body.audience_type], titles: ['owner', 'manager'] };\n    let titles = config.titles;\n    if (body.queries && body.queries.length > 0) {\n      titles = [...new Set([...titles, ...body.queries])];\n    }\n    return [{\n      json: {\n        businessId: body.business_id || 'webhook',\n        industryTags: config.tags,\n        employeeRanges,\n        locations,\n        personTitles: titles,\n        perPage,\n        currentPage: 1,\n        isWebhook: true\n      }\n    }];\n  }\n}\n\n// Track pagination via static data\nconst staticData = $getWorkflowStaticData('global');\nconst today = $now.toFormat('yyyy-MM-dd');\nif (!staticData.pagePerBusiness) staticData.pagePerBusiness = {};\nif (staticData.lastRunDate !== today) {\n  staticData.pagePerBusiness = {};\n  staticData.lastRunDate = today;\n}\n\n// Generate one search config per active business\nconst searchConfigs = [];\nfor (const biz of businesses) {\n  const category = biz.category || 'auto_repair';\n  const config = categoryToIndustry[category] || { tags: [category], titles: ['owner', 'manager'] };\n  \n  const bizKey = biz.business_id || biz.id;\n  if (!staticData.pagePerBusiness[bizKey]) staticData.pagePerBusiness[bizKey] = 1;\n  \n  searchConfigs.push({\n    json: {\n      businessId: biz.business_id,\n      businessUuid: biz.id,\n      businessName: biz.name,\n      category: category,\n      industryTags: config.tags,\n      employeeRanges,\n      locations,\n      personTitles: config.titles,\n      perPage,\n      currentPage: staticData.pagePerBusiness[bizKey],\n      isWebhook: false\n    }\n  });\n}\n\nif (searchConfigs.length === 0) {\n  // Fallback to auto_repair if no businesses found\n  return [{\n    json: {\n      businessId: 'unknown',\n      industryTags: ['auto_repair'],\n      employeeRanges,\n      locations,\n      personTitles: ['owner', 'manager', 'general manager', 'service manager', 'shop owner'],\n      perPage,\n      currentPage: 1,\n      isWebhook: false\n    }\n  }];\n}\n\nreturn searchConfigs;"
       },
       "id": "build-search-params",
-      "name": "Build Apollo Search Params",
+      "name": "Build Apollo Search Params (Per Business)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [300, 150]
+      "position": [500, 150]
     },
     {
       "parameters": {
@@ -48,59 +75,37 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "{{ $env.APOLLO_API_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "x-api-key", "value": "{{ $env.APOLLO_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ organization_industry_tag_ids: $json.industryTags, organization_num_employees_ranges: $json.employeeRanges, organization_locations: $json.locations, per_page: $json.perPage, page: $json.currentPage }) }}",
-        "options": {
-          "timeout": 30000
-        }
+        "options": { "timeout": 30000 }
       },
       "id": "apollo-org-search",
       "name": "Step 1 - Search Apollo Organizations",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [540, 150],
+      "position": [740, 150],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const response = $input.first().json;\nconst searchParams = $('Build Apollo Search Params').first().json;\n\n// Update pagination state\nconst staticData = $getWorkflowStaticData('global');\n\nconst organizations = response.organizations || response.accounts || [];\n\nif (!organizations || organizations.length === 0) {\n  // Reset page for next run\n  staticData.apolloPage = 1;\n  return [{ json: { _empty: true, reason: 'No organizations found from Apollo. Page: ' + searchParams.currentPage, totalProcessed: staticData.totalOrgsProcessed || 0 } }];\n}\n\n// Advance page for next batch\nstaticData.apolloPage = (staticData.apolloPage || 1) + 1;\n\n// Extract org data\nreturn organizations.map(org => ({\n  json: {\n    org_id: org.id || org.organization_id || '',\n    business_name: org.name || '',\n    website: org.website_url || org.primary_domain || '',\n    domain: (org.primary_domain || org.website_url || '').replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0],\n    phone: org.phone || org.sanitized_phone || '',\n    industry: org.industry || '',\n    company_size: org.estimated_num_employees ? String(org.estimated_num_employees) : (org.num_employees_ranges ? org.num_employees_ranges[0] : ''),\n    annual_revenue: org.annual_revenue_printed || org.annual_revenue || '',\n    city: org.city || '',\n    state: org.state || '',\n    country: org.country || 'United States',\n    technologies: org.technologies || [],\n    linkedin_url: org.linkedin_url || '',\n    apollo_org_id: org.id || org.organization_id || '',\n    personTitles: searchParams.personTitles\n  }\n}));"
+        "jsCode": "const response = $input.first().json;\nconst searchParams = $('Build Apollo Search Params (Per Business)').item.json;\n\nconst staticData = $getWorkflowStaticData('global');\nconst organizations = response.organizations || response.accounts || [];\n\nif (!organizations || organizations.length === 0) {\n  const bizKey = searchParams.businessId || 'unknown';\n  if (staticData.pagePerBusiness) staticData.pagePerBusiness[bizKey] = 1;\n  return [{ json: { _empty: true, reason: 'No organizations found for ' + searchParams.businessId + ' (' + (searchParams.industryTags || []).join(',') + '). Page: ' + searchParams.currentPage, totalProcessed: 0 } }];\n}\n\n// Advance page for next batch\nconst bizKey = searchParams.businessId || 'unknown';\nif (staticData.pagePerBusiness) {\n  staticData.pagePerBusiness[bizKey] = (staticData.pagePerBusiness[bizKey] || 1) + 1;\n}\n\nreturn organizations.map(org => ({\n  json: {\n    org_id: org.id || org.organization_id || '',\n    business_name: org.name || '',\n    website: org.website_url || org.primary_domain || '',\n    domain: (org.primary_domain || org.website_url || '').replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0],\n    phone: org.phone || org.sanitized_phone || '',\n    industry: org.industry || '',\n    company_size: org.estimated_num_employees ? String(org.estimated_num_employees) : (org.num_employees_ranges ? org.num_employees_ranges[0] : ''),\n    annual_revenue: org.annual_revenue_printed || org.annual_revenue || '',\n    city: org.city || '',\n    state: org.state || '',\n    country: org.country || 'United States',\n    technologies: org.technologies || [],\n    linkedin_url: org.linkedin_url || '',\n    apollo_org_id: org.id || org.organization_id || '',\n    personTitles: searchParams.personTitles,\n    _forBusinessId: searchParams.businessId,\n    _forBusinessUuid: searchParams.businessUuid\n  }\n}));"
       },
       "id": "parse-org-results",
       "name": "Parse Organization Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [760, 150]
+      "position": [960, 150]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "has-orgs",
-              "leftValue": "={{ $json._empty }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ],
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "has-orgs", "leftValue": "={{ $json._empty }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }],
           "combinator": "and"
         },
         "options": {}
@@ -109,7 +114,7 @@
       "name": "Has Organizations?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [980, 150]
+      "position": [1180, 150]
     },
     {
       "parameters": {
@@ -118,65 +123,37 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "{{ $env.APOLLO_API_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "x-api-key", "value": "{{ $env.APOLLO_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ organization_ids: [$json.org_id], person_titles: $json.personTitles, per_page: 5 }) }}",
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 2,
-              "batchInterval": 1000
-            }
-          },
-          "timeout": 30000
-        }
+        "options": { "batching": { "batch": { "batchSize": 2, "batchInterval": 1000 } }, "timeout": 30000 }
       },
       "id": "apollo-people-search",
       "name": "Step 2 - Search Decision Makers",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1200, 100],
+      "position": [1400, 100],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const response = $input.first().json;\nconst orgData = $('Has Organizations?').first().json;\n\nconst people = response.people || response.contacts || [];\n\nif (!people || people.length === 0) {\n  return [{ json: { _empty: true, reason: 'No decision makers found for ' + orgData.business_name, org_id: orgData.org_id } }];\n}\n\n// Take the top person (most senior / best match)\nconst best = people[0];\n\nreturn [{\n  json: {\n    apollo_id: best.id || '',\n    first_name: best.first_name || '',\n    last_name: best.last_name || '',\n    title: best.title || '',\n    seniority: best.seniority || '',\n    email: best.email || '',\n    phone: best.phone_numbers ? (best.phone_numbers[0] || {}).sanitized_number || '' : (orgData.phone || ''),\n    linkedin_url: best.linkedin_url || orgData.linkedin_url || '',\n    person_city: best.city || '',\n    person_state: best.state || '',\n    // Carry forward org data\n    business_name: orgData.business_name,\n    website: orgData.website,\n    domain: orgData.domain,\n    industry: orgData.industry,\n    company_size: orgData.company_size,\n    annual_revenue: orgData.annual_revenue,\n    city: orgData.city || best.city || '',\n    state: orgData.state || best.state || '',\n    technologies: orgData.technologies,\n    apollo_org_id: orgData.apollo_org_id\n  }\n}];"
+        "jsCode": "const response = $input.first().json;\nconst orgData = $('Has Organizations?').first().json;\nconst people = response.people || response.contacts || [];\n\nif (!people || people.length === 0) {\n  return [{ json: { _empty: true, reason: 'No decision makers found for ' + orgData.business_name, org_id: orgData.org_id } }];\n}\n\nconst best = people[0];\nreturn [{\n  json: {\n    apollo_id: best.id || '',\n    first_name: best.first_name || '',\n    last_name: best.last_name || '',\n    title: best.title || '',\n    seniority: best.seniority || '',\n    email: best.email || '',\n    phone: best.phone_numbers ? (best.phone_numbers[0] || {}).sanitized_number || '' : (orgData.phone || ''),\n    linkedin_url: best.linkedin_url || orgData.linkedin_url || '',\n    person_city: best.city || '',\n    person_state: best.state || '',\n    business_name: orgData.business_name,\n    website: orgData.website,\n    domain: orgData.domain,\n    industry: orgData.industry,\n    company_size: orgData.company_size,\n    annual_revenue: orgData.annual_revenue,\n    city: orgData.city || best.city || '',\n    state: orgData.state || best.state || '',\n    technologies: orgData.technologies,\n    apollo_org_id: orgData.apollo_org_id,\n    _forBusinessId: orgData._forBusinessId,\n    _forBusinessUuid: orgData._forBusinessUuid\n  }\n}];"
       },
       "id": "extract-best-person",
       "name": "Extract Best Decision Maker",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1420, 100]
+      "position": [1620, 100]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "has-person",
-              "leftValue": "={{ $json._empty }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ],
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "has-person", "leftValue": "={{ $json._empty }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }],
           "combinator": "and"
         },
         "options": {}
@@ -185,7 +162,7 @@
       "name": "Found Decision Maker?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1640, 100]
+      "position": [1840, 100]
     },
     {
       "parameters": {
@@ -194,65 +171,37 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "x-api-key",
-              "value": "{{ $env.APOLLO_API_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "x-api-key", "value": "{{ $env.APOLLO_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ id: $json.apollo_id, reveal_personal_emails: true, reveal_phone_number: true }) }}",
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 1,
-              "batchInterval": 1000
-            }
-          },
-          "timeout": 30000
-        }
+        "options": { "batching": { "batch": { "batchSize": 1, "batchInterval": 1000 } }, "timeout": 30000 }
       },
       "id": "apollo-enrich",
       "name": "Step 3 - Enrich Person (Email + Phone)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1860, 50],
+      "position": [2060, 50],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const enriched = $input.first().json;\nconst prevData = $('Found Decision Maker?').first().json;\n\nconst person = enriched.person || enriched;\n\n// Get email - prefer work email, fallback to personal\nlet email = '';\nif (person.email) {\n  email = person.email;\n} else if (person.personal_emails && person.personal_emails.length > 0) {\n  email = person.personal_emails[0];\n} else if (prevData.email) {\n  email = prevData.email;\n}\n\n// Get phone\nlet phone = prevData.phone || '';\nif (person.phone_numbers && person.phone_numbers.length > 0) {\n  phone = person.phone_numbers[0].sanitized_number || person.phone_numbers[0].number || phone;\n} else if (person.phone) {\n  phone = person.phone;\n}\n\nif (!email) {\n  return [{ json: { _skip: true, reason: 'No email found after enrichment', business_name: prevData.business_name, apollo_id: prevData.apollo_id } }];\n}\n\nreturn [{\n  json: {\n    ...prevData,\n    email,\n    phone,\n    linkedin_url: person.linkedin_url || prevData.linkedin_url || '',\n    title: person.title || prevData.title || '',\n    seniority: person.seniority || prevData.seniority || ''\n  }\n}];"
+        "jsCode": "const enriched = $input.first().json;\nconst prevData = $('Found Decision Maker?').first().json;\nconst person = enriched.person || enriched;\n\nlet email = '';\nif (person.email) email = person.email;\nelse if (person.personal_emails && person.personal_emails.length > 0) email = person.personal_emails[0];\nelse if (prevData.email) email = prevData.email;\n\nlet phone = prevData.phone || '';\nif (person.phone_numbers && person.phone_numbers.length > 0) phone = person.phone_numbers[0].sanitized_number || person.phone_numbers[0].number || phone;\nelse if (person.phone) phone = person.phone;\n\nif (!email) {\n  return [{ json: { _skip: true, reason: 'No email found after enrichment', business_name: prevData.business_name, apollo_id: prevData.apollo_id } }];\n}\n\nreturn [{ json: { ...prevData, email, phone, linkedin_url: person.linkedin_url || prevData.linkedin_url || '', title: person.title || prevData.title || '', seniority: person.seniority || prevData.seniority || '' } }];"
       },
       "id": "parse-enrichment",
       "name": "Parse Enrichment Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2080, 50]
+      "position": [2280, 50]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "has-email",
-              "leftValue": "={{ $json._skip }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ],
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "has-email", "leftValue": "={{ $json._skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }],
           "combinator": "and"
         },
         "options": {}
@@ -261,7 +210,7 @@
       "name": "Has Email?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2300, 50]
+      "position": [2500, 50]
     },
     {
       "parameters": {
@@ -270,61 +219,34 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
-            }
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
           ]
         },
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 5,
-              "batchInterval": 200
-            }
-          }
-        }
+        "options": { "batching": { "batch": { "batchSize": 5, "batchInterval": 200 } } }
       },
       "id": "check-supabase-dupe",
       "name": "Check Existing in Supabase",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2520, 0],
+      "position": [2720, 0],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const dupeCheck = $input.first().json;\nconst leadData = $('Has Email?').first().json;\n\nconst results = Array.isArray(dupeCheck) ? dupeCheck : [];\n\nif (results.length > 0) {\n  return [{ json: { _skip: true, reason: 'Duplicate - already in Supabase', email: leadData.email, business_name: leadData.business_name } }];\n}\n\nreturn [{ json: { ...leadData, _skip: false } }];"
+        "jsCode": "const dupeCheck = $input.first().json;\nconst leadData = $('Has Email?').first().json;\nconst results = Array.isArray(dupeCheck) ? dupeCheck : [];\nif (results.length > 0) {\n  return [{ json: { _skip: true, reason: 'Duplicate', email: leadData.email, business_name: leadData.business_name } }];\n}\nreturn [{ json: { ...leadData, _skip: false } }];"
       },
       "id": "check-is-new",
       "name": "Is New Lead?",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2740, 0]
+      "position": [2940, 0]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "not-skip",
-              "leftValue": "={{ $json._skip }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ],
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "not-skip", "leftValue": "={{ $json._skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }],
           "combinator": "and"
         },
         "options": {}
@@ -333,57 +255,36 @@
       "name": "Not Duplicate?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2960, 0]
+      "position": [3160, 0]
     },
     {
       "parameters": {
         "method": "GET",
         "url": "={{ 'https://api.millionverifier.com/api/v3/?api=' + $env.MILLIONVERIFIER_API_KEY + '&email=' + encodeURIComponent($json.email) }}",
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 1,
-              "batchInterval": 1000
-            }
-          }
-        }
+        "options": { "batching": { "batch": { "batchSize": 1, "batchInterval": 1000 } } }
       },
       "id": "validate-email",
       "name": "Step 4 - Validate Email (MillionVerifier)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3180, -50],
+      "position": [3380, -50],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const verifyResponse = $input.first().json;\nconst leadData = $('Not Duplicate?').first().json;\n\nconst result = (verifyResponse.result || '').toLowerCase();\nconst acceptable = ['ok', 'catch_all'];\n\nif (!acceptable.includes(result)) {\n  return [{\n    json: {\n      _skip: true,\n      reason: 'Email validation failed: ' + result,\n      email: leadData.email,\n      business_name: leadData.business_name\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...leadData,\n    email_verified: true,\n    email_verify_result: result\n  }\n}];"
+        "jsCode": "const verifyResponse = $input.first().json;\nconst leadData = $('Not Duplicate?').first().json;\nconst result = (verifyResponse.result || '').toLowerCase();\nconst acceptable = ['ok', 'catch_all'];\nif (!acceptable.includes(result)) {\n  return [{ json: { _skip: true, reason: 'Email validation failed: ' + result, email: leadData.email, business_name: leadData.business_name } }];\n}\nreturn [{ json: { ...leadData, email_verified: true, email_verify_result: result } }];"
       },
       "id": "parse-validation",
       "name": "Parse Validation Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3400, -50]
+      "position": [3600, -50]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "email-valid",
-              "leftValue": "={{ $json._skip }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ],
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "email-valid", "leftValue": "={{ $json._skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }],
           "combinator": "and"
         },
         "options": {}
@@ -392,7 +293,7 @@
       "name": "Email Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [3620, -50]
+      "position": [3820, -50]
     },
     {
       "parameters": {
@@ -401,45 +302,33 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
-            }
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ business_name: $json.business_name, email: $json.email, first_name: $json.first_name, last_name: $json.last_name, phone: $json.phone, website: $json.website, domain: $json.domain, city: $json.city, state: $json.state, source: 'apollo', status: 'new', email_verified: $json.email_verified || false, email_verify_result: $json.email_verify_result || null, title: $json.title || null, seniority: $json.seniority || null, company_size: $json.company_size || null, annual_revenue: $json.annual_revenue || null, linkedin_url: $json.linkedin_url || null, technologies: $json.technologies || null, apollo_id: $json.apollo_id || null, apollo_org_id: $json.apollo_org_id || null, created_at: new Date().toISOString() }) }}",
+        "jsonBody": "={{ JSON.stringify({ business_id: $json._forBusinessUuid || $json._forBusinessId || null, business_name: $json.business_name, email: $json.email, first_name: $json.first_name, last_name: $json.last_name, phone: $json.phone, website: $json.website, domain: $json.domain, city: $json.city, state: $json.state, source: 'apollo', status: 'new', email_verified: $json.email_verified || false, email_verify_result: $json.email_verify_result || null, title: $json.title || null, seniority: $json.seniority || null, company_size: $json.company_size || null, annual_revenue: $json.annual_revenue || null, linkedin_url: $json.linkedin_url || null, technologies: $json.technologies || null, apollo_id: $json.apollo_id || null, apollo_org_id: $json.apollo_org_id || null, created_at: new Date().toISOString() }) }}",
         "options": {}
       },
       "id": "save-lead-supabase",
       "name": "Step 5 - Save Lead to Supabase",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3840, -100],
+      "position": [4040, -100],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const allSaved = $input.all();\nconst now = new Date();\nconst dateStr = $now.toFormat('yyyy-MM-dd');\n\nlet savedCount = 0;\nlet failedCount = 0;\nconst statesSeen = new Set();\nconst savedLeads = [];\n\nfor (const item of allSaved) {\n  const d = item.json;\n  if (d.id || (Array.isArray(d) && d.length > 0)) {\n    savedCount++;\n    const lead = Array.isArray(d) ? d[0] : d;\n    if (lead.state) statesSeen.add(lead.state);\n    savedLeads.push({\n      business: lead.business_name || 'Unknown',\n      email: lead.email || 'N/A',\n      title: lead.title || 'N/A',\n      city: lead.city || 'N/A',\n      state: lead.state || 'N/A'\n    });\n  } else {\n    failedCount++;\n  }\n}\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.totalOrgsProcessed = (staticData.totalOrgsProcessed || 0) + savedCount;\n\nlet report = `# Apollo Lead Gen Report - ${dateStr}\\n\\n`;\nreport += `## Summary\\n`;\nreport += `- **Date**: ${now.toISOString()}\\n`;\nreport += `- **New validated leads saved**: ${savedCount}\\n`;\nreport += `- **Failed/skipped**: ${failedCount}\\n`;\nreport += `- **States covered**: ${Array.from(statesSeen).join(', ')}\\n`;\nreport += `- **Total leads processed to date**: ${staticData.totalOrgsProcessed}\\n`;\nreport += `- **Apollo page**: ${staticData.apolloPage || 1}\\n\\n`;\n\nif (savedLeads.length > 0) {\n  report += `## New Leads\\n\\n`;\n  report += `| Business | Email | Title | City | State |\\n`;\n  report += `|----------|-------|-------|------|-------|\\n`;\n  for (const lead of savedLeads) {\n    report += `| ${lead.business} | ${lead.email} | ${lead.title} | ${lead.city} | ${lead.state} |\\n`;\n  }\n}\n\nreturn [{\n  json: {\n    report,\n    dateStr,\n    savedCount,\n    failedCount,\n    totalProcessed: staticData.totalOrgsProcessed,\n    telegramMessage: `Apollo Lead Gen: Found ${savedCount} new validated leads. States: ${Array.from(statesSeen).join(', ')}. Total to date: ${staticData.totalOrgsProcessed}. Failed/skipped: ${failedCount}.`\n  }\n}];"
+        "jsCode": "const allSaved = $input.all();\nconst dateStr = $now.toFormat('yyyy-MM-dd');\nlet savedCount = 0, failedCount = 0;\nconst statesSeen = new Set();\nconst savedLeads = [];\nconst businessesSeen = new Set();\n\nfor (const item of allSaved) {\n  const d = item.json;\n  if (d.id || (Array.isArray(d) && d.length > 0)) {\n    savedCount++;\n    const lead = Array.isArray(d) ? d[0] : d;\n    if (lead.state) statesSeen.add(lead.state);\n    if (lead.business_id) businessesSeen.add(lead.business_id);\n    savedLeads.push({ business: lead.business_name || 'Unknown', email: lead.email || 'N/A', title: lead.title || 'N/A', city: lead.city || 'N/A', state: lead.state || 'N/A' });\n  } else {\n    failedCount++;\n  }\n}\n\nlet report = '# Apollo Lead Gen Report - ' + dateStr + '\\n\\n';\nreport += '## Summary\\n';\nreport += '- **Date**: ' + new Date().toISOString() + '\\n';\nreport += '- **New validated leads saved**: ' + savedCount + '\\n';\nreport += '- **Failed/skipped**: ' + failedCount + '\\n';\nreport += '- **States covered**: ' + Array.from(statesSeen).join(', ') + '\\n';\nreport += '- **Businesses served**: ' + Array.from(businessesSeen).join(', ') + '\\n\\n';\n\nif (savedLeads.length > 0) {\n  report += '## New Leads\\n\\n';\n  report += '| Business | Email | Title | City | State |\\n';\n  report += '|----------|-------|-------|------|-------|\\n';\n  for (const lead of savedLeads) {\n    report += '| ' + lead.business + ' | ' + lead.email + ' | ' + lead.title + ' | ' + lead.city + ' | ' + lead.state + ' |\\n';\n  }\n}\n\nreturn [{ json: { report, dateStr, savedCount, failedCount, telegramMessage: 'Apollo Lead Gen: Found ' + savedCount + ' new validated leads across ' + businessesSeen.size + ' businesses. States: ' + Array.from(statesSeen).join(', ') + '. Failed/skipped: ' + failedCount + '.' } }];"
       },
       "id": "generate-report",
       "name": "Generate Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [4060, -100]
+      "position": [4260, -100]
     },
     {
       "parameters": {
@@ -448,18 +337,9 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.GITHUB_TOKEN }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Accept",
-              "value": "application/vnd.github.v3+json"
-            }
+            { "name": "Authorization", "value": "Bearer {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
           ]
         },
         "sendBody": true,
@@ -471,7 +351,7 @@
       "name": "Write Report to GitHub",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [4280, -100],
+      "position": [4480, -100],
       "continueOnFail": true
     },
     {
@@ -479,14 +359,7 @@
         "method": "POST",
         "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
         "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ message: $json.telegramMessage, source: 'mass-lead-gen-apollo' }) }}",
@@ -496,32 +369,25 @@
       "name": "Notify via Telegram",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [4500, -100],
+      "position": [4700, -100],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nreturn [{\n  json: {\n    telegramMessage: 'Apollo Lead Gen: No organizations found. All pages exhausted or API issue. Total processed: ' + (data.totalProcessed || 'unknown') + '.',\n    _complete: true\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\nreturn [{ json: { telegramMessage: 'Apollo Lead Gen: No organizations found. ' + (data.reason || 'All pages exhausted or API issue.'), _complete: true } }];"
       },
       "id": "no-orgs-found",
       "name": "No Organizations Found",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1200, 300]
+      "position": [1400, 300]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
         "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ message: $json.telegramMessage, source: 'mass-lead-gen-apollo' }) }}",
@@ -531,276 +397,43 @@
       "name": "Notify No Orgs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1420, 300],
+      "position": [1620, 300],
       "continueOnFail": true
     }
   ],
   "connections": {
-    "Weekly Sunday 2AM": {
-      "main": [
-        [
-          {
-            "node": "Build Apollo Search Params",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Webhook: Expand Lead Gen": {
-      "main": [
-        [
-          {
-            "node": "Build Apollo Search Params",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Apollo Search Params": {
-      "main": [
-        [
-          {
-            "node": "Step 1 - Search Apollo Organizations",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Step 1 - Search Apollo Organizations": {
-      "main": [
-        [
-          {
-            "node": "Parse Organization Results",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Organization Results": {
-      "main": [
-        [
-          {
-            "node": "Has Organizations?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Organizations?": {
-      "main": [
-        [
-          {
-            "node": "Step 2 - Search Decision Makers",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "No Organizations Found",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Step 2 - Search Decision Makers": {
-      "main": [
-        [
-          {
-            "node": "Extract Best Decision Maker",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract Best Decision Maker": {
-      "main": [
-        [
-          {
-            "node": "Found Decision Maker?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Found Decision Maker?": {
-      "main": [
-        [
-          {
-            "node": "Step 3 - Enrich Person (Email + Phone)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Step 3 - Enrich Person (Email + Phone)": {
-      "main": [
-        [
-          {
-            "node": "Parse Enrichment Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Enrichment Result": {
-      "main": [
-        [
-          {
-            "node": "Has Email?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Email?": {
-      "main": [
-        [
-          {
-            "node": "Check Existing in Supabase",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Check Existing in Supabase": {
-      "main": [
-        [
-          {
-            "node": "Is New Lead?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Is New Lead?": {
-      "main": [
-        [
-          {
-            "node": "Not Duplicate?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Not Duplicate?": {
-      "main": [
-        [
-          {
-            "node": "Step 4 - Validate Email (MillionVerifier)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Step 4 - Validate Email (MillionVerifier)": {
-      "main": [
-        [
-          {
-            "node": "Parse Validation Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Validation Result": {
-      "main": [
-        [
-          {
-            "node": "Email Valid?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Email Valid?": {
-      "main": [
-        [
-          {
-            "node": "Step 5 - Save Lead to Supabase",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Step 5 - Save Lead to Supabase": {
-      "main": [
-        [
-          {
-            "node": "Generate Report",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Generate Report": {
-      "main": [
-        [
-          {
-            "node": "Write Report to GitHub",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Write Report to GitHub": {
-      "main": [
-        [
-          {
-            "node": "Notify via Telegram",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "No Organizations Found": {
-      "main": [
-        [
-          {
-            "node": "Notify No Orgs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+    "Weekly Sunday 2AM": { "main": [[ { "node": "Fetch All Businesses", "type": "main", "index": 0 } ]] },
+    "Webhook: Expand Lead Gen": { "main": [[ { "node": "Build Apollo Search Params (Per Business)", "type": "main", "index": 0 } ]] },
+    "Fetch All Businesses": { "main": [[ { "node": "Build Apollo Search Params (Per Business)", "type": "main", "index": 0 } ]] },
+    "Build Apollo Search Params (Per Business)": { "main": [[ { "node": "Step 1 - Search Apollo Organizations", "type": "main", "index": 0 } ]] },
+    "Step 1 - Search Apollo Organizations": { "main": [[ { "node": "Parse Organization Results", "type": "main", "index": 0 } ]] },
+    "Parse Organization Results": { "main": [[ { "node": "Has Organizations?", "type": "main", "index": 0 } ]] },
+    "Has Organizations?": { "main": [[ { "node": "Step 2 - Search Decision Makers", "type": "main", "index": 0 } ], [ { "node": "No Organizations Found", "type": "main", "index": 0 } ]] },
+    "Step 2 - Search Decision Makers": { "main": [[ { "node": "Extract Best Decision Maker", "type": "main", "index": 0 } ]] },
+    "Extract Best Decision Maker": { "main": [[ { "node": "Found Decision Maker?", "type": "main", "index": 0 } ]] },
+    "Found Decision Maker?": { "main": [[ { "node": "Step 3 - Enrich Person (Email + Phone)", "type": "main", "index": 0 } ], []] },
+    "Step 3 - Enrich Person (Email + Phone)": { "main": [[ { "node": "Parse Enrichment Result", "type": "main", "index": 0 } ]] },
+    "Parse Enrichment Result": { "main": [[ { "node": "Has Email?", "type": "main", "index": 0 } ]] },
+    "Has Email?": { "main": [[ { "node": "Check Existing in Supabase", "type": "main", "index": 0 } ], []] },
+    "Check Existing in Supabase": { "main": [[ { "node": "Is New Lead?", "type": "main", "index": 0 } ]] },
+    "Is New Lead?": { "main": [[ { "node": "Not Duplicate?", "type": "main", "index": 0 } ]] },
+    "Not Duplicate?": { "main": [[ { "node": "Step 4 - Validate Email (MillionVerifier)", "type": "main", "index": 0 } ], []] },
+    "Step 4 - Validate Email (MillionVerifier)": { "main": [[ { "node": "Parse Validation Result", "type": "main", "index": 0 } ]] },
+    "Parse Validation Result": { "main": [[ { "node": "Email Valid?", "type": "main", "index": 0 } ]] },
+    "Email Valid?": { "main": [[ { "node": "Step 5 - Save Lead to Supabase", "type": "main", "index": 0 } ], []] },
+    "Step 5 - Save Lead to Supabase": { "main": [[ { "node": "Generate Report", "type": "main", "index": 0 } ]] },
+    "Generate Report": { "main": [[ { "node": "Write Report to GitHub", "type": "main", "index": 0 } ]] },
+    "Write Report to GitHub": { "main": [[ { "node": "Notify via Telegram", "type": "main", "index": 0 } ]] },
+    "No Organizations Found": { "main": [[ { "node": "Notify No Orgs", "type": "main", "index": 0 } ]] }
   },
-  "settings": {
-    "executionOrder": "v1"
-  },
+  "settings": { "executionOrder": "v1" },
   "staticData": {
     "global": {
-      "apolloPage": 1,
-      "totalOrgsProcessed": 0,
+      "pagePerBusiness": {},
       "lastRunDate": ""
     }
   },
   "meta": {
-    "notes": "Mass Lead Generator using Apollo.io API. Replaces SerpAPI + Hunter.io flow.\n\nFlow: Search organizations (auto_repair vertical) -> Find decision makers (owners/managers) -> Enrich for email + phone -> Verify with MillionVerifier -> Save to Supabase cold_email_leads.\n\nTriggers: Weekly Sunday 2AM cron, or POST /expand-lead-gen webhook with { regions, queries, audience_type }.\n\nApollo $79/mo plan = 1,000 enriched leads/month with full company data (title, seniority, company_size, revenue, technologies, LinkedIn).\n\nRequired env vars: APOLLO_API_KEY, MILLIONVERIFIER_API_KEY, SUPABASE_SERVICE_KEY, GITHUB_TOKEN."
+    "notes": "Multi-Business Mass Lead Generator using Apollo.io API.\n\nFlow: Fetch all active businesses -> Map category to Apollo industry tags -> Search organizations per vertical -> Find decision makers -> Enrich -> Verify -> Save with business_id.\n\nSupported categories: auto_repair, salon, hvac, plumbing, dental, fitness, restaurant, cleaning, landscaping, pet_care.\n\nTriggers: Weekly Sunday 2AM cron, or POST /expand-lead-gen webhook.\n\nRequired env vars: APOLLO_API_KEY, MILLIONVERIFIER_API_KEY, SUPABASE_SERVICE_KEY, GITHUB_TOKEN."
   }
 }

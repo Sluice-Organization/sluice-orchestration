@@ -1,5 +1,5 @@
 {
-  "name": "Cold Email Metrics - Daily Performance Tracker",
+  "name": "Cold Email Metrics - Daily Performance Tracker (Multi-Business)",
   "nodes": [
     {
       "parameters": {
@@ -21,33 +21,51 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?select=status,business_id",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "status", "value": "not.in.(killed,sold)" },
+            { "name": "select", "value": "id,business_id,name" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_ANON_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-businesses",
+      "name": "Fetch All Businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?select=business_id,status",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_ANON_KEY }}"
-            }
+            { "name": "apikey", "value": "{{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_ANON_KEY }}" }
           ]
         },
-        "options": {
-          "timeout": 30000
-        }
+        "options": { "timeout": 30000 }
       },
       "id": "query-lead-status",
       "name": "Query Lead Status Counts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [250, 200],
-      "continueOnFail": true,
-      "notes": "Fetches all leads with status field to count by status (new, contacted, replied, positive, demo_booked, converted, bounced)"
+      "position": [250, 300],
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -58,31 +76,23 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_ANON_KEY }}"
-            }
+            { "name": "apikey", "value": "{{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_ANON_KEY }}" }
           ]
         },
-        "options": {
-          "timeout": 30000
-        }
+        "options": { "timeout": 30000 }
       },
       "id": "query-email-log",
       "name": "Query Email Log (7 Days)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [250, 450],
+      "position": [250, 500],
       "continueOnFail": true
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// This node waits for both queries to arrive\n// n8n merges the inputs - we process in the next node\nreturn [$input.item];"
+        "jsCode": "return [$input.item];"
       },
       "id": "wait-for-queries",
       "name": "Wait for Queries",
@@ -92,13 +102,23 @@
     },
     {
       "parameters": {
-        "jsCode": "const leadItems = $('Query Lead Status Counts').all().map(i => i.json);\nconst emailLogItems = $('Query Email Log (7 Days)').all().map(i => i.json);\n\n// Flatten arrays if nested\nconst leads = leadItems.flat();\nconst emailLogs = emailLogItems.flat();\n\n// Resilience gate: filter out leads/logs belonging to killed or sold businesses\n// by checking business_id. If no business_id field, include the record (backwards compat).\n// Note: killed/sold business IDs should ideally come from a businesses query,\n// but since we don't have that data here, we log business_id in output for CEO Agent to cross-reference.\n\n// Count leads by status\nconst statusCounts = {};\nfor (const lead of leads) {\n  const s = lead.status || 'unknown';\n  statusCounts[s] = (statusCounts[s] || 0) + 1;\n}\n\n// Calculate 7-day email metrics\nconst totalSent7d = emailLogs.length;\nconst replied = emailLogs.filter(e => ['replied', 'positive', 'demo_booked', 'converted'].includes(e.status)).length;\nconst positive = emailLogs.filter(e => ['positive', 'demo_booked', 'converted'].includes(e.status)).length;\nconst demoBooked = emailLogs.filter(e => e.status === 'demo_booked' || e.status === 'converted').length;\nconst converted = emailLogs.filter(e => e.status === 'converted').length;\n\n// By region breakdown\nconst byRegion = {};\nfor (const log of emailLogs) {\n  const region = log.region || 'unknown';\n  if (!byRegion[region]) {\n    byRegion[region] = { sent: 0, replied: 0, positive: 0 };\n  }\n  byRegion[region].sent++;\n  if (['replied', 'positive', 'demo_booked', 'converted'].includes(log.status)) byRegion[region].replied++;\n  if (['positive', 'demo_booked', 'converted'].includes(log.status)) byRegion[region].positive++;\n}\n\nconst metrics = {\n  emails_sent_7d: totalSent7d,\n  reply_rate: totalSent7d > 0 ? (replied / totalSent7d * 100).toFixed(1) + '%' : '0%',\n  positive_rate: totalSent7d > 0 ? (positive / totalSent7d * 100).toFixed(1) + '%' : '0%',\n  demo_book_rate: totalSent7d > 0 ? (demoBooked / totalSent7d * 100).toFixed(1) + '%' : '0%',\n  conversion_rate: totalSent7d > 0 ? (converted / totalSent7d * 100).toFixed(1) + '%' : '0%',\n  by_region: byRegion,\n  lead_pipeline: statusCounts,\n  total_leads: Object.values(statusCounts).reduce((a, b) => a + b, 0),\n  calculated_at: new Date().toISOString()\n};\n\nreturn [{ json: metrics }];"
+        "jsCode": "// Multi-business metrics calculation\nconst leadItems = $('Query Lead Status Counts').all().map(i => i.json);\nconst emailLogItems = $('Query Email Log (7 Days)').all().map(i => i.json);\nconst bizItems = $('Fetch All Businesses').all().map(i => i.json);\n\nconst leads = leadItems.flat();\nconst emailLogs = emailLogItems.flat();\nconst businesses = Array.isArray(bizItems[0]) ? bizItems[0] : bizItems;\n\n// Build per-business metrics\nconst perBusinessMetrics = [];\n\nfor (const biz of businesses) {\n  const bizId = biz.business_id;\n  const bizUuid = biz.id;\n\n  // Filter leads for this business\n  const bizLeads = leads.filter(l => l.business_id === bizUuid || l.business_id === bizId);\n  const bizLogs = emailLogs.filter(l => l.business_id === bizUuid || l.business_id === bizId);\n\n  const statusCounts = {};\n  for (const lead of bizLeads) {\n    const s = lead.status || 'unknown';\n    statusCounts[s] = (statusCounts[s] || 0) + 1;\n  }\n\n  const totalSent7d = bizLogs.length;\n  const replied = bizLogs.filter(e => ['replied', 'positive', 'demo_booked', 'converted'].includes(e.status)).length;\n  const positive = bizLogs.filter(e => ['positive', 'demo_booked', 'converted'].includes(e.status)).length;\n  const demoBooked = bizLogs.filter(e => e.status === 'demo_booked' || e.status === 'converted').length;\n  const converted = bizLogs.filter(e => e.status === 'converted').length;\n\n  const byRegion = {};\n  for (const log of bizLogs) {\n    const region = log.region || 'unknown';\n    if (!byRegion[region]) byRegion[region] = { sent: 0, replied: 0, positive: 0 };\n    byRegion[region].sent++;\n    if (['replied', 'positive', 'demo_booked', 'converted'].includes(log.status)) byRegion[region].replied++;\n    if (['positive', 'demo_booked', 'converted'].includes(log.status)) byRegion[region].positive++;\n  }\n\n  perBusinessMetrics.push({\n    business_id: bizId,\n    business_name: biz.name,\n    emails_sent_7d: totalSent7d,\n    reply_rate: totalSent7d > 0 ? (replied / totalSent7d * 100).toFixed(1) + '%' : '0%',\n    positive_rate: totalSent7d > 0 ? (positive / totalSent7d * 100).toFixed(1) + '%' : '0%',\n    demo_book_rate: totalSent7d > 0 ? (demoBooked / totalSent7d * 100).toFixed(1) + '%' : '0%',\n    conversion_rate: totalSent7d > 0 ? (converted / totalSent7d * 100).toFixed(1) + '%' : '0%',\n    by_region: byRegion,\n    lead_pipeline: statusCounts,\n    total_leads: Object.values(statusCounts).reduce((a, b) => a + b, 0)\n  });\n}\n\nreturn [{ json: { perBusinessMetrics, calculated_at: new Date().toISOString() } }];"
       },
       "id": "calculate-metrics",
-      "name": "Calculate Metrics",
+      "name": "Calculate Metrics (Per Business)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Upsert per-business context rows\nconst data = $input.first().json;\nconst rows = [];\n\nfor (const bm of data.perBusinessMetrics) {\n  rows.push({\n    json: {\n      business_id: bm.business_id,\n      context_key: 'email_metrics',\n      context_value: JSON.stringify(bm),\n      updated_at: data.calculated_at\n    }\n  });\n}\n\nif (rows.length === 0) {\n  rows.push({ json: { business_id: 'portfolio', context_key: 'email_metrics', context_value: JSON.stringify({ message: 'No active businesses' }), updated_at: data.calculated_at } });\n}\n\nreturn rows;"
+      },
+      "id": "split-for-upsert",
+      "name": "Split Per Business for Upsert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 150]
     },
     {
       "parameters": {
@@ -109,32 +129,47 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "apikey",
-              "value": "{{ $env.SUPABASE_ANON_KEY }}"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
-            },
-            {
-              "name": "Prefer",
-              "value": "resolution=merge-duplicates"
-            }
+            { "name": "apikey", "value": "{{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Prefer", "value": "resolution=merge-duplicates" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ context_key: 'email_metrics', context_value: JSON.stringify($json), updated_at: new Date().toISOString() }) }}",
-        "options": {
-          "timeout": 15000
-        }
+        "jsonBody": "={{ JSON.stringify({ business_id: $json.business_id, context_key: $json.context_key, context_value: $json.context_value, updated_at: $json.updated_at }) }}",
+        "options": { "timeout": 15000 }
       },
       "id": "upsert-system-context",
-      "name": "Upsert to system_context",
+      "name": "Upsert to system_context (Per Business)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1050, 150],
+      "position": [1250, 150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Calculate Metrics (Per Business)').first().json;\nconst metrics = data.perBusinessMetrics || [];\n\nlet report = 'Cold Email Metrics (7-Day) - Portfolio\\n';\nreport += '======================================\\n\\n';\n\nfor (const bm of metrics) {\n  report += '## ' + bm.business_name + ' (' + bm.business_id + ')\\n';\n  report += 'Sent: ' + bm.emails_sent_7d + '\\n';\n  report += 'Reply Rate: ' + bm.reply_rate + '\\n';\n  report += 'Positive Rate: ' + bm.positive_rate + '\\n';\n  report += 'Demo Book Rate: ' + bm.demo_book_rate + '\\n';\n  report += 'Conversion Rate: ' + bm.conversion_rate + '\\n';\n  report += 'Total Pipeline Leads: ' + bm.total_leads + '\\n';\n\n  const regionReport = Object.entries(bm.by_region || {}).map(([region, d]) => {\n    return '  ' + region + ': ' + d.sent + ' sent, ' + d.replied + ' replied, ' + d.positive + ' positive';\n  }).join('\\n');\n  report += 'By Region:\\n' + (regionReport || '  No regional data') + '\\n';\n\n  const pipelineReport = Object.entries(bm.lead_pipeline || {}).map(([status, count]) => {\n    return '  ' + status + ': ' + count;\n  }).join('\\n');\n  report += 'Pipeline:\\n' + (pipelineReport || '  No pipeline data') + '\\n\\n';\n}\n\nreturn [{ json: { report, ...data } }];"
+      },
+      "id": "build-report-text",
+      "name": "Build Report Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'cold-email-metrics', level: 'info', message: $json.report }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "notify-telegram",
+      "name": "Notify: Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300],
       "continueOnFail": true
     },
     {
@@ -145,138 +180,41 @@
         "nodeCredentialType": "githubApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ message: 'chore: update cold email metrics ' + new Date().toISOString().split('T')[0], content: Buffer.from(JSON.stringify($json, null, 2)).toString('base64'), sha: '' }) }}",
-        "options": {
-          "timeout": 15000
-        }
+        "jsonBody": "={{ JSON.stringify({ message: 'chore: update cold email metrics ' + new Date().toISOString().split('T')[0], content: Buffer.from(JSON.stringify($('Calculate Metrics (Per Business)').first().json, null, 2)).toString('base64'), sha: '' }) }}",
+        "options": { "timeout": 15000 }
       },
       "id": "write-github-report",
       "name": "Write Report to GitHub",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1050, 450],
+      "position": [1000, 450],
       "credentials": {
-        "githubApi": {
-          "id": "github-cred",
-          "name": "GitHub API"
-        }
+        "githubApi": { "id": "github-cred", "name": "GitHub API" }
       },
-      "continueOnFail": true,
-      "notes": "First run will need to use POST to create the file. Subsequent runs use PUT with SHA. continueOnFail handles gracefully."
-    },
-    {
-      "parameters": {
-        "jsCode": "const m = $('Calculate Metrics').first().json;\n\nconst regionReport = Object.entries(m.by_region || {}).map(([region, data]) => {\n  return `  ${region}: ${data.sent} sent, ${data.replied} replied, ${data.positive} positive`;\n}).join('\\n');\n\nconst pipelineReport = Object.entries(m.lead_pipeline || {}).map(([status, count]) => {\n  return `  ${status}: ${count}`;\n}).join('\\n');\n\nconst report = `Cold Email Metrics (7-Day)\\n` +\n  `==========================\\n` +\n  `Sent: ${m.emails_sent_7d}\\n` +\n  `Reply Rate: ${m.reply_rate}\\n` +\n  `Positive Rate: ${m.positive_rate}\\n` +\n  `Demo Book Rate: ${m.demo_book_rate}\\n` +\n  `Conversion Rate: ${m.conversion_rate}\\n` +\n  `Total Pipeline Leads: ${m.total_leads}\\n\\n` +\n  `By Region:\\n${regionReport || '  No regional data'}\\n\\n` +\n  `Pipeline:\\n${pipelineReport || '  No pipeline data'}`;\n\nreturn [{ json: { report, ...m } }];"
-      },
-      "id": "build-report-text",
-      "name": "Build Report Text",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1050, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ source: 'cold-email-metrics', level: 'info', message: $json.report }) }}",
-        "options": {
-          "timeout": 10000
-        }
-      },
-      "id": "notify-telegram",
-      "name": "Notify: Telegram",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1300, 300],
       "continueOnFail": true
     }
   ],
   "connections": {
     "Daily 6AM Metrics Pull": {
-      "main": [
-        [
-          {
-            "node": "Query Lead Status Counts",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Query Email Log (7 Days)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[
+        { "node": "Fetch All Businesses", "type": "main", "index": 0 },
+        { "node": "Query Lead Status Counts", "type": "main", "index": 0 },
+        { "node": "Query Email Log (7 Days)", "type": "main", "index": 0 }
+      ]]
     },
-    "Query Lead Status Counts": {
-      "main": [
-        [
-          {
-            "node": "Wait for Queries",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Fetch All Businesses": { "main": [[ { "node": "Wait for Queries", "type": "main", "index": 0 } ]] },
+    "Query Lead Status Counts": { "main": [[ { "node": "Wait for Queries", "type": "main", "index": 0 } ]] },
+    "Query Email Log (7 Days)": { "main": [[ { "node": "Wait for Queries", "type": "main", "index": 0 } ]] },
+    "Wait for Queries": { "main": [[ { "node": "Calculate Metrics (Per Business)", "type": "main", "index": 0 } ]] },
+    "Calculate Metrics (Per Business)": {
+      "main": [[
+        { "node": "Split Per Business for Upsert", "type": "main", "index": 0 },
+        { "node": "Build Report Text", "type": "main", "index": 0 },
+        { "node": "Write Report to GitHub", "type": "main", "index": 0 }
+      ]]
     },
-    "Query Email Log (7 Days)": {
-      "main": [
-        [
-          {
-            "node": "Wait for Queries",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait for Queries": {
-      "main": [
-        [
-          {
-            "node": "Calculate Metrics",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Calculate Metrics": {
-      "main": [
-        [
-          {
-            "node": "Upsert to system_context",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Write Report to GitHub",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Build Report Text",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Report Text": {
-      "main": [
-        [
-          {
-            "node": "Notify: Telegram",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+    "Split Per Business for Upsert": { "main": [[ { "node": "Upsert to system_context (Per Business)", "type": "main", "index": 0 } ]] },
+    "Build Report Text": { "main": [[ { "node": "Notify: Telegram", "type": "main", "index": 0 } ]] }
   },
-  "settings": {
-    "executionOrder": "v1"
-  }
+  "settings": { "executionOrder": "v1" }
 }
