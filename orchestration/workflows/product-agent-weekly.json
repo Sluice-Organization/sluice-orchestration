@@ -20,6 +20,36 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?status=not.in.(killed,sold)&select=business_id,name,site_url,repo_name,category,tagline",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "fetch-active-businesses",
+      "name": "Fetch Active Businesses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.all().map(i => i.json);\nconst businesses = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;\nconst results = [];\nfor (const biz of businesses) {\n  const id = biz.business_id || biz.name;\n  if (!id || id === '_template') continue;\n  results.push({ json: {\n    businessId: id,\n    businessName: biz.name || id,\n    businessPath: 'memory-bank/businesses/' + id,\n    repo_name: biz.repo_name || id,\n    site_url: biz.site_url || '',\n    category: biz.category || '',\n    tagline: biz.tagline || ''\n  }});\n}\nif (results.length === 0) results.push({ json: { businessId: 'bayflow', businessName: 'BayFlow', businessPath: 'memory-bank/businesses/bayflow', repo_name: 'bayflow', site_url: 'https://bayflow.app', category: 'auto_repair', tagline: '' } });\nreturn results;"
+      },
+      "id": "split-businesses",
+      "name": "Split Into Businesses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "=https://{{ $env.SUPABASE_URL || 'qmwiahstuzcqmdksrzxe.supabase.co' }}/rest/v1/rpc/get_system_context",
         "authentication": "genericCredentialType",
@@ -34,14 +64,14 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ business_id: 'bayflow' }) }}",
+        "jsonBody": "={{ JSON.stringify({ business_id: $json.businessId }) }}",
         "options": { "timeout": 15000 }
       },
       "id": "read-system-context",
       "name": "Read System Context (Supabase)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, -300],
+      "position": [660, -300],
       "continueOnFail": true
     },
     {
@@ -49,14 +79,14 @@
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/prd.md",
+        "filePath": "={{ $('Split Into Businesses').item.json.businessPath }}/prd.md",
         "resource": "file"
       },
       "id": "read-prd",
       "name": "Read PRD",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, -200],
+      "position": [660, -200],
       "continueOnFail": true
     },
     {
@@ -64,14 +94,14 @@
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/state.md",
+        "filePath": "={{ $('Split Into Businesses').item.json.businessPath }}/state.md",
         "resource": "file"
       },
       "id": "read-state",
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, -100],
+      "position": [660, -100],
       "continueOnFail": true
     },
     {
@@ -79,14 +109,14 @@
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/weekly-plan.md",
+        "filePath": "={{ $('Split Into Businesses').item.json.businessPath }}/weekly-plan.md",
         "resource": "file"
       },
       "id": "read-plan",
       "name": "Read Weekly Plan",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, 0],
+      "position": [660, 0],
       "continueOnFail": true
     },
     {
@@ -94,20 +124,20 @@
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/businesses/bayflow/reports/support-log.md",
+        "filePath": "={{ $('Split Into Businesses').item.json.businessPath }}/reports/support-log.md",
         "resource": "file"
       },
       "id": "read-support-log",
       "name": "Read Support Log",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [220, 100],
+      "position": [660, 100],
       "continueOnFail": true
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/bayflow/reports",
+        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": { "timeout": 15000 }
@@ -116,7 +146,7 @@
       "name": "List Reports Directory",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 200],
+      "position": [660, 200],
       "credentials": {
         "githubApi": {
           "id": "github-cred",
@@ -133,12 +163,12 @@
       "name": "Find Latest Report Files",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 200]
+      "position": [880, 200]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/bayflow/reports/{{ $json.latestAppTest }}",
+        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports/{{ $json.latestAppTest }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
@@ -153,7 +183,7 @@
       "name": "Read App Test Report",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 100],
+      "position": [1100, 100],
       "credentials": {
         "githubApi": {
           "id": "github-cred",
@@ -165,7 +195,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/bayflow/reports/{{ $('Find Latest Report Files').first().json.latestCompetitor }}",
+        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports/{{ $('Find Latest Report Files').first().json.latestCompetitor }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
@@ -180,7 +210,7 @@
       "name": "Read Competitor Report",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 200],
+      "position": [1100, 200],
       "credentials": {
         "githubApi": {
           "id": "github-cred",
@@ -192,7 +222,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/bayflow/reports/{{ $('Find Latest Report Files').first().json.latestSeo }}",
+        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports/{{ $('Find Latest Report Files').first().json.latestSeo }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
@@ -207,7 +237,7 @@
       "name": "Read SEO Report",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 300],
+      "position": [1100, 300],
       "credentials": {
         "githubApi": {
           "id": "github-cred",
@@ -218,13 +248,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Gather all data sources\nconst systemContext = (() => {\n  try {\n    const raw = $('Read System Context (Supabase)').first().json;\n    return typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);\n  } catch (e) { return 'System context unavailable: ' + e.message; }\n})();\n\nconst prd = (() => {\n  try { return $('Read PRD').first().json.content || 'PRD not found.'; }\n  catch (e) { return 'PRD unavailable: ' + e.message; }\n})();\n\nconst state = (() => {\n  try { return $('Read State').first().json.content || ''; }\n  catch (e) { return 'State unavailable: ' + e.message; }\n})();\n\nconst plan = (() => {\n  try { return $('Read Weekly Plan').first().json.content || ''; }\n  catch (e) { return 'Weekly plan unavailable: ' + e.message; }\n})();\n\nconst supportLog = (() => {\n  try { return $('Read Support Log').first().json.content || 'No support tickets yet.'; }\n  catch (e) { return 'Support log unavailable: ' + e.message; }\n})();\n\nconst appTestReport = (() => {\n  try {\n    const raw = $('Read App Test Report').first().json;\n    return typeof raw === 'string' ? raw : (raw.data || JSON.stringify(raw, null, 2));\n  } catch (e) { return 'App test report unavailable: ' + e.message; }\n})();\n\nconst competitorReport = (() => {\n  try {\n    const raw = $('Read Competitor Report').first().json;\n    return typeof raw === 'string' ? raw : (raw.data || JSON.stringify(raw, null, 2));\n  } catch (e) { return 'Competitor report unavailable: ' + e.message; }\n})();\n\nconst seoReport = (() => {\n  try {\n    const raw = $('Read SEO Report').first().json;\n    return typeof raw === 'string' ? raw : (raw.data || JSON.stringify(raw, null, 2));\n  } catch (e) { return 'SEO report unavailable: ' + e.message; }\n})();\n\nconst today = $now.toFormat('yyyy-MM-dd');\n\nreturn [{\n  json: {\n    businessId: 'bayflow',\n    businessPath: 'memory-bank/businesses/bayflow',\n    prompt: `Today is ${today}. You are the Product Agent for BayFlow (auto repair shop software by Forge Technologies).\n\nYou have access to REAL data from multiple sources. Your job is to analyze all of it and produce highly specific, actionable GitHub issues.\n\n---\n\n## 1. PRD (Product Requirements Document) — What Was Supposed To Be Built\n${prd}\n\n---\n\n## 2. Current State\n${state}\n\n---\n\n## 3. Weekly Plan\n${plan}\n\n---\n\n## 4. System Context — Real Metrics (Traffic, Revenue, Signups, Churn)\n${systemContext}\n\n---\n\n## 5. Recent Support Tickets\n${supportLog}\n\n---\n\n## 6. Latest App Test Report — What's Broken\n${appTestReport}\n\n---\n\n## 7. Latest Competitor Report — What Competitors Have\n${competitorReport}\n\n---\n\n## 8. Latest SEO Report — Keyword Performance\n${seoReport}\n\n---\n\n# YOUR ANALYSIS TASKS\n\nPerform ALL of the following analyses. Be specific, cite data, and reference exact PRD sections.\n\n## Analysis 1: PRD vs Reality Gap\nCompare the PRD against the current state and app test report. For each PRD feature/section:\n- Is it built? Partially built? Not started?\n- If built, does it pass tests or is it broken?\n- Rank the gaps by revenue impact.\n\n## Analysis 2: Support Ticket Themes\nGroup support tickets by theme. For each theme:\n- Count of tickets\n- Example ticket text\n- Root cause hypothesis\n- Suggested fix\n\n## Analysis 3: App Test Failures\nFor each failing test or broken feature from the app test report:\n- What exactly is broken\n- How to reproduce\n- Severity (blocks usage, degrades experience, cosmetic)\n\n## Analysis 4: Usage Data Analysis\nFrom the system_context metrics:\n- Which features have high usage? Low usage? Zero usage?\n- Signup-to-activation funnel: where are users dropping off?\n- Revenue trends: growing, flat, declining?\n- Churn indicators: what correlates with churn?\n\n## Analysis 5: Competitive Gap Analysis\nFrom the competitor report:\n- What do competitors offer that we don't?\n- Which competitor features appear in our support tickets (users asking for them)?\n- Which competitor features would most impact retention if we added them?\n\n## Analysis 6: SEO Performance\nFrom the SEO report:\n- Which keywords are ranking? Which are declining?\n- Any technical SEO issues (broken links, missing meta, sitemap)?\n- Content gaps: keywords competitors rank for that we don't?\n\n## Analysis 7: Prioritized Issue List\nCombine all analyses into a single prioritized list. Rank by:\n- P0: Blocks revenue (broken payment, signup, core feature)\n- P1: Affects retention (features users need, UX confusion, missing competitor parity)\n- P2: Nice to have (SEO improvements, minor UX polish, features with low demand)\n\n---\n\n# OUTPUT FORMAT\n\nFirst, output a brief executive summary (5-10 lines max) with:\n- Overall status: GREEN / YELLOW / RED\n- Key metric changes since last week\n- Top 3 priorities this week\n\nThen output your full analysis for each of the 7 sections above.\n\nFinally, output a section called ## GitHub Issues\n\nFor EACH actionable item (aim for 5-15 issues, quality over quantity), output:\n\n### Issue: @claude [Product] <Clear descriptive title>\n**Priority:** P0 / P1 / P2\n**User Story:** As a [role], I want to [action] so that [benefit].\n**PRD Reference:** [Section X.Y if applicable, or \"N/A\"]\n**Acceptance Criteria:**\n- [ ] Criterion 1\n- [ ] Criterion 2\n- [ ] Criterion 3\n**Context:** [Why this matters now — cite specific data: support ticket count, test failure, competitor feature, usage metric, etc.]\n\nDo NOT output vague issues like \"improve performance\" or \"fix bugs\". Every issue must reference specific data from the inputs above.`\n  }\n}];"
+        "jsCode": "// Gather all data sources\nconst biz = $('Split Into Businesses').item.json;\nconst businessId = biz.businessId;\nconst businessName = biz.businessName;\nconst businessPath = biz.businessPath;\nconst category = biz.category;\n\nconst systemContext = (() => {\n  try {\n    const raw = $('Read System Context (Supabase)').first().json;\n    return typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);\n  } catch (e) { return 'System context unavailable: ' + e.message; }\n})();\n\nconst prd = (() => {\n  try { return $('Read PRD').first().json.content || 'PRD not found.'; }\n  catch (e) { return 'PRD unavailable: ' + e.message; }\n})();\n\nconst state = (() => {\n  try { return $('Read State').first().json.content || ''; }\n  catch (e) { return 'State unavailable: ' + e.message; }\n})();\n\nconst plan = (() => {\n  try { return $('Read Weekly Plan').first().json.content || ''; }\n  catch (e) { return 'Weekly plan unavailable: ' + e.message; }\n})();\n\nconst supportLog = (() => {\n  try { return $('Read Support Log').first().json.content || 'No support tickets yet.'; }\n  catch (e) { return 'Support log unavailable: ' + e.message; }\n})();\n\nconst appTestReport = (() => {\n  try {\n    const raw = $('Read App Test Report').first().json;\n    return typeof raw === 'string' ? raw : (raw.data || JSON.stringify(raw, null, 2));\n  } catch (e) { return 'App test report unavailable: ' + e.message; }\n})();\n\nconst competitorReport = (() => {\n  try {\n    const raw = $('Read Competitor Report').first().json;\n    return typeof raw === 'string' ? raw : (raw.data || JSON.stringify(raw, null, 2));\n  } catch (e) { return 'Competitor report unavailable: ' + e.message; }\n})();\n\nconst seoReport = (() => {\n  try {\n    const raw = $('Read SEO Report').first().json;\n    return typeof raw === 'string' ? raw : (raw.data || JSON.stringify(raw, null, 2));\n  } catch (e) { return 'SEO report unavailable: ' + e.message; }\n})();\n\nconst today = $now.toFormat('yyyy-MM-dd');\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    businessPath,\n    repo_name: biz.repo_name,\n    prompt: `Today is ${today}. You are the Product Agent for ${businessName} (${category || 'SaaS'} software by Forge Technologies).\n\nYou have access to REAL data from multiple sources. Your job is to analyze all of it and produce highly specific, actionable GitHub issues.\n\n---\n\n## 1. PRD (Product Requirements Document) — What Was Supposed To Be Built\n${prd}\n\n---\n\n## 2. Current State\n${state}\n\n---\n\n## 3. Weekly Plan\n${plan}\n\n---\n\n## 4. System Context — Real Metrics (Traffic, Revenue, Signups, Churn)\n${systemContext}\n\n---\n\n## 5. Recent Support Tickets\n${supportLog}\n\n---\n\n## 6. Latest App Test Report — What's Broken\n${appTestReport}\n\n---\n\n## 7. Latest Competitor Report — What Competitors Have\n${competitorReport}\n\n---\n\n## 8. Latest SEO Report — Keyword Performance\n${seoReport}\n\n---\n\n# YOUR ANALYSIS TASKS\n\nPerform ALL of the following analyses. Be specific, cite data, and reference exact PRD sections.\n\n## Analysis 1: PRD vs Reality Gap\nCompare the PRD against the current state and app test report. For each PRD feature/section:\n- Is it built? Partially built? Not started?\n- If built, does it pass tests or is it broken?\n- Rank the gaps by revenue impact.\n\n## Analysis 2: Support Ticket Themes\nGroup support tickets by theme. For each theme:\n- Count of tickets\n- Example ticket text\n- Root cause hypothesis\n- Suggested fix\n\n## Analysis 3: App Test Failures\nFor each failing test or broken feature from the app test report:\n- What exactly is broken\n- How to reproduce\n- Severity (blocks usage, degrades experience, cosmetic)\n\n## Analysis 4: Usage Data Analysis\nFrom the system_context metrics:\n- Which features have high usage? Low usage? Zero usage?\n- Signup-to-activation funnel: where are users dropping off?\n- Revenue trends: growing, flat, declining?\n- Churn indicators: what correlates with churn?\n\n## Analysis 5: Competitive Gap Analysis\nFrom the competitor report:\n- What do competitors offer that we don't?\n- Which competitor features appear in our support tickets (users asking for them)?\n- Which competitor features would most impact retention if we added them?\n\n## Analysis 6: SEO Performance\nFrom the SEO report:\n- Which keywords are ranking? Which are declining?\n- Any technical SEO issues (broken links, missing meta, sitemap)?\n- Content gaps: keywords competitors rank for that we don't?\n\n## Analysis 7: Prioritized Issue List\nCombine all analyses into a single prioritized list. Rank by:\n- P0: Blocks revenue (broken payment, signup, core feature)\n- P1: Affects retention (features users need, UX confusion, missing competitor parity)\n- P2: Nice to have (SEO improvements, minor UX polish, features with low demand)\n\n---\n\n# OUTPUT FORMAT\n\nFirst, output a brief executive summary (5-10 lines max) with:\n- Overall status: GREEN / YELLOW / RED\n- Key metric changes since last week\n- Top 3 priorities this week\n\nThen output your full analysis for each of the 7 sections above.\n\nFinally, output a section called ## GitHub Issues\n\nFor EACH actionable item (aim for 5-15 issues, quality over quantity), output:\n\n### Issue: @claude [Product] <Clear descriptive title>\n**Priority:** P0 / P1 / P2\n**User Story:** As a [role], I want to [action] so that [benefit].\n**PRD Reference:** [Section X.Y if applicable, or \"N/A\"]\n**Acceptance Criteria:**\n- [ ] Criterion 1\n- [ ] Criterion 2\n- [ ] Criterion 3\n**Context:** [Why this matters now — cite specific data: support ticket count, test failure, competitor feature, usage metric, etc.]\n\nDo NOT output vague issues like \"improve performance\" or \"fix bugs\". Every issue must reference specific data from the inputs above.`\n  }\n}];"
       },
       "id": "build-prompt",
       "name": "Build Product Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [1320, 0]
     },
     {
       "parameters": {
@@ -235,7 +265,7 @@
       "name": "Product LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [1100, 0]
+      "position": [1540, 0]
     },
     {
       "parameters": {
@@ -249,17 +279,17 @@
       "name": "Opus Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [1100, 220]
+      "position": [1540, 220]
     },
     {
       "parameters": {
-        "jsCode": "const response = $json.text;\nconst businessId = $('Build Product Prompt').first().json.businessId;\nconst businessPath = $('Build Product Prompt').first().json.businessPath;\n\n// Extract GitHub issues from the response — updated regex to match new format\nconst issueRegex = /### Issue: (.+?)\\n([\\s\\S]*?)(?=### Issue:|## |$)/g;\nconst issues = [];\nlet match;\nwhile ((match = issueRegex.exec(response)) !== null) {\n  const title = match[1].trim();\n  const body = match[2].trim();\n  \n  // Extract priority from body\n  const priorityMatch = body.match(/\\*\\*Priority:\\*\\*\\s*(P[012])/);\n  const priority = priorityMatch ? priorityMatch[1] : 'P2';\n  \n  issues.push({ title, body, priority });\n}\n\n// Sort: P0 first, then P1, then P2\nconst priorityOrder = { 'P0': 0, 'P1': 1, 'P2': 2 };\nissues.sort((a, b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3));\n\nreturn [{\n  json: {\n    report: response,\n    issues,\n    issueCount: issues.length,\n    p0Count: issues.filter(i => i.priority === 'P0').length,\n    p1Count: issues.filter(i => i.priority === 'P1').length,\n    p2Count: issues.filter(i => i.priority === 'P2').length,\n    businessId,\n    businessPath\n  }\n}];"
+        "jsCode": "const response = $json.text;\nconst businessId = $('Build Product Prompt').first().json.businessId;\nconst businessName = $('Build Product Prompt').first().json.businessName;\nconst businessPath = $('Build Product Prompt').first().json.businessPath;\nconst repo_name = $('Build Product Prompt').first().json.repo_name;\n\n// Extract GitHub issues from the response — updated regex to match new format\nconst issueRegex = /### Issue: (.+?)\\n([\\s\\S]*?)(?=### Issue:|## |$)/g;\nconst issues = [];\nlet match;\nwhile ((match = issueRegex.exec(response)) !== null) {\n  const title = match[1].trim();\n  const body = match[2].trim();\n  \n  // Extract priority from body\n  const priorityMatch = body.match(/\\*\\*Priority:\\*\\*\\s*(P[012])/);\n  const priority = priorityMatch ? priorityMatch[1] : 'P2';\n  \n  issues.push({ title, body, priority });\n}\n\n// Sort: P0 first, then P1, then P2\nconst priorityOrder = { 'P0': 0, 'P1': 1, 'P2': 2 };\nissues.sort((a, b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3));\n\nreturn [{\n  json: {\n    report: response,\n    issues,\n    issueCount: issues.length,\n    p0Count: issues.filter(i => i.priority === 'P0').length,\n    p1Count: issues.filter(i => i.priority === 'P1').length,\n    p2Count: issues.filter(i => i.priority === 'P2').length,\n    businessId,\n    businessName,\n    businessPath,\n    repo_name\n  }\n}];"
       },
       "id": "parse-issues",
       "name": "Parse GitHub Issues",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, 0]
+      "position": [1760, 0]
     },
     {
       "parameters": {
@@ -275,24 +305,24 @@
       "name": "Write Product Report",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1540, -100],
+      "position": [1980, -100],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "// Create GitHub issues in the business app repo for Claude Code to pick up\nconst issues = $('Parse GitHub Issues').first().json.issues;\nif (!issues || issues.length === 0) {\n  return [{ json: { message: 'No issues to create' } }];\n}\n\nconst today = $now.toFormat('yyyy-MM-dd');\n\n// Map priority to GitHub labels\nconst priorityLabels = {\n  'P0': 'priority-p0',\n  'P1': 'priority-p1',\n  'P2': 'priority-p2'\n};\n\nreturn issues.map(issue => ({\n  json: {\n    title: issue.title.startsWith('@claude') ? issue.title : `@claude [Product] ${issue.title}`,\n    body: `${issue.body}\\n\\n---\\n_Auto-generated by Product Agent on ${today} | Priority: ${issue.priority}_`,\n    labels: `product-agent,${priorityLabels[issue.priority] || 'priority-p2'}`\n  }\n}));"
+        "jsCode": "// Create GitHub issues in the business app repo for Claude Code to pick up\nconst issues = $('Parse GitHub Issues').first().json.issues;\nconst repo_name = $('Parse GitHub Issues').first().json.repo_name;\nif (!issues || issues.length === 0) {\n  return [{ json: { message: 'No issues to create', repo_name } }];\n}\n\nconst today = $now.toFormat('yyyy-MM-dd');\n\n// Map priority to GitHub labels\nconst priorityLabels = {\n  'P0': 'priority-p0',\n  'P1': 'priority-p1',\n  'P2': 'priority-p2'\n};\n\nreturn issues.map(issue => ({\n  json: {\n    title: issue.title.startsWith('@claude') ? issue.title : `@claude [Product] ${issue.title}`,\n    body: `${issue.body}\\n\\n---\\n_Auto-generated by Product Agent on ${today} | Priority: ${issue.priority}_`,\n    labels: `product-agent,${priorityLabels[issue.priority] || 'priority-p2'}`,\n    repo_name\n  }\n}));"
       },
       "id": "prepare-issues",
       "name": "Prepare Issues",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, 100]
+      "position": [1980, 100]
     },
     {
       "parameters": {
         "operation": "create",
         "owner": "ShalinPatel670",
-        "repository": "bayflow",
+        "repository": "={{ $json.repo_name }}",
         "title": "={{ $json.title }}",
         "body": "={{ $json.body }}",
         "labels": "={{ $json.labels }}",
@@ -302,7 +332,7 @@
       "name": "Create GitHub Issue",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1760, 100],
+      "position": [2200, 100],
       "continueOnFail": true
     },
     {
@@ -317,19 +347,33 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ agent: 'Product Agent', message: 'Weekly review complete. Created ' + $('Parse GitHub Issues').first().json.issueCount + ' issues (P0: ' + $('Parse GitHub Issues').first().json.p0Count + ', P1: ' + $('Parse GitHub Issues').first().json.p1Count + ', P2: ' + $('Parse GitHub Issues').first().json.p2Count + '). Top issues: ' + $('Parse GitHub Issues').first().json.issues.slice(0, 3).map(i => i.priority + ' ' + i.title).join('; '), severity: $('Parse GitHub Issues').first().json.p0Count > 0 ? 'critical' : 'info', businessId: $('Parse GitHub Issues').first().json.businessId, requiresResponse: $('Parse GitHub Issues').first().json.p0Count > 0 }) }}",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Product Agent', message: 'Weekly review complete for ' + $('Parse GitHub Issues').first().json.businessName + '. Created ' + $('Parse GitHub Issues').first().json.issueCount + ' issues (P0: ' + $('Parse GitHub Issues').first().json.p0Count + ', P1: ' + $('Parse GitHub Issues').first().json.p1Count + ', P2: ' + $('Parse GitHub Issues').first().json.p2Count + '). Top issues: ' + $('Parse GitHub Issues').first().json.issues.slice(0, 3).map(i => i.priority + ' ' + i.title).join('; '), severity: $('Parse GitHub Issues').first().json.p0Count > 0 ? 'critical' : 'info', businessId: $('Parse GitHub Issues').first().json.businessId, requiresResponse: $('Parse GitHub Issues').first().json.p0Count > 0 }) }}",
         "options": { "timeout": 10000 }
       },
       "id": "notify-telegram",
       "name": "Notify Human (Telegram)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1980, 100],
+      "position": [2420, 100],
       "continueOnFail": true
     }
   ],
   "connections": {
     "Tuesday 9 AM Trigger": {
+      "main": [
+        [
+          { "node": "Fetch Active Businesses", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Active Businesses": {
+      "main": [
+        [
+          { "node": "Split Into Businesses", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Split Into Businesses": {
       "main": [
         [
           { "node": "Read System Context (Supabase)", "type": "main", "index": 0 },
