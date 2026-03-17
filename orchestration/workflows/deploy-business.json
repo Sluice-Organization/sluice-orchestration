@@ -12,23 +12,17 @@
       "name": "Deploy Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, 0]
     },
     {
       "parameters": {
-        "jsCode": "const webhook = $('Deploy Webhook').first().json;\nconst businessId = webhook.body.businessId;\nconst businessName = webhook.body.businessName;\nconst repoName = webhook.body.repoName;\nconst techStack = webhook.body.techStack || 'nextjs';\nconst prdContent = webhook.body.prdContent || '';\n\n// Claude Code GitHub Action YAML (same template as bayflow)\nconst claudeYml = `name: Claude Code\n\non:\n  issue_comment:\n    types: [created]\n  pull_request_review_comment:\n    types: [created]\n  issues:\n    types: [opened, assigned]\n  pull_request_review:\n    types: [submitted]\n\njobs:\n  claude:\n    if: |\n      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||\n      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||\n      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    permissions:\n      contents: write\n      pull-requests: write\n      issues: write\n      id-token: write\n      actions: read\n    steps:\n      - name: Checkout repository\n        uses: actions/checkout@v6\n        with:\n          fetch-depth: 1\n\n      - name: Run Claude Code\n        id: claude\n        uses: anthropics/claude-code-action@v1\n        with:\n          anthropic_api_key: \\${{ secrets.ANTHROPIC_API_KEY }}\n          claude_args: |\n            --model claude-opus-4-6\n            --max-turns 25\n`;\n\n// Parse design system from PRD if available\nlet primaryColor = '#2563EB';\nlet secondaryColor = '#1E40AF';\nlet accentColor = '#F59E0B';\nlet headingFont = 'Space Grotesk';\nlet bodyFont = 'Inter';\nlet designAesthetic = 'Clean, modern, professional. Trustworthy.';\nlet dataModel = '';\nlet features = '';\nlet pagesRoutes = '';\nlet pricingTiers = '';\nlet integrations = '';\nlet seoKeywords = '';\nlet launchChecklist = '';\nlet competitiveWeaknesses = '';\nlet targetPersona = '';\n\nif (prdContent) {\n  // Extract design system section\n  const designMatch = prdContent.match(/## 6\\.\\s*Design System[\\s\\S]*?(?=## 7\\.|$)/);\n  if (designMatch) {\n    const ds = designMatch[0];\n    const colorMatch = ds.match(/Primary color[^#]*(#[0-9a-fA-F]{6})/);\n    if (colorMatch) primaryColor = colorMatch[1];\n    const secMatch = ds.match(/Secondary color[^#]*(#[0-9a-fA-F]{6})/);\n    if (secMatch) secondaryColor = secMatch[1];\n    const accMatch = ds.match(/Accent color[^#]*(#[0-9a-fA-F]{6})/);\n    if (accMatch) accentColor = accMatch[1];\n    const headMatch = ds.match(/Heading font[^:]*:\\s*([^\\n]+)/);\n    if (headMatch) headingFont = headMatch[1].trim();\n    const bodyMatch = ds.match(/Body font[^:]*:\\s*([^\\n]+)/);\n    if (bodyMatch) bodyFont = bodyMatch[1].trim();\n    const aestheticMatch = ds.match(/Design aesthetic[^:]*:\\s*([^\\n]+)/);\n    if (aestheticMatch) designAesthetic = aestheticMatch[1].trim();\n  }\n\n  // Extract other sections\n  const dataModelMatch = prdContent.match(/## 4\\.\\s*Data Model[\\s\\S]*?(?=## 5\\.|$)/);\n  if (dataModelMatch) dataModel = dataModelMatch[0].trim();\n\n  const featuresMatch = prdContent.match(/## 3\\.\\s*Core Features[\\s\\S]*?(?=## 4\\.|$)/);\n  if (featuresMatch) features = featuresMatch[0].trim();\n\n  const pagesMatch = prdContent.match(/## 5\\.\\s*Pages & Routes[\\s\\S]*?(?=## 6\\.|$)/);\n  if (pagesMatch) pagesRoutes = pagesMatch[0].trim();\n\n  const pricingMatch = prdContent.match(/## 7\\.\\s*Pricing Tiers[\\s\\S]*?(?=## 8\\.|$)/);\n  if (pricingMatch) pricingTiers = pricingMatch[0].trim();\n\n  const integrationsMatch = prdContent.match(/## 8\\.\\s*Required Integrations[\\s\\S]*?(?=## 9\\.|$)/);\n  if (integrationsMatch) integrations = integrationsMatch[0].trim();\n\n  const seoMatch = prdContent.match(/## 9\\.\\s*SEO Plan[\\s\\S]*?(?=## 10\\.|$)/);\n  if (seoMatch) seoKeywords = seoMatch[0].trim();\n\n  const competitiveMatch = prdContent.match(/## 10\\.\\s*Competitive Weaknesses[\\s\\S]*?(?=## 11\\.|$)/);\n  if (competitiveMatch) competitiveWeaknesses = competitiveMatch[0].trim();\n\n  const personaMatch = prdContent.match(/## 2\\.\\s*Target Persona[\\s\\S]*?(?=## 3\\.|$)/);\n  if (personaMatch) targetPersona = personaMatch[0].trim();\n\n  const launchMatch = prdContent.match(/## 12\\.\\s*Launch Checklist[\\s\\S]*$/);\n  if (launchMatch) launchChecklist = launchMatch[0].trim();\n}\n\n// Build a comprehensive CLAUDE.md from PRD data\nlet claudeMd = `# ${businessName}\\n\\n`;\n\nif (prdContent) {\n  claudeMd += `## Product Overview\\n`;\n  const overviewMatch = prdContent.match(/## 1\\.\\s*Product Overview[\\s\\S]*?(?=## 2\\.|$)/);\n  if (overviewMatch) {\n    claudeMd += overviewMatch[0].replace(/## 1\\.\\s*Product Overview\\s*/, '').trim() + '\\n\\n';\n  }\n} else {\n  claudeMd += `## Product Overview\\nA SaaS product built by The Forge.\\n\\n`;\n}\n\nclaudeMd += `## Stack\\n- Next.js 15 (App Router) + TypeScript + Tailwind CSS v4\\n- Supabase (auth, database, storage)\\n- Stripe (subscriptions with 14-day trial)\\n- Deployed on Vercel\\n\\n`;\n\nclaudeMd += `## Design System\\n- **Heading font**: ${headingFont} (from Google Fonts)\\n- **Body font**: ${bodyFont} (from Google Fonts)\\n- **Primary color**: ${primaryColor}\\n- **Secondary color**: ${secondaryColor}\\n- **Accent color**: ${accentColor}\\n- **Aesthetic**: ${designAesthetic}\\n\\n`;\n\nif (targetPersona) {\n  claudeMd += targetPersona + '\\n\\n';\n}\n\nif (features) {\n  claudeMd += features + '\\n\\n';\n}\n\nif (dataModel) {\n  claudeMd += dataModel + '\\n\\n';\n}\n\nif (pagesRoutes) {\n  claudeMd += pagesRoutes + '\\n\\n';\n}\n\nif (pricingTiers) {\n  claudeMd += pricingTiers + '\\n\\n';\n}\n\nif (integrations) {\n  claudeMd += integrations + '\\n\\n';\n} else {\n  claudeMd += `## Required Integrations\\n- Supabase Auth (email + password)\\n- Stripe Checkout (3 products/prices, 14-day trial)\\n- Stripe webhook -> forward to n8n at \\${NEXT_PUBLIC_N8N_URL}/webhook/stripe-events\\n- Signup webhook -> POST to \\${NEXT_PUBLIC_N8N_URL}/webhook/user-signup\\n- Contact form -> POST to \\${NEXT_PUBLIC_N8N_URL}/webhook/support-ticket\\n- /demo route -> redirect to cal.com/shalinp\\n- Plausible analytics script (data-domain from NEXT_PUBLIC_PLAUSIBLE_DOMAIN env var)\\n- All n8n URLs via NEXT_PUBLIC_N8N_URL env var\\n\\n`;\n}\n\nif (seoKeywords) {\n  claudeMd += seoKeywords + '\\n\\n';\n}\n\nif (competitiveWeaknesses) {\n  claudeMd += competitiveWeaknesses + '\\n\\n';\n}\n\nclaudeMd += `## Content Quality Standards (MANDATORY)\\nBANNED WORDS: \"delve\", \"leverage\", \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"game-changer\", \"revolutionize\", \"transform\", \"innovative\", \"best-in-class\", \"world-class\", \"state-of-the-art\", \"paradigm\", \"synergy\", \"holistic\"\\nBANNED PUNCTUATION: em dashes (use regular dashes instead)\\nWrite like a real person. Direct, practical, no BS. Conversational tone.\\n\\n`;\n\nclaudeMd += `## Development Rules\\n- Always use App Router (app/ directory)\\n- Use TypeScript strict mode\\n- Use Tailwind CSS v4 for all styling\\n- Use Supabase client from @supabase/ssr\\n- All pages must be responsive (mobile-first)\\n- Use Server Components by default, Client Components only when needed\\n- Follow the design system defined above for ALL UI elements\\n- Include sitemap.xml and robots.txt\\n- Add JSON-LD structured data to landing page\\n- Include OG image meta tags on all pages\\n- Lighthouse targets: performance > 50, accessibility > 80, SEO > 80\\n\\n`;\n\nclaudeMd += `## Environment Variables (.env.example)\\nNEXT_PUBLIC_SUPABASE_URL=\\nNEXT_PUBLIC_SUPABASE_ANON_KEY=\\nSUPABASE_SERVICE_ROLE_KEY=\\nSTRIPE_SECRET_KEY=\\nSTRIPE_WEBHOOK_SECRET=\\nNEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=\\nNEXT_PUBLIC_N8N_URL=\\nNEXT_PUBLIC_PLAUSIBLE_DOMAIN=\\nNEXT_PUBLIC_SITE_URL=\\n`;\n\nif (launchChecklist) {\n  claudeMd += '\\n\\n' + launchChecklist;\n}\n\n// Build the issue body - if we have a PRD, reference it heavily\nlet issueBody;\nif (prdContent) {\n  issueBody = `@claude Build the complete MVP for ${businessName} following the PRD and CLAUDE.md specifications exactly.\\n\\n## Full PRD\\n\\n${prdContent}\\n\\n## Build Instructions\\n\\n1. **Read CLAUDE.md first** - it contains the full design system, data model, features, routes, and integration requirements.\\n\\n2. **Initialize the project**:\\n   - Next.js 15 with App Router, TypeScript, Tailwind CSS v4\\n   - Install: @supabase/ssr, @supabase/supabase-js, stripe, @stripe/stripe-js\\n\\n3. **Build every page listed in the PRD** (Section 5 - Pages & Routes):\\n   - Each page must match the exact routes specified\\n   - Landing page needs: hero, features, pricing, testimonials, CTA, footer\\n   - Dashboard must be a protected route with the full feature set\\n\\n4. **Implement the data model** (Section 4):\\n   - Create Supabase migration SQL for all entities\\n   - Include RLS policies for multi-tenant data isolation\\n   - Create TypeScript types matching the schema\\n\\n5. **Wire up all integrations** (Section 8):\\n   - Supabase Auth with email/password\\n   - Stripe Checkout with 3 pricing tiers and 14-day trial\\n   - Stripe webhook handler at /api/webhooks/stripe\\n   - Signup webhook POST to NEXT_PUBLIC_N8N_URL/webhook/user-signup\\n   - Contact form POST to NEXT_PUBLIC_N8N_URL/webhook/support-ticket\\n   - /demo route redirects to cal.com/shalinp\\n   - Plausible analytics script with NEXT_PUBLIC_PLAUSIBLE_DOMAIN\\n\\n6. **Apply the design system exactly**:\\n   - Use the exact fonts from Google Fonts specified in CLAUDE.md\\n   - Use the exact color palette specified\\n   - Match the aesthetic description\\n   - Mobile-first responsive design\\n\\n7. **SEO requirements**:\\n   - Meta titles and descriptions on all pages\\n   - OG image tags\\n   - sitemap.xml and robots.txt\\n   - JSON-LD structured data on landing page\\n\\n8. **Content standards**:\\n   - NO banned words (see CLAUDE.md)\\n   - NO em dashes\\n   - Write like a real person\\n\\n9. **Create .env.example** with all required environment variables.\\n\\n10. **Quality gates** - the app MUST:\\n    - Build without errors (npm run build)\\n    - Have zero TypeScript errors\\n    - Be fully mobile responsive\\n    - Pass Lighthouse: performance > 50, accessibility > 80, SEO > 80\\n\\nCreate a PR with all changes when done.`;\n} else {\n  issueBody = `@claude Build the initial MVP for ${businessName}.\\n\\n## Instructions\\n1. Read the CLAUDE.md file for design system and stack requirements.\\n2. Initialize a Next.js project with TypeScript and Tailwind CSS v4.\\n3. Set up the app/ directory structure with:\\n   - Landing page with hero, features, pricing, CTA sections\\n   - Login and signup pages (Supabase Auth)\\n   - Dashboard page (protected route)\\n4. Install and configure Supabase client (@supabase/ssr).\\n5. Create a shared layout with navigation and footer.\\n6. Apply the design system from CLAUDE.md (fonts, colors, aesthetic).\\n7. Ensure all pages are mobile-responsive.\\n8. Add a .env.example with all required environment variables.\\n\\n## Quality Gates\\n- The app must build without errors (npm run build)\\n- No TypeScript errors\\n- All pages render correctly\\n- Mobile responsive\\n\\nCreate a PR with all changes when done.`;\n}\n\n// Base64 encode the file contents for GitHub API\nconst claudeYmlB64 = Buffer.from(claudeYml).toString('base64');\nconst claudeMdB64 = Buffer.from(claudeMd).toString('base64');\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    repoName,\n    techStack,\n    prdContent,\n    targetPersona,\n    features,\n    pricingTiers,\n    claudeYmlB64,\n    claudeMdB64,\n    issueBody,\n    issueTitle: '@claude Build initial MVP for ' + businessName,\n    hasPrd: prdContent ? true : false\n  }\n}];"
+        "jsCode": "const webhook = $('Deploy Webhook').first().json;\nconst businessId = webhook.body.businessId;\nconst businessName = webhook.body.businessName;\nconst repoName = webhook.body.repoName;\nconst techStack = webhook.body.techStack || 'nextjs';\nconst prdContent = webhook.body.prdContent || '';\n\n// Claude Code GitHub Action YAML (same template as bayflow)\nconst claudeYml = `name: Claude Code\n\non:\n  issue_comment:\n    types: [created]\n  pull_request_review_comment:\n    types: [created]\n  issues:\n    types: [opened, assigned]\n  pull_request_review:\n    types: [submitted]\n\njobs:\n  claude:\n    if: |\n      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||\n      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||\n      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    permissions:\n      contents: write\n      pull-requests: write\n      issues: write\n      id-token: write\n      actions: read\n    steps:\n      - name: Checkout repository\n        uses: actions/checkout@v6\n        with:\n          fetch-depth: 1\n\n      - name: Run Claude Code\n        id: claude\n        uses: anthropics/claude-code-action@v1\n        with:\n          anthropic_api_key: \\${{ secrets.ANTHROPIC_API_KEY }}\n          claude_args: |\n            --model claude-opus-4-6\n            --max-turns 25\n`;\n\n// Parse design system from PRD if available\nlet primaryColor = '#2563EB';\nlet secondaryColor = '#1E40AF';\nlet accentColor = '#F59E0B';\nlet headingFont = 'Space Grotesk';\nlet bodyFont = 'Inter';\nlet designAesthetic = 'Clean, modern, professional. Trustworthy.';\nlet dataModel = '';\nlet features = '';\nlet pagesRoutes = '';\nlet pricingTiers = '';\nlet integrations = '';\nlet seoKeywords = '';\nlet launchChecklist = '';\nlet competitiveWeaknesses = '';\nlet targetPersona = '';\n\nif (prdContent) {\n  const designMatch = prdContent.match(/## 6\\.\\s*Design System[\\s\\S]*?(?=## 7\\.|$)/);\n  if (designMatch) {\n    const ds = designMatch[0];\n    const colorMatch = ds.match(/Primary color[^#]*(#[0-9a-fA-F]{6})/);\n    if (colorMatch) primaryColor = colorMatch[1];\n    const secMatch = ds.match(/Secondary color[^#]*(#[0-9a-fA-F]{6})/);\n    if (secMatch) secondaryColor = secMatch[1];\n    const accMatch = ds.match(/Accent color[^#]*(#[0-9a-fA-F]{6})/);\n    if (accMatch) accentColor = accMatch[1];\n    const headMatch = ds.match(/Heading font[^:]*:\\s*([^\\n]+)/);\n    if (headMatch) headingFont = headMatch[1].trim();\n    const bodyMatch = ds.match(/Body font[^:]*:\\s*([^\\n]+)/);\n    if (bodyMatch) bodyFont = bodyMatch[1].trim();\n    const aestheticMatch = ds.match(/Design aesthetic[^:]*:\\s*([^\\n]+)/);\n    if (aestheticMatch) designAesthetic = aestheticMatch[1].trim();\n  }\n\n  const dataModelMatch = prdContent.match(/## 4\\.\\s*Data Model[\\s\\S]*?(?=## 5\\.|$)/);\n  if (dataModelMatch) dataModel = dataModelMatch[0].trim();\n\n  const featuresMatch = prdContent.match(/## 3\\.\\s*Core Features[\\s\\S]*?(?=## 4\\.|$)/);\n  if (featuresMatch) features = featuresMatch[0].trim();\n\n  const pagesMatch = prdContent.match(/## 5\\.\\s*Pages & Routes[\\s\\S]*?(?=## 6\\.|$)/);\n  if (pagesMatch) pagesRoutes = pagesMatch[0].trim();\n\n  const pricingMatch = prdContent.match(/## 7\\.\\s*Pricing Tiers[\\s\\S]*?(?=## 8\\.|$)/);\n  if (pricingMatch) pricingTiers = pricingMatch[0].trim();\n\n  const integrationsMatch = prdContent.match(/## 8\\.\\s*Required Integrations[\\s\\S]*?(?=## 9\\.|$)/);\n  if (integrationsMatch) integrations = integrationsMatch[0].trim();\n\n  const seoMatch = prdContent.match(/## 9\\.\\s*SEO Plan[\\s\\S]*?(?=## 10\\.|$)/);\n  if (seoMatch) seoKeywords = seoMatch[0].trim();\n\n  const competitiveMatch = prdContent.match(/## 10\\.\\s*Competitive Weaknesses[\\s\\S]*?(?=## 11\\.|$)/);\n  if (competitiveMatch) competitiveWeaknesses = competitiveMatch[0].trim();\n\n  const personaMatch = prdContent.match(/## 2\\.\\s*Target Persona[\\s\\S]*?(?=## 3\\.|$)/);\n  if (personaMatch) targetPersona = personaMatch[0].trim();\n\n  const launchMatch = prdContent.match(/## 12\\.\\s*Launch Checklist[\\s\\S]*$/);\n  if (launchMatch) launchChecklist = launchMatch[0].trim();\n}\n\n// Build CLAUDE.md from PRD data\nlet claudeMd = `# ${businessName}\\n\\n`;\n\nif (prdContent) {\n  claudeMd += `## Product Overview\\n`;\n  const overviewMatch = prdContent.match(/## 1\\.\\s*Product Overview[\\s\\S]*?(?=## 2\\.|$)/);\n  if (overviewMatch) {\n    claudeMd += overviewMatch[0].replace(/## 1\\.\\s*Product Overview\\s*/, '').trim() + '\\n\\n';\n  }\n} else {\n  claudeMd += `## Product Overview\\nA SaaS product built by The Forge.\\n\\n`;\n}\n\nclaudeMd += `## Stack\\n- Next.js 15 (App Router) + TypeScript + Tailwind CSS v4\\n- Supabase (auth, database, storage)\\n- Stripe (subscriptions with 14-day trial)\\n- Deployed on Vercel\\n\\n`;\n\nclaudeMd += `## Design System\\n- **Heading font**: ${headingFont} (from Google Fonts)\\n- **Body font**: ${bodyFont} (from Google Fonts)\\n- **Primary color**: ${primaryColor}\\n- **Secondary color**: ${secondaryColor}\\n- **Accent color**: ${accentColor}\\n- **Aesthetic**: ${designAesthetic}\\n\\n`;\n\nif (targetPersona) claudeMd += targetPersona + '\\n\\n';\nif (features) claudeMd += features + '\\n\\n';\nif (dataModel) claudeMd += dataModel + '\\n\\n';\nif (pagesRoutes) claudeMd += pagesRoutes + '\\n\\n';\nif (pricingTiers) claudeMd += pricingTiers + '\\n\\n';\n\nif (integrations) {\n  claudeMd += integrations + '\\n\\n';\n} else {\n  claudeMd += `## Required Integrations\\n- Supabase Auth (email + password)\\n- Stripe Checkout (3 products/prices, 14-day trial)\\n- Stripe webhook -> forward to n8n at \\${NEXT_PUBLIC_N8N_URL}/webhook/stripe-events\\n- Signup webhook -> POST to \\${NEXT_PUBLIC_N8N_URL}/webhook/user-signup\\n- Contact form -> POST to \\${NEXT_PUBLIC_N8N_URL}/webhook/support-ticket\\n- /demo route -> redirect to cal.com/shalinp\\n- Plausible analytics script (data-domain from NEXT_PUBLIC_PLAUSIBLE_DOMAIN env var)\\n- All n8n URLs via NEXT_PUBLIC_N8N_URL env var\\n\\n`;\n}\n\nif (seoKeywords) claudeMd += seoKeywords + '\\n\\n';\nif (competitiveWeaknesses) claudeMd += competitiveWeaknesses + '\\n\\n';\n\nclaudeMd += `## Content Quality Standards (MANDATORY)\\nBANNED WORDS: \"delve\", \"leverage\", \"utilize\", \"harness\", \"elevate\", \"empower\", \"streamline\", \"robust\", \"seamless\", \"cutting-edge\", \"game-changer\", \"revolutionize\", \"transform\", \"innovative\", \"best-in-class\", \"world-class\", \"state-of-the-art\", \"paradigm\", \"synergy\", \"holistic\"\\nBANNED PUNCTUATION: em dashes (use regular dashes instead)\\nWrite like a real person. Direct, practical, no BS. Conversational tone.\\n\\n`;\n\nclaudeMd += `## Development Rules\\n- Always use App Router (app/ directory)\\n- Use TypeScript strict mode\\n- Use Tailwind CSS v4 for all styling\\n- Use Supabase client from @supabase/ssr\\n- All pages must be responsive (mobile-first)\\n- Use Server Components by default, Client Components only when needed\\n- Follow the design system defined above for ALL UI elements\\n- Include sitemap.xml and robots.txt\\n- Add JSON-LD structured data to landing page\\n- Include OG image meta tags on all pages\\n- Lighthouse targets: performance > 50, accessibility > 80, SEO > 80\\n\\n`;\n\nclaudeMd += `## Environment Variables (.env.example)\\nNEXT_PUBLIC_SUPABASE_URL=\\nNEXT_PUBLIC_SUPABASE_ANON_KEY=\\nSUPABASE_SERVICE_ROLE_KEY=\\nSTRIPE_SECRET_KEY=\\nSTRIPE_WEBHOOK_SECRET=\\nNEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=\\nNEXT_PUBLIC_N8N_URL=\\nNEXT_PUBLIC_PLAUSIBLE_DOMAIN=\\nNEXT_PUBLIC_SITE_URL=\\n`;\n\nif (launchChecklist) claudeMd += '\\n\\n' + launchChecklist;\n\n// Build the issue body\nlet issueBody;\nif (prdContent) {\n  issueBody = `@claude Build the complete MVP for ${businessName} following the PRD and CLAUDE.md specifications exactly.\\n\\n## Full PRD\\n\\n${prdContent}\\n\\n## Build Instructions\\n\\n1. **Read CLAUDE.md first** - it contains the full design system, data model, features, routes, and integration requirements.\\n\\n2. **Initialize the project**:\\n   - Next.js 15 with App Router, TypeScript, Tailwind CSS v4\\n   - Install: @supabase/ssr, @supabase/supabase-js, stripe, @stripe/stripe-js\\n\\n3. **Build every page listed in the PRD** (Section 5 - Pages & Routes):\\n   - Each page must match the exact routes specified\\n   - Landing page needs: hero, features, pricing, testimonials, CTA, footer\\n   - Dashboard must be a protected route with the full feature set\\n\\n4. **Implement the data model** (Section 4):\\n   - Create Supabase migration SQL for all entities\\n   - Include RLS policies for multi-tenant data isolation\\n   - Create TypeScript types matching the schema\\n\\n5. **Wire up all integrations** (Section 8):\\n   - Supabase Auth with email/password\\n   - Stripe Checkout with 3 pricing tiers and 14-day trial\\n   - Stripe webhook handler at /api/webhooks/stripe\\n   - Signup webhook POST to NEXT_PUBLIC_N8N_URL/webhook/user-signup\\n   - Contact form POST to NEXT_PUBLIC_N8N_URL/webhook/support-ticket\\n   - /demo route redirects to cal.com/shalinp\\n   - Plausible analytics script with NEXT_PUBLIC_PLAUSIBLE_DOMAIN\\n\\n6. **Apply the design system exactly**:\\n   - Use the exact fonts from Google Fonts specified in CLAUDE.md\\n   - Use the exact color palette specified\\n   - Match the aesthetic description\\n   - Mobile-first responsive design\\n\\n7. **SEO requirements**:\\n   - Meta titles and descriptions on all pages\\n   - OG image tags\\n   - sitemap.xml and robots.txt\\n   - JSON-LD structured data on landing page\\n\\n8. **Content standards**:\\n   - NO banned words (see CLAUDE.md)\\n   - NO em dashes\\n   - Write like a real person\\n\\n9. **Create .env.example** with all required environment variables.\\n\\n10. **Quality gates** - the app MUST:\\n    - Build without errors (npm run build)\\n    - Have zero TypeScript errors\\n    - Be fully mobile responsive\\n    - Pass Lighthouse: performance > 50, accessibility > 80, SEO > 80\\n\\n## Stripe Price IDs\\nThese Stripe price IDs have been pre-created for the checkout flow. Use them in your Stripe Checkout integration:\\n- **STRIPE_PRICE_SOLO**: Will be injected as env var after deployment\\n- **STRIPE_PRICE_PRO**: Will be injected as env var after deployment\\n- **STRIPE_PRICE_SHOP**: Will be injected as env var after deployment\\n\\nUse environment variables NEXT_PUBLIC_STRIPE_PRICE_SOLO, NEXT_PUBLIC_STRIPE_PRICE_PRO, NEXT_PUBLIC_STRIPE_PRICE_SHOP for the checkout buttons.\\n\\nCreate a PR with all changes when done.`;\n} else {\n  issueBody = `@claude Build the initial MVP for ${businessName}.\\n\\n## Instructions\\n1. Read the CLAUDE.md file for design system and stack requirements.\\n2. Initialize a Next.js project with TypeScript and Tailwind CSS v4.\\n3. Set up the app/ directory structure with:\\n   - Landing page with hero, features, pricing, CTA sections\\n   - Login and signup pages (Supabase Auth)\\n   - Dashboard page (protected route)\\n4. Install and configure Supabase client (@supabase/ssr).\\n5. Create a shared layout with navigation and footer.\\n6. Apply the design system from CLAUDE.md (fonts, colors, aesthetic).\\n7. Ensure all pages are mobile-responsive.\\n8. Add a .env.example with all required environment variables.\\n\\n## Stripe Price IDs\\nPre-created Stripe price IDs will be available as env vars:\\n- NEXT_PUBLIC_STRIPE_PRICE_SOLO\\n- NEXT_PUBLIC_STRIPE_PRICE_PRO\\n- NEXT_PUBLIC_STRIPE_PRICE_SHOP\\n\\nUse these in your Stripe Checkout integration.\\n\\n## Quality Gates\\n- The app must build without errors (npm run build)\\n- No TypeScript errors\\n- All pages render correctly\\n- Mobile responsive\\n\\nCreate a PR with all changes when done.`;\n}\n\nconst claudeYmlB64 = Buffer.from(claudeYml).toString('base64');\nconst claudeMdB64 = Buffer.from(claudeMd).toString('base64');\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    repoName,\n    techStack,\n    prdContent,\n    targetPersona,\n    features,\n    pricingTiers,\n    claudeYmlB64,\n    claudeMdB64,\n    issueBody,\n    issueTitle: '@claude Build initial MVP for ' + businessName,\n    hasPrd: prdContent ? true : false\n  }\n}];"
       },
       "id": "prepare-payloads",
       "name": "Prepare Payloads",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        220,
-        0
-      ]
+      "position": [220, 0]
     },
     {
       "parameters": {
@@ -37,31 +31,20 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "token {{ $env.GITHUB_TOKEN }}"
-            },
-            {
-              "name": "Accept",
-              "value": "application/vnd.github.v3+json"
-            }
+            { "name": "Authorization", "value": "token {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ name: $json.repoName, private: false, auto_init: true, description: $json.businessName + ' - Built by The Forge' }) }}",
-        "options": {
-          "timeout": 30000
-        }
+        "options": { "timeout": 30000 }
       },
       "id": "create-repo",
       "name": "Step 1 - Create GitHub Repo",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        440,
-        0
-      ],
+      "position": [440, 0],
       "continueOnFail": true
     },
     {
@@ -71,31 +54,20 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "token {{ $env.GITHUB_TOKEN }}"
-            },
-            {
-              "name": "Accept",
-              "value": "application/vnd.github.v3+json"
-            }
+            { "name": "Authorization", "value": "token {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ message: 'Add Claude Code GitHub Action workflow', content: $('Prepare Payloads').first().json.claudeYmlB64 }) }}",
-        "options": {
-          "timeout": 30000
-        }
+        "options": { "timeout": 30000 }
       },
       "id": "add-claude-action",
       "name": "Step 2 - Add Claude Code Action",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        660,
-        0
-      ],
+      "position": [660, 0],
       "continueOnFail": true
     },
     {
@@ -105,31 +77,20 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "token {{ $env.GITHUB_TOKEN }}"
-            },
-            {
-              "name": "Accept",
-              "value": "application/vnd.github.v3+json"
-            }
+            { "name": "Authorization", "value": "token {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ message: 'Add CLAUDE.md with full PRD-derived design system and spec', content: $('Prepare Payloads').first().json.claudeMdB64 }) }}",
-        "options": {
-          "timeout": 30000
-        }
+        "options": { "timeout": 30000 }
       },
       "id": "add-claude-md",
       "name": "Step 3 - Add CLAUDE.md",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        880,
-        0
-      ],
+      "position": [880, 0],
       "continueOnFail": true
     },
     {
@@ -139,45 +100,31 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "token {{ $env.GITHUB_TOKEN }}"
-            },
-            {
-              "name": "Accept",
-              "value": "application/vnd.github.v3+json"
-            }
+            { "name": "Authorization", "value": "token {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ title: $('Prepare Payloads').first().json.issueTitle, body: $('Prepare Payloads').first().json.issueBody, labels: ['product-agent'] }) }}",
-        "options": {
-          "timeout": 30000
-        }
+        "options": { "timeout": 30000 }
       },
       "id": "create-issue",
       "name": "Step 4 - Create Build Issue",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1100,
-        0
-      ],
+      "position": [1100, 0],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "// Step 4.5 - Build Retell AI Voice Agent Config\n// Reads PRD content and generates a voice agent configuration for Retell AI\n\nconst payloads = $('Prepare Payloads').first().json;\nconst businessId = payloads.businessId;\nconst businessName = payloads.businessName;\nconst repoName = payloads.repoName;\nconst prdContent = payloads.prdContent || '';\nconst targetPersona = payloads.targetPersona || '';\nconst features = payloads.features || '';\nconst pricingTiers = payloads.pricingTiers || '';\n\n// Determine site URL from repoName (best guess - can be updated later)\nconst siteUrl = repoName ? `https://${repoName}.vercel.app` : `https://${businessName.toLowerCase().replace(/\\s+/g, '')}.com`;\nconst bookingLink = 'https://cal.com/shalinp';\n\n// --- Voice mapping based on target persona ---\nconst persona = targetPersona || businessName;\nconst personaLower = persona.toLowerCase();\nlet voiceId, voiceName;\n\nif (personaLower.includes('auto') || personaLower.includes('mechanic') || personaLower.includes('construction') || personaLower.includes('plumbing') || personaLower.includes('hvac') || personaLower.includes('electrician')) {\n  voiceId = 'professional_male_mature';\n  voiceName = 'Professional Male (35-50)';\n} else if (personaLower.includes('salon') || personaLower.includes('spa') || personaLower.includes('beauty') || personaLower.includes('yoga') || personaLower.includes('fitness') || personaLower.includes('wellness')) {\n  voiceId = 'friendly_female_young';\n  voiceName = 'Friendly Female (25-35)';\n} else if (personaLower.includes('law') || personaLower.includes('legal') || personaLower.includes('accounting') || personaLower.includes('financial') || personaLower.includes('consulting')) {\n  voiceId = 'authoritative_male_senior';\n  voiceName = 'Authoritative Male (45-60)';\n} else if (personaLower.includes('tutor') || personaLower.includes('coach') || personaLower.includes('teacher') || personaLower.includes('education')) {\n  voiceId = 'warm_female_mid';\n  voiceName = 'Warm Female (28-40)';\n} else if (personaLower.includes('photography') || personaLower.includes('creative') || personaLower.includes('design') || personaLower.includes('marketing')) {\n  voiceId = 'energetic_female_young';\n  voiceName = 'Energetic Female (25-35)';\n} else {\n  voiceId = 'professional_male_mid';\n  voiceName = 'Professional Male (30-40)';\n}\n\n// --- Extract product info from PRD for the sales script ---\nlet oneLineDescription = `software built for ${personaLower.includes('auto') ? 'auto repair shops' : personaLower.includes('salon') ? 'salons' : 'small businesses'}`;\nlet topFeatures = '';\nlet pricingLine = '$49/month';\nlet trialDays = '14';\nlet productType = 'management software';\nlet personaType = 'business owners';\n\nif (prdContent) {\n  // Try to extract one-line description from Product Overview\n  const overviewMatch = prdContent.match(/## 1\\.\\s*Product Overview[\\s\\S]*?(?=## 2\\.|$)/);\n  if (overviewMatch) {\n    const overviewLines = overviewMatch[0].replace(/## 1\\.\\s*Product Overview\\s*/, '').trim().split('\\n').filter(l => l.trim());\n    if (overviewLines.length > 0) {\n      oneLineDescription = overviewLines[0].replace(/^[-*]\\s*/, '').trim();\n      if (oneLineDescription.length > 120) oneLineDescription = oneLineDescription.substring(0, 117) + '...';\n    }\n  }\n\n  // Extract top features (first 4 bullet points from Core Features)\n  if (features) {\n    const featureLines = features.split('\\n').filter(l => l.trim().match(/^[-*]/)).slice(0, 4);\n    topFeatures = featureLines.map(l => l.replace(/^[-*]\\s*/, '').trim()).join('\\n- ');\n    if (topFeatures) topFeatures = '- ' + topFeatures;\n  }\n\n  // Extract pricing\n  if (pricingTiers) {\n    const priceMatch = pricingTiers.match(/\\$\\d+\\/month|\\$\\d+\\/mo/);\n    if (priceMatch) pricingLine = priceMatch[0];\n    const trialMatch = pricingTiers.match(/(\\d+)[- ]day\\s*(free\\s*)?trial/i);\n    if (trialMatch) trialDays = trialMatch[1];\n  }\n\n  // Determine persona type from Target Persona section\n  if (targetPersona) {\n    const personaLines = targetPersona.split('\\n').filter(l => l.trim()).slice(0, 3);\n    const firstLine = personaLines.find(l => !l.startsWith('#'));\n    if (firstLine) {\n      personaType = firstLine.replace(/^[-*]\\s*/, '').trim();\n      if (personaType.length > 60) personaType = personaType.substring(0, 57) + '...';\n    }\n  }\n} else {\n  // Fallback: generic features\n  topFeatures = '- Easy scheduling and appointment management\\n- Invoicing and payments\\n- Customer management\\n- Mobile-friendly dashboard';\n}\n\n// --- Build the sales script ---\nlet scriptContent = `You are calling on behalf of ${businessName}, ${oneLineDescription}.\nYou're calling {prospect_name} at {prospect_business}.\n\nYour goal: Book a 15-minute demo at {booking_link}\n\nKey selling points:\n${topFeatures || '- All-in-one management platform\\n- Save hours on paperwork every week\\n- Easy setup, no technical knowledge needed\\n- Mobile-friendly'}\n\nPricing: ${pricingLine}. ${trialDays}-day free trial, no credit card needed.\n\nIf interested: 'Great, I can get you set up with a quick 15-minute walkthrough. Would [suggest two specific times this week] work for you?'\n\nIf voicemail: 'Hey {prospect_name}, quick call about ${businessName} - we built ${productType} specifically for ${personaType}. Check out ${siteUrl} or I'll try you again in a couple days.'\n\nIf not interested: 'No problem at all. If things change, we're at ${siteUrl}. Have a great day.'\n\nBe natural, conversational, not salesy. Get to the point fast - ${personaType} are busy.`;\n\n// Extract boosted keywords from business name and key terms\nconst boostedKeywords = [businessName];\nif (features) {\n  // Pull key nouns from feature names\n  const featureWords = features.match(/\\b(scheduling|invoicing|inspection|dashboard|booking|payment|CRM|inventory|reporting|analytics|automation)\\b/gi);\n  if (featureWords) {\n    featureWords.slice(0, 5).forEach(w => {\n      if (!boostedKeywords.includes(w)) boostedKeywords.push(w);\n    });\n  }\n}\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    repoName,\n    siteUrl,\n    bookingLink,\n    voiceId,\n    voiceName,\n    scriptContent,\n    boostedKeywords,\n    agentName: businessId + '_sales_agent'\n  }\n}];"
+        "jsCode": "// Step 4.5 - Build Retell AI Voice Agent Config\nconst payloads = $('Prepare Payloads').first().json;\nconst businessId = payloads.businessId;\nconst businessName = payloads.businessName;\nconst repoName = payloads.repoName;\nconst prdContent = payloads.prdContent || '';\nconst targetPersona = payloads.targetPersona || '';\nconst features = payloads.features || '';\nconst pricingTiers = payloads.pricingTiers || '';\n\nconst siteUrl = repoName ? `https://${repoName}.vercel.app` : `https://${businessName.toLowerCase().replace(/\\s+/g, '')}.com`;\nconst bookingLink = 'https://cal.com/shalinp';\n\nconst persona = targetPersona || businessName;\nconst personaLower = persona.toLowerCase();\nlet voiceId, voiceName;\n\nif (personaLower.includes('auto') || personaLower.includes('mechanic') || personaLower.includes('construction') || personaLower.includes('plumbing') || personaLower.includes('hvac') || personaLower.includes('electrician')) {\n  voiceId = 'professional_male_mature';\n  voiceName = 'Professional Male (35-50)';\n} else if (personaLower.includes('salon') || personaLower.includes('spa') || personaLower.includes('beauty') || personaLower.includes('yoga') || personaLower.includes('fitness') || personaLower.includes('wellness')) {\n  voiceId = 'friendly_female_young';\n  voiceName = 'Friendly Female (25-35)';\n} else if (personaLower.includes('law') || personaLower.includes('legal') || personaLower.includes('accounting') || personaLower.includes('financial') || personaLower.includes('consulting')) {\n  voiceId = 'authoritative_male_senior';\n  voiceName = 'Authoritative Male (45-60)';\n} else if (personaLower.includes('tutor') || personaLower.includes('coach') || personaLower.includes('teacher') || personaLower.includes('education')) {\n  voiceId = 'warm_female_mid';\n  voiceName = 'Warm Female (28-40)';\n} else if (personaLower.includes('photography') || personaLower.includes('creative') || personaLower.includes('design') || personaLower.includes('marketing')) {\n  voiceId = 'energetic_female_young';\n  voiceName = 'Energetic Female (25-35)';\n} else {\n  voiceId = 'professional_male_mid';\n  voiceName = 'Professional Male (30-40)';\n}\n\nlet oneLineDescription = `software built for ${personaLower.includes('auto') ? 'auto repair shops' : personaLower.includes('salon') ? 'salons' : 'small businesses'}`;\nlet topFeatures = '';\nlet pricingLine = '$49/month';\nlet trialDays = '14';\nlet productType = 'management software';\nlet personaType = 'business owners';\n\nif (prdContent) {\n  const overviewMatch = prdContent.match(/## 1\\.\\s*Product Overview[\\s\\S]*?(?=## 2\\.|$)/);\n  if (overviewMatch) {\n    const overviewLines = overviewMatch[0].replace(/## 1\\.\\s*Product Overview\\s*/, '').trim().split('\\n').filter(l => l.trim());\n    if (overviewLines.length > 0) {\n      oneLineDescription = overviewLines[0].replace(/^[-*]\\s*/, '').trim();\n      if (oneLineDescription.length > 120) oneLineDescription = oneLineDescription.substring(0, 117) + '...';\n    }\n  }\n\n  if (features) {\n    const featureLines = features.split('\\n').filter(l => l.trim().match(/^[-*]/)).slice(0, 4);\n    topFeatures = featureLines.map(l => l.replace(/^[-*]\\s*/, '').trim()).join('\\n- ');\n    if (topFeatures) topFeatures = '- ' + topFeatures;\n  }\n\n  if (pricingTiers) {\n    const priceMatch = pricingTiers.match(/\\$\\d+\\/month|\\$\\d+\\/mo/);\n    if (priceMatch) pricingLine = priceMatch[0];\n    const trialMatch = pricingTiers.match(/(\\d+)[- ]day\\s*(free\\s*)?trial/i);\n    if (trialMatch) trialDays = trialMatch[1];\n  }\n\n  if (targetPersona) {\n    const personaLines = targetPersona.split('\\n').filter(l => l.trim()).slice(0, 3);\n    const firstLine = personaLines.find(l => !l.startsWith('#'));\n    if (firstLine) {\n      personaType = firstLine.replace(/^[-*]\\s*/, '').trim();\n      if (personaType.length > 60) personaType = personaType.substring(0, 57) + '...';\n    }\n  }\n} else {\n  topFeatures = '- Easy scheduling and appointment management\\n- Invoicing and payments\\n- Customer management\\n- Mobile-friendly dashboard';\n}\n\nlet scriptContent = `You are calling on behalf of ${businessName}, ${oneLineDescription}.\nYou're calling {prospect_name} at {prospect_business}.\n\nYour goal: Book a 15-minute demo at {booking_link}\n\nKey selling points:\n${topFeatures || '- All-in-one management platform\\n- Save hours on paperwork every week\\n- Easy setup, no technical knowledge needed\\n- Mobile-friendly'}\n\nPricing: ${pricingLine}. ${trialDays}-day free trial, no credit card needed.\n\nIf interested: 'Great, I can get you set up with a quick 15-minute walkthrough. Would [suggest two specific times this week] work for you?'\n\nIf voicemail: 'Hey {prospect_name}, quick call about ${businessName} - we built ${productType} specifically for ${personaType}. Check out ${siteUrl} or I'll try you again in a couple days.'\n\nIf not interested: 'No problem at all. If things change, we're at ${siteUrl}. Have a great day.'\n\nBe natural, conversational, not salesy. Get to the point fast - ${personaType} are busy.`;\n\nconst boostedKeywords = [businessName];\nif (features) {\n  const featureWords = features.match(/\\b(scheduling|invoicing|inspection|dashboard|booking|payment|CRM|inventory|reporting|analytics|automation)\\b/gi);\n  if (featureWords) {\n    featureWords.slice(0, 5).forEach(w => {\n      if (!boostedKeywords.includes(w)) boostedKeywords.push(w);\n    });\n  }\n}\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    repoName,\n    siteUrl,\n    bookingLink,\n    voiceId,\n    voiceName,\n    scriptContent,\n    boostedKeywords,\n    agentName: businessId + '_sales_agent'\n  }\n}];"
       },
       "id": "build-retell-config",
       "name": "Step 4.5a - Build Retell Agent Config",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1320,
-        0
-      ]
+      "position": [1320, 0]
     },
     {
       "parameters": {
@@ -186,81 +133,31 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.RETELL_API_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "Authorization", "value": "Bearer {{ $env.RETELL_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ agent_name: $json.agentName, voice_id: $json.voiceId, response_engine: { type: 'retell-llm', llm_id: null }, agent_prompt: $json.scriptContent, language: 'en-US', voice_temperature: 0.7, responsiveness: 0.8, interruption_sensitivity: 0.6, enable_backchannel: true, boosted_keywords: $json.boostedKeywords }) }}",
-        "options": {
-          "timeout": 30000
-        }
+        "options": { "timeout": 30000 }
       },
       "id": "create-retell-agent",
       "name": "Step 4.5b - Create Retell AI Agent",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1540,
-        0
-      ],
+      "position": [1540, 0],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "// Parse Retell API response and prepare data for Knowledge Graph update\nconst retellResponse = $input.first().json;\nconst configData = $('Step 4.5a - Build Retell Agent Config').first().json;\n\nlet retellAgentId = '';\nlet retellCreated = false;\nlet retellError = '';\n\n// Check if Retell API returned an agent_id\nif (retellResponse && retellResponse.agent_id) {\n  retellAgentId = retellResponse.agent_id;\n  retellCreated = true;\n} else if (retellResponse && retellResponse.error) {\n  retellError = typeof retellResponse.error === 'string' ? retellResponse.error : JSON.stringify(retellResponse.error);\n} else {\n  retellError = 'Retell API did not return an agent_id. Response: ' + JSON.stringify(retellResponse).substring(0, 200);\n}\n\nreturn [{\n  json: {\n    retellAgentId,\n    retellCreated,\n    retellError,\n    voiceName: configData.voiceName,\n    siteUrl: configData.siteUrl,\n    repoName: configData.repoName,\n    bookingLink: configData.bookingLink\n  }\n}];"
+        "jsCode": "const retellResponse = $input.first().json;\nconst configData = $('Step 4.5a - Build Retell Agent Config').first().json;\n\nlet retellAgentId = '';\nlet retellCreated = false;\nlet retellError = '';\n\nif (retellResponse && retellResponse.agent_id) {\n  retellAgentId = retellResponse.agent_id;\n  retellCreated = true;\n} else if (retellResponse && retellResponse.error) {\n  retellError = typeof retellResponse.error === 'string' ? retellResponse.error : JSON.stringify(retellResponse.error);\n} else {\n  retellError = 'Retell API did not return an agent_id. Response: ' + JSON.stringify(retellResponse).substring(0, 200);\n}\n\nreturn [{\n  json: {\n    retellAgentId,\n    retellCreated,\n    retellError,\n    voiceName: configData.voiceName,\n    siteUrl: configData.siteUrl,\n    repoName: configData.repoName,\n    bookingLink: configData.bookingLink\n  }\n}];"
       },
       "id": "parse-retell-response",
       "name": "Step 4.5c - Parse Retell Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1760,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "method": "PATCH",
-        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?id=eq.' + $('Prepare Payloads').first().json.businessId }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ launched_at: new Date().toISOString(), repo_url: 'https://github.com/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName, repo_name: $('Prepare Payloads').first().json.repoName, status: 'deploying', retell_agent_id: $json.retellAgentId || $('Step 4.5c - Parse Retell Response').first().json.retellAgentId || null, retell_voice: $('Step 4.5c - Parse Retell Response').first().json.voiceName || null, retell_phone_number: $json.retellPhoneNumber || null, site_url: $('Step 4.5c - Parse Retell Response').first().json.siteUrl || null, cal_booking_url: $('Step 4.5c - Parse Retell Response').first().json.bookingLink || 'https://cal.com/shalinp' }) }}",
-        "options": {
-          "timeout": 15000
-        }
-      },
-      "id": "update-knowledge-graph",
-      "name": "Step 5 - Register in Knowledge Graph",
-      "_note": "Phone number provisioned in step 4.6"
+      "position": [1760, 0]
     },
     {
       "parameters": {
@@ -282,7 +179,7 @@
       "name": "Step 4.6 - Buy Phone Number",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1880, 0],
+      "position": [1980, 0],
       "continueOnFail": true
     },
     {
@@ -293,165 +190,267 @@
       "name": "Step 4.6b - Parse Phone Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2000, 0]
+      "position": [2200, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 4.7 - Create Stripe Products and Prices\n// Parse PRD pricing tiers or use defaults ($99/$149/$199)\nconst payloads = $('Prepare Payloads').first().json;\nconst businessName = payloads.businessName;\nconst businessId = payloads.businessId;\nconst pricingTiers = payloads.pricingTiers || '';\n\n// Default tier config\nlet tiers = [\n  { name: businessName + ' Solo', amount: 9900, interval: 'month' },\n  { name: businessName + ' Pro', amount: 14900, interval: 'month' },\n  { name: businessName + ' Shop', amount: 19900, interval: 'month' }\n];\n\n// Try to parse pricing from PRD\nif (pricingTiers) {\n  const priceMatches = pricingTiers.match(/\\$(\\d+)\\/month|\\$(\\d+)\\/mo/g);\n  if (priceMatches && priceMatches.length >= 3) {\n    const amounts = priceMatches.map(p => {\n      const num = p.match(/\\$(\\d+)/);\n      return num ? parseInt(num[1]) * 100 : null;\n    }).filter(Boolean);\n    if (amounts.length >= 3) {\n      tiers[0].amount = amounts[0];\n      tiers[1].amount = amounts[1];\n      tiers[2].amount = amounts[2];\n    }\n  }\n\n  // Try to extract tier names\n  const tierNames = pricingTiers.match(/(?:###?\\s*|\\*\\*)(Solo|Starter|Basic|Pro|Professional|Growth|Shop|Business|Enterprise|Team|Premium)[^\\n]*/gi);\n  if (tierNames && tierNames.length >= 3) {\n    const cleanNames = tierNames.map(t => t.replace(/^[#*\\s]+/, '').replace(/[*]+$/, '').trim());\n    tiers[0].name = businessName + ' ' + cleanNames[0];\n    tiers[1].name = businessName + ' ' + cleanNames[1];\n    tiers[2].name = businessName + ' ' + cleanNames[2];\n  }\n}\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    tiers,\n    currentTierIndex: 0\n  }\n}];"
+      },
+      "id": "prepare-stripe-tiers",
+      "name": "Step 4.7a - Prepare Stripe Tiers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2420, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/products",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.STRIPE_SECRET_KEY }}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ 'name=' + encodeURIComponent($json.tiers[0].name) + '&metadata[business_id]=' + encodeURIComponent($json.businessId) + '&metadata[tier]=solo' }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "create-stripe-product-solo",
+      "name": "Step 4.7b - Create Solo Product",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1980,
-        0
-      ],
+      "position": [2640, -150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/prices",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.STRIPE_SECRET_KEY }}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ 'product=' + $json.id + '&unit_amount=' + $('Step 4.7a - Prepare Stripe Tiers').first().json.tiers[0].amount + '&currency=usd&recurring[interval]=month' }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "create-stripe-price-solo",
+      "name": "Step 4.7c - Create Solo Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2860, -150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/products",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.STRIPE_SECRET_KEY }}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ 'name=' + encodeURIComponent($('Step 4.7a - Prepare Stripe Tiers').first().json.tiers[1].name) + '&metadata[business_id]=' + encodeURIComponent($('Step 4.7a - Prepare Stripe Tiers').first().json.businessId) + '&metadata[tier]=pro' }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "create-stripe-product-pro",
+      "name": "Step 4.7d - Create Pro Product",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3080, -150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/prices",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.STRIPE_SECRET_KEY }}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ 'product=' + $json.id + '&unit_amount=' + $('Step 4.7a - Prepare Stripe Tiers').first().json.tiers[1].amount + '&currency=usd&recurring[interval]=month' }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "create-stripe-price-pro",
+      "name": "Step 4.7e - Create Pro Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, -150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/products",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.STRIPE_SECRET_KEY }}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ 'name=' + encodeURIComponent($('Step 4.7a - Prepare Stripe Tiers').first().json.tiers[2].name) + '&metadata[business_id]=' + encodeURIComponent($('Step 4.7a - Prepare Stripe Tiers').first().json.businessId) + '&metadata[tier]=shop' }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "create-stripe-product-shop",
+      "name": "Step 4.7f - Create Shop Product",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3520, -150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/prices",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.STRIPE_SECRET_KEY }}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ 'product=' + $json.id + '&unit_amount=' + $('Step 4.7a - Prepare Stripe Tiers').first().json.tiers[2].amount + '&currency=usd&recurring[interval]=month' }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "create-stripe-price-shop",
+      "name": "Step 4.7g - Create Shop Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3740, -150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all Stripe price IDs from the 3 tier creation chains\nconst prevData = $('Step 4.6b - Parse Phone Result').first().json;\nconst payloads = $('Prepare Payloads').first().json;\n\nlet soloPriceId = '';\nlet proPriceId = '';\nlet shopPriceId = '';\n\ntry { soloPriceId = $('Step 4.7c - Create Solo Price').first().json.id || ''; } catch(e) {}\ntry { proPriceId = $('Step 4.7e - Create Pro Price').first().json.id || ''; } catch(e) {}\ntry { shopPriceId = $('Step 4.7g - Create Shop Price').first().json.id || ''; } catch(e) {}\n\nreturn [{\n  json: {\n    ...prevData,\n    stripe_price_solo: soloPriceId,\n    stripe_price_pro: proPriceId,\n    stripe_price_shop: shopPriceId,\n    businessId: payloads.businessId\n  }\n}];"
+      },
+      "id": "collect-stripe-prices",
+      "name": "Step 4.7h - Collect Stripe Price IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3960, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?id=eq.' + $json.businessId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ launched_at: new Date().toISOString(), repo_url: 'https://github.com/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName, repo_name: $('Prepare Payloads').first().json.repoName, status: 'deploying', retell_agent_id: $json.retellAgentId || null, retell_voice: $json.voiceName || null, retell_phone_number: $json.retellPhoneNumber || null, site_url: $json.siteUrl || null, cal_booking_url: $json.bookingLink || 'https://cal.com/shalinp', stripe_price_solo: $json.stripe_price_solo || null, stripe_price_pro: $json.stripe_price_pro || null, stripe_price_shop: $json.stripe_price_shop || null }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "update-knowledge-graph",
+      "name": "Step 5 - Register in Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4180, 0],
       "continueOnFail": true
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ status: 'success', message: 'Birth Protocol complete for ' + $('Prepare Payloads').first().json.businessName, businessId: $('Prepare Payloads').first().json.businessId, repoUrl: 'https://github.com/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName, issueUrl: $('Step 4 - Create Build Issue').first().json.html_url || 'created', hasPrd: $('Prepare Payloads').first().json.hasPrd, retellAgentCreated: $('Step 4.5c - Parse Retell Response').first().json.retellCreated || false, retellAgentId: $('Step 4.5c - Parse Retell Response').first().json.retellAgentId || null, retellError: $('Step 4.5c - Parse Retell Response').first().json.retellError || null, steps: { repoCreated: true, claudeActionAdded: true, claudeMdAdded: true, buildIssueCreated: true, retellAgentCreated: $('Step 4.5c - Parse Retell Response').first().json.retellCreated || false, knowledgeGraphUpdated: true } }) }}",
-        "options": {
-          "responseCode": 201
-        }
+        "responseBody": "={{ JSON.stringify({ status: 'success', message: 'Birth Protocol complete for ' + $('Prepare Payloads').first().json.businessName, businessId: $('Prepare Payloads').first().json.businessId, repoUrl: 'https://github.com/ShalinPatel670/' + $('Prepare Payloads').first().json.repoName, issueUrl: $('Step 4 - Create Build Issue').first().json.html_url || 'created', hasPrd: $('Prepare Payloads').first().json.hasPrd, retellAgentCreated: $('Step 4.5c - Parse Retell Response').first().json.retellCreated || false, retellAgentId: $('Step 4.5c - Parse Retell Response').first().json.retellAgentId || null, retellError: $('Step 4.5c - Parse Retell Response').first().json.retellError || null, stripePrices: { solo: $('Step 4.7h - Collect Stripe Price IDs').first().json.stripe_price_solo || null, pro: $('Step 4.7h - Collect Stripe Price IDs').first().json.stripe_price_pro || null, shop: $('Step 4.7h - Collect Stripe Price IDs').first().json.stripe_price_shop || null }, steps: { repoCreated: true, claudeActionAdded: true, claudeMdAdded: true, buildIssueCreated: true, retellAgentCreated: $('Step 4.5c - Parse Retell Response').first().json.retellCreated || false, stripeProductsCreated: true, knowledgeGraphUpdated: true } }) }}",
+        "options": { "responseCode": 201 }
       },
       "id": "respond-success",
       "name": "Step 6 - Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        2200,
-        0
-      ]
+      "position": [4400, 0]
     }
   ],
   "connections": {
     "Deploy Webhook": {
-      "main": [
-        [
-          {
-            "node": "Prepare Payloads",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Prepare Payloads", "type": "main", "index": 0 }]]
     },
     "Prepare Payloads": {
-      "main": [
-        [
-          {
-            "node": "Step 1 - Create GitHub Repo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 1 - Create GitHub Repo", "type": "main", "index": 0 }]]
     },
     "Step 1 - Create GitHub Repo": {
-      "main": [
-        [
-          {
-            "node": "Step 2 - Add Claude Code Action",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 2 - Add Claude Code Action", "type": "main", "index": 0 }]]
     },
     "Step 2 - Add Claude Code Action": {
-      "main": [
-        [
-          {
-            "node": "Step 3 - Add CLAUDE.md",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 3 - Add CLAUDE.md", "type": "main", "index": 0 }]]
     },
     "Step 3 - Add CLAUDE.md": {
-      "main": [
-        [
-          {
-            "node": "Step 4 - Create Build Issue",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 4 - Create Build Issue", "type": "main", "index": 0 }]]
     },
     "Step 4 - Create Build Issue": {
-      "main": [
-        [
-          {
-            "node": "Step 4.5a - Build Retell Agent Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 4.5a - Build Retell Agent Config", "type": "main", "index": 0 }]]
     },
     "Step 4.5a - Build Retell Agent Config": {
-      "main": [
-        [
-          {
-            "node": "Step 4.5b - Create Retell AI Agent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 4.5b - Create Retell AI Agent", "type": "main", "index": 0 }]]
     },
     "Step 4.5b - Create Retell AI Agent": {
-      "main": [
-        [
-          {
-            "node": "Step 4.5c - Parse Retell Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 4.5c - Parse Retell Response", "type": "main", "index": 0 }]]
     },
     "Step 4.5c - Parse Retell Response": {
-      "main": [
-        [
-          {
-            "node": "Step 4.6 - Buy Phone Number",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 4.6 - Buy Phone Number", "type": "main", "index": 0 }]]
     },
     "Step 4.6 - Buy Phone Number": {
-      "main": [
-        [
-          {
-            "node": "Step 4.6b - Parse Phone Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 4.6b - Parse Phone Result", "type": "main", "index": 0 }]]
     },
     "Step 4.6b - Parse Phone Result": {
-      "main": [
-        [
-          {
-            "node": "Step 5 - Register in Knowledge Graph",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 4.7a - Prepare Stripe Tiers", "type": "main", "index": 0 }]]
+    },
+    "Step 4.7a - Prepare Stripe Tiers": {
+      "main": [[{ "node": "Step 4.7b - Create Solo Product", "type": "main", "index": 0 }]]
+    },
+    "Step 4.7b - Create Solo Product": {
+      "main": [[{ "node": "Step 4.7c - Create Solo Price", "type": "main", "index": 0 }]]
+    },
+    "Step 4.7c - Create Solo Price": {
+      "main": [[{ "node": "Step 4.7d - Create Pro Product", "type": "main", "index": 0 }]]
+    },
+    "Step 4.7d - Create Pro Product": {
+      "main": [[{ "node": "Step 4.7e - Create Pro Price", "type": "main", "index": 0 }]]
+    },
+    "Step 4.7e - Create Pro Price": {
+      "main": [[{ "node": "Step 4.7f - Create Shop Product", "type": "main", "index": 0 }]]
+    },
+    "Step 4.7f - Create Shop Product": {
+      "main": [[{ "node": "Step 4.7g - Create Shop Price", "type": "main", "index": 0 }]]
+    },
+    "Step 4.7g - Create Shop Price": {
+      "main": [[{ "node": "Step 4.7h - Collect Stripe Price IDs", "type": "main", "index": 0 }]]
+    },
+    "Step 4.7h - Collect Stripe Price IDs": {
+      "main": [[{ "node": "Step 5 - Register in Knowledge Graph", "type": "main", "index": 0 }]]
     },
     "Step 5 - Register in Knowledge Graph": {
-      "main": [
-        [
-          {
-            "node": "Step 6 - Respond Success",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Step 6 - Respond Success", "type": "main", "index": 0 }]]
     }
   },
   "settings": {

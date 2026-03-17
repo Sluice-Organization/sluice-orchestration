@@ -1,5 +1,5 @@
 {
-  "name": "Mass Lead Generator - BayFlow",
+  "name": "Mass Lead Generator - Apollo.io",
   "nodes": [
     {
       "parameters": {
@@ -12,14 +12,11 @@
           ]
         }
       },
-      "id": "schedule-weekly-scrape",
-      "name": "Weekly Sunday 2AM Scrape",
+      "id": "schedule-weekly",
+      "name": "Weekly Sunday 2AM",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, 0]
     },
     {
       "parameters": {
@@ -28,214 +25,62 @@
         "responseMode": "lastNode",
         "options": {}
       },
-      "id": "webhook-expand-regions",
-      "name": "Webhook: Expand Regions",
+      "id": "webhook-expand",
+      "name": "Webhook: Expand Lead Gen",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        0,
-        300
-      ]
+      "position": [0, 300]
     },
     {
       "parameters": {
-        "jsCode": "// ===== TOP 100+ US CITIES BY POPULATION (50K+) GROUPED BY STATE =====\nconst ALL_CITIES = [\n  // California\n  { name: 'Los Angeles', state: 'CA', lat: 34.0522, lon: -118.2437 },\n  { name: 'San Diego', state: 'CA', lat: 32.7157, lon: -117.1611 },\n  { name: 'San Jose', state: 'CA', lat: 37.3382, lon: -121.8863 },\n  { name: 'San Francisco', state: 'CA', lat: 37.7749, lon: -122.4194 },\n  { name: 'Fresno', state: 'CA', lat: 36.7378, lon: -119.7871 },\n  { name: 'Sacramento', state: 'CA', lat: 38.5816, lon: -121.4944 },\n  { name: 'Long Beach', state: 'CA', lat: 33.7701, lon: -118.1937 },\n  { name: 'Oakland', state: 'CA', lat: 37.8044, lon: -122.2712 },\n  { name: 'Bakersfield', state: 'CA', lat: 35.3733, lon: -119.0187 },\n  { name: 'Anaheim', state: 'CA', lat: 33.8366, lon: -117.9143 },\n  { name: 'Riverside', state: 'CA', lat: 33.9806, lon: -117.3755 },\n  { name: 'Stockton', state: 'CA', lat: 37.9577, lon: -121.2908 },\n  // Texas\n  { name: 'Houston', state: 'TX', lat: 29.7604, lon: -95.3698 },\n  { name: 'San Antonio', state: 'TX', lat: 29.4241, lon: -98.4936 },\n  { name: 'Dallas', state: 'TX', lat: 32.7767, lon: -96.7970 },\n  { name: 'Austin', state: 'TX', lat: 30.2672, lon: -97.7431 },\n  { name: 'Fort Worth', state: 'TX', lat: 32.7555, lon: -97.3308 },\n  { name: 'El Paso', state: 'TX', lat: 31.7619, lon: -106.4850 },\n  { name: 'Arlington', state: 'TX', lat: 32.7357, lon: -97.1081 },\n  { name: 'Corpus Christi', state: 'TX', lat: 27.8006, lon: -97.3964 },\n  { name: 'Plano', state: 'TX', lat: 33.0198, lon: -96.6989 },\n  { name: 'Lubbock', state: 'TX', lat: 33.5779, lon: -101.8552 },\n  // Florida\n  { name: 'Jacksonville', state: 'FL', lat: 30.3322, lon: -81.6557 },\n  { name: 'Miami', state: 'FL', lat: 25.7617, lon: -80.1918 },\n  { name: 'Tampa', state: 'FL', lat: 27.9506, lon: -82.4572 },\n  { name: 'Orlando', state: 'FL', lat: 28.5383, lon: -81.3792 },\n  { name: 'St. Petersburg', state: 'FL', lat: 27.7676, lon: -82.6403 },\n  { name: 'Fort Lauderdale', state: 'FL', lat: 26.1224, lon: -80.1373 },\n  { name: 'Tallahassee', state: 'FL', lat: 30.4383, lon: -84.2807 },\n  // New York\n  { name: 'New York', state: 'NY', lat: 40.7128, lon: -74.0060 },\n  { name: 'Buffalo', state: 'NY', lat: 42.8864, lon: -78.8784 },\n  { name: 'Rochester', state: 'NY', lat: 43.1566, lon: -77.6088 },\n  { name: 'Yonkers', state: 'NY', lat: 40.9312, lon: -73.8987 },\n  // Illinois\n  { name: 'Chicago', state: 'IL', lat: 41.8781, lon: -87.6298 },\n  { name: 'Aurora', state: 'IL', lat: 41.7606, lon: -88.3201 },\n  { name: 'Naperville', state: 'IL', lat: 41.7508, lon: -88.1535 },\n  // Pennsylvania\n  { name: 'Philadelphia', state: 'PA', lat: 39.9526, lon: -75.1652 },\n  { name: 'Pittsburgh', state: 'PA', lat: 40.4406, lon: -79.9959 },\n  // Arizona\n  { name: 'Phoenix', state: 'AZ', lat: 33.4484, lon: -112.0740 },\n  { name: 'Tucson', state: 'AZ', lat: 32.2226, lon: -110.9747 },\n  { name: 'Mesa', state: 'AZ', lat: 33.4152, lon: -111.8315 },\n  { name: 'Chandler', state: 'AZ', lat: 33.3062, lon: -111.8413 },\n  { name: 'Scottsdale', state: 'AZ', lat: 33.4942, lon: -111.9261 },\n  // Ohio\n  { name: 'Columbus', state: 'OH', lat: 39.9612, lon: -82.9988 },\n  { name: 'Cleveland', state: 'OH', lat: 41.4993, lon: -81.6944 },\n  { name: 'Cincinnati', state: 'OH', lat: 39.1031, lon: -84.5120 },\n  { name: 'Toledo', state: 'OH', lat: 41.6528, lon: -83.5379 },\n  // Georgia\n  { name: 'Atlanta', state: 'GA', lat: 33.7490, lon: -84.3880 },\n  { name: 'Augusta', state: 'GA', lat: 33.4735, lon: -82.0105 },\n  { name: 'Savannah', state: 'GA', lat: 32.0809, lon: -81.0912 },\n  // North Carolina\n  { name: 'Charlotte', state: 'NC', lat: 35.2271, lon: -80.8431 },\n  { name: 'Raleigh', state: 'NC', lat: 35.7796, lon: -78.6382 },\n  { name: 'Durham', state: 'NC', lat: 35.9940, lon: -78.8986 },\n  { name: 'Greensboro', state: 'NC', lat: 36.0726, lon: -79.7920 },\n  // Michigan\n  { name: 'Detroit', state: 'MI', lat: 42.3314, lon: -83.0458 },\n  { name: 'Grand Rapids', state: 'MI', lat: 42.9634, lon: -85.6681 },\n  // Washington\n  { name: 'Seattle', state: 'WA', lat: 47.6062, lon: -122.3321 },\n  { name: 'Spokane', state: 'WA', lat: 47.6588, lon: -117.4260 },\n  { name: 'Tacoma', state: 'WA', lat: 47.2529, lon: -122.4443 },\n  // Colorado\n  { name: 'Denver', state: 'CO', lat: 39.7392, lon: -104.9903 },\n  { name: 'Colorado Springs', state: 'CO', lat: 38.8339, lon: -104.8214 },\n  { name: 'Aurora', state: 'CO', lat: 39.7294, lon: -104.8319 },\n  // Tennessee\n  { name: 'Nashville', state: 'TN', lat: 36.1627, lon: -86.7816 },\n  { name: 'Memphis', state: 'TN', lat: 35.1495, lon: -90.0490 },\n  { name: 'Knoxville', state: 'TN', lat: 35.9606, lon: -83.9207 },\n  // Massachusetts\n  { name: 'Boston', state: 'MA', lat: 42.3601, lon: -71.0589 },\n  { name: 'Worcester', state: 'MA', lat: 42.2626, lon: -71.8023 },\n  // Maryland\n  { name: 'Baltimore', state: 'MD', lat: 39.2904, lon: -76.6122 },\n  // Indiana\n  { name: 'Indianapolis', state: 'IN', lat: 39.7684, lon: -86.1581 },\n  { name: 'Fort Wayne', state: 'IN', lat: 41.0793, lon: -85.1394 },\n  // Missouri\n  { name: 'Kansas City', state: 'MO', lat: 39.0997, lon: -94.5786 },\n  { name: 'St. Louis', state: 'MO', lat: 38.6270, lon: -90.1994 },\n  // Wisconsin\n  { name: 'Milwaukee', state: 'WI', lat: 43.0389, lon: -87.9065 },\n  { name: 'Madison', state: 'WI', lat: 43.0731, lon: -89.4012 },\n  // Minnesota\n  { name: 'Minneapolis', state: 'MN', lat: 44.9778, lon: -93.2650 },\n  { name: 'St. Paul', state: 'MN', lat: 44.9537, lon: -93.0900 },\n  // Oregon\n  { name: 'Portland', state: 'OR', lat: 45.5152, lon: -122.6784 },\n  // Nevada\n  { name: 'Las Vegas', state: 'NV', lat: 36.1699, lon: -115.1398 },\n  { name: 'Henderson', state: 'NV', lat: 36.0395, lon: -114.9817 },\n  { name: 'Reno', state: 'NV', lat: 39.5296, lon: -119.8138 },\n  // Oklahoma\n  { name: 'Oklahoma City', state: 'OK', lat: 35.4676, lon: -97.5164 },\n  { name: 'Tulsa', state: 'OK', lat: 36.1540, lon: -95.9928 },\n  // Virginia\n  { name: 'Virginia Beach', state: 'VA', lat: 36.8529, lon: -75.9780 },\n  { name: 'Norfolk', state: 'VA', lat: 36.8508, lon: -76.2859 },\n  { name: 'Richmond', state: 'VA', lat: 37.5407, lon: -77.4360 },\n  // Louisiana\n  { name: 'New Orleans', state: 'LA', lat: 29.9511, lon: -90.0715 },\n  { name: 'Baton Rouge', state: 'LA', lat: 30.4515, lon: -91.1871 },\n  // Kentucky\n  { name: 'Louisville', state: 'KY', lat: 38.2527, lon: -85.7585 },\n  { name: 'Lexington', state: 'KY', lat: 38.0406, lon: -84.5037 },\n  // Alabama\n  { name: 'Birmingham', state: 'AL', lat: 33.5207, lon: -86.8025 },\n  { name: 'Montgomery', state: 'AL', lat: 32.3792, lon: -86.3077 },\n  // South Carolina\n  { name: 'Charleston', state: 'SC', lat: 32.7765, lon: -79.9311 },\n  { name: 'Columbia', state: 'SC', lat: 34.0007, lon: -81.0348 },\n  // Utah\n  { name: 'Salt Lake City', state: 'UT', lat: 40.7608, lon: -111.8910 },\n  // New Mexico\n  { name: 'Albuquerque', state: 'NM', lat: 35.0844, lon: -106.6504 },\n  // Nebraska\n  { name: 'Omaha', state: 'NE', lat: 41.2565, lon: -95.9345 },\n  // Iowa\n  { name: 'Des Moines', state: 'IA', lat: 41.5868, lon: -93.6250 },\n  // Kansas\n  { name: 'Wichita', state: 'KS', lat: 37.6872, lon: -97.3301 },\n  // Arkansas\n  { name: 'Little Rock', state: 'AR', lat: 34.7465, lon: -92.2896 },\n  // Mississippi\n  { name: 'Jackson', state: 'MS', lat: 32.2988, lon: -90.1848 },\n  // Hawaii\n  { name: 'Honolulu', state: 'HI', lat: 21.3069, lon: -157.8583 },\n  // Connecticut\n  { name: 'Bridgeport', state: 'CT', lat: 41.1865, lon: -73.1952 },\n  { name: 'New Haven', state: 'CT', lat: 41.3083, lon: -72.9279 },\n  // New Jersey\n  { name: 'Newark', state: 'NJ', lat: 40.7357, lon: -74.1724 },\n  { name: 'Jersey City', state: 'NJ', lat: 40.7178, lon: -74.0431 }\n];\n\nconst QUERIES = ['auto repair shop', 'mechanic shop', 'auto service center'];\nconst CITIES_PER_BATCH = 10;\n\n// Check if triggered by webhook with specific regions\nconst webhookData = $input.first().json;\nconst isWebhook = !!(webhookData.body && webhookData.body.regions);\nconst requestedRegions = isWebhook ? (webhookData.body.regions || []).map(r => r.toLowerCase()) : [];\nconst requestedQueries = isWebhook && webhookData.body.queries ? webhookData.body.queries : QUERIES;\n\n// Get scrape progress from static data (tracks which city+query combos are done)\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.scrapedCities) {\n  staticData.scrapedCities = {}; // key: \"city_state_query\" => timestamp\n}\nif (!staticData.batchIndex) {\n  staticData.batchIndex = 0;\n}\n\n// Filter cities based on webhook regions if provided\nlet availableCities = ALL_CITIES;\nif (requestedRegions.length > 0) {\n  // Map common region names to state abbreviations\n  const stateMap = {\n    'texas': 'TX', 'florida': 'FL', 'california': 'CA', 'new york': 'NY',\n    'illinois': 'IL', 'pennsylvania': 'PA', 'ohio': 'OH', 'georgia': 'GA',\n    'north carolina': 'NC', 'michigan': 'MI', 'arizona': 'AZ',\n    'washington': 'WA', 'colorado': 'CO', 'tennessee': 'TN',\n    'massachusetts': 'MA', 'maryland': 'MD', 'indiana': 'IN',\n    'missouri': 'MO', 'wisconsin': 'WI', 'minnesota': 'MN',\n    'oregon': 'OR', 'nevada': 'NV', 'oklahoma': 'OK', 'virginia': 'VA',\n    'louisiana': 'LA', 'kentucky': 'KY', 'alabama': 'AL',\n    'south carolina': 'SC', 'utah': 'UT', 'new mexico': 'NM',\n    'nebraska': 'NE', 'iowa': 'IA', 'kansas': 'KS', 'arkansas': 'AR',\n    'mississippi': 'MS', 'hawaii': 'HI', 'connecticut': 'CT',\n    'new jersey': 'NJ'\n  };\n  const stateAbbrs = requestedRegions.map(r => stateMap[r] || r.toUpperCase());\n  availableCities = ALL_CITIES.filter(c => stateAbbrs.includes(c.state));\n}\n\n// Build all city+query combos that haven't been scraped\nconst pendingJobs = [];\nfor (const city of availableCities) {\n  for (const query of requestedQueries) {\n    const key = `${city.name}_${city.state}_${query}`;\n    if (!staticData.scrapedCities[key]) {\n      pendingJobs.push({\n        city: city.name,\n        state: city.state,\n        lat: city.lat,\n        lon: city.lon,\n        query: query,\n        key: key\n      });\n    }\n  }\n}\n\n// Pick next batch\nconst batch = pendingJobs.slice(0, CITIES_PER_BATCH);\n\nif (batch.length === 0) {\n  return [{ json: { _empty: true, reason: 'All cities have been scraped. Reset staticData to re-scrape.', totalCities: availableCities.length, totalScraped: Object.keys(staticData.scrapedCities).length } }];\n}\n\n// Increment batch counter\nconst batchId = new Date().toISOString().split('T')[0] + '_batch_' + staticData.batchIndex;\nstaticData.batchIndex++;\n\nreturn batch.map(job => ({\n  json: {\n    ...job,\n    batchId,\n    totalPending: pendingJobs.length,\n    totalCities: availableCities.length\n  }\n}));"
+        "jsCode": "// Build Apollo search parameters from trigger context\nconst webhookData = $input.first().json;\nconst isWebhook = !!(webhookData.body && (webhookData.body.regions || webhookData.body.queries || webhookData.body.audience_type));\n\n// Default search config for auto repair vertical\nlet industryTags = ['auto_repair'];\nlet employeeRanges = ['1,10', '11,20', '21,50'];\nlet locations = ['United States'];\nlet personTitles = ['owner', 'manager', 'general manager', 'service manager', 'shop owner'];\nlet perPage = 100;\n\nif (isWebhook) {\n  const body = webhookData.body;\n\n  // Override industry/audience if provided\n  if (body.audience_type) {\n    const audienceMap = {\n      'auto_repair': ['auto_repair'],\n      'salon': ['beauty_salon', 'hair_salon'],\n      'hvac': ['hvac'],\n      'plumbing': ['plumbing'],\n      'dental': ['dental_practice'],\n      'fitness': ['fitness', 'gym']\n    };\n    industryTags = audienceMap[body.audience_type] || [body.audience_type];\n  }\n\n  // Override locations if regions provided\n  if (body.regions && body.regions.length > 0) {\n    // Apollo accepts state names directly\n    locations = body.regions.map(r => r + ', United States');\n  }\n\n  // Override person titles if queries suggest different roles\n  if (body.queries && body.queries.length > 0) {\n    // Treat queries as additional title search terms\n    personTitles = [...new Set([...personTitles, ...body.queries])];\n  }\n}\n\n// Track pagination via static data\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.apolloPage) staticData.apolloPage = 1;\nif (!staticData.totalOrgsProcessed) staticData.totalOrgsProcessed = 0;\nif (!staticData.lastRunDate) staticData.lastRunDate = '';\n\n// Reset page counter each week (new run)\nconst today = $now.toFormat('yyyy-MM-dd');\nif (staticData.lastRunDate !== today) {\n  staticData.apolloPage = 1;\n  staticData.lastRunDate = today;\n}\n\nconst currentPage = staticData.apolloPage;\n\nreturn [{\n  json: {\n    industryTags,\n    employeeRanges,\n    locations,\n    personTitles,\n    perPage,\n    currentPage,\n    isWebhook\n  }\n}];"
       },
-      "id": "get-city-batch",
-      "name": "Get Next City Batch",
+      "id": "build-search-params",
+      "name": "Build Apollo Search Params",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        300,
-        150
-      ]
+      "position": [300, 150]
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "has-cities",
-              "leftValue": "={{ $json._empty }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "filter-empty-batch",
-      "name": "Has Cities to Scrape?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        520,
-        150
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "https://serpapi.com/search.json",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "engine",
-              "value": "google_maps"
-            },
-            {
-              "name": "q",
-              "value": "={{ encodeURIComponent($json.query) + '+' + encodeURIComponent($json.city) + '+' + $json.state }}"
-            },
-            {
-              "name": "ll",
-              "value": "={{ '@' + $json.lat + ',' + $json.lon + ',11z' }}"
-            },
-            {
-              "name": "type",
-              "value": "search"
-            },
-            {
-              "name": "api_key",
-              "value": "{{ $env.SERPAPI_API_KEY }}"
-            }
-          ]
-        },
-        "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 1,
-              "batchInterval": 2000
-            }
-          }
-        }
-      },
-      "id": "scrape-serpapi",
-      "name": "Scrape Google Maps (SerpAPI)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        740,
-        100
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const response = $input.first().json;\nconst cityData = $('Has Cities to Scrape?').first().json;\n\n// Mark this city+query as scraped in static data\nconst staticData = $getWorkflowStaticData('global');\nif (staticData.scrapedCities && cityData.key) {\n  staticData.scrapedCities[cityData.key] = new Date().toISOString();\n}\n\nconst results = response.local_results || response.place_results || [];\n\nif (!results || results.length === 0) {\n  return [{ json: { _empty: true, reason: 'No results for ' + cityData.city + ', ' + cityData.state + ' (' + cityData.query + ')', city: cityData.city, state: cityData.state, query: cityData.query, batchId: cityData.batchId } }];\n}\n\nconst leads = results.map(r => {\n  const name = r.title || r.name || '';\n  const address = r.address || '';\n  const phone = r.phone || '';\n  const website = r.website || '';\n  const rating = r.rating || null;\n  const reviews = r.reviews || 0;\n\n  let domain = '';\n  if (website) {\n    try {\n      domain = new URL(website.startsWith('http') ? website : 'https://' + website).hostname.replace('www.', '');\n    } catch (e) {\n      domain = website.replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0];\n    }\n  }\n\n  return {\n    json: {\n      business_name: name,\n      address,\n      phone,\n      website,\n      domain,\n      city: cityData.city,\n      state: cityData.state,\n      query: cityData.query,\n      rating,\n      reviews,\n      source: 'google_maps',\n      batchId: cityData.batchId\n    }\n  };\n}).filter(l => l.json.domain);\n\nif (leads.length === 0) {\n  return [{ json: { _empty: true, reason: 'No leads with websites for ' + cityData.city, city: cityData.city, state: cityData.state, query: cityData.query, batchId: cityData.batchId } }];\n}\n\nreturn leads;"
-      },
-      "id": "extract-lead-data",
-      "name": "Extract & Mark Progress",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        960,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "has-leads",
-              "leftValue": "={{ $json._empty }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "filter-empty-results",
-      "name": "Has Leads?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        1180,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Deduplicate by domain within this batch\nconst allItems = $input.all();\nconst seen = new Set();\nconst unique = [];\n\nfor (const item of allItems) {\n  const domain = item.json.domain;\n  if (domain && !seen.has(domain)) {\n    seen.add(domain);\n    unique.push(item);\n  }\n}\n\nreturn unique;"
-      },
-      "id": "dedupe-within-batch",
-      "name": "Deduplicate Within Batch",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1400,
-        50
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?domain=eq.' + encodeURIComponent($json.domain) + '&select=id' }}",
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/mixed_companies/search",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+              "name": "x-api-key",
+              "value": "{{ $env.APOLLO_API_KEY }}"
             },
             {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ organization_industry_tag_ids: $json.industryTags, organization_num_employees_ranges: $json.employeeRanges, organization_locations: $json.locations, per_page: $json.perPage, page: $json.currentPage }) }}",
         "options": {
-          "batching": {
-            "batch": {
-              "batchSize": 5,
-              "batchInterval": 200
-            }
-          }
+          "timeout": 30000
         }
       },
-      "id": "check-supabase-duplicate",
-      "name": "Check Existing in Supabase",
+      "id": "apollo-org-search",
+      "name": "Step 1 - Search Apollo Organizations",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1620,
-        50
-      ],
+      "position": [540, 150],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const dupeCheck = $input.first().json;\nconst leadData = $('Deduplicate Within Batch').first().json;\n\n// If Supabase returned an array with results, it's a duplicate\nconst results = Array.isArray(dupeCheck) ? dupeCheck : [];\n\nif (results.length > 0) {\n  return [{ json: { _skip: true, reason: 'Duplicate - already in Supabase', domain: leadData.domain, business_name: leadData.business_name } }];\n}\n\nreturn [{ json: { ...leadData, _skip: false } }];"
+        "jsCode": "const response = $input.first().json;\nconst searchParams = $('Build Apollo Search Params').first().json;\n\n// Update pagination state\nconst staticData = $getWorkflowStaticData('global');\n\nconst organizations = response.organizations || response.accounts || [];\n\nif (!organizations || organizations.length === 0) {\n  // Reset page for next run\n  staticData.apolloPage = 1;\n  return [{ json: { _empty: true, reason: 'No organizations found from Apollo. Page: ' + searchParams.currentPage, totalProcessed: staticData.totalOrgsProcessed || 0 } }];\n}\n\n// Advance page for next batch\nstaticData.apolloPage = (staticData.apolloPage || 1) + 1;\n\n// Extract org data\nreturn organizations.map(org => ({\n  json: {\n    org_id: org.id || org.organization_id || '',\n    business_name: org.name || '',\n    website: org.website_url || org.primary_domain || '',\n    domain: (org.primary_domain || org.website_url || '').replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0],\n    phone: org.phone || org.sanitized_phone || '',\n    industry: org.industry || '',\n    company_size: org.estimated_num_employees ? String(org.estimated_num_employees) : (org.num_employees_ranges ? org.num_employees_ranges[0] : ''),\n    annual_revenue: org.annual_revenue_printed || org.annual_revenue || '',\n    city: org.city || '',\n    state: org.state || '',\n    country: org.country || 'United States',\n    technologies: org.technologies || [],\n    linkedin_url: org.linkedin_url || '',\n    apollo_org_id: org.id || org.organization_id || '',\n    personTitles: searchParams.personTitles\n  }\n}));"
       },
-      "id": "check-is-new",
-      "name": "Is New Lead?",
+      "id": "parse-org-results",
+      "name": "Parse Organization Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1840,
-        50
-      ]
+      "position": [760, 150]
     },
     {
       "parameters": {
@@ -247,8 +92,8 @@
           },
           "conditions": [
             {
-              "id": "not-skip",
-              "leftValue": "={{ $json._skip }}",
+              "id": "has-orgs",
+              "leftValue": "={{ $json._empty }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -260,50 +105,134 @@
         },
         "options": {}
       },
-      "id": "filter-duplicates",
-      "name": "Not Duplicate?",
+      "id": "filter-empty-orgs",
+      "name": "Has Organizations?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        2060,
-        50
-      ]
+      "position": [980, 150]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://api.hunter.io/v2/domain-search?domain=' + $json.domain + '&api_key=' + $env.HUNTER_API_KEY }}",
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/mixed_people/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "{{ $env.APOLLO_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ organization_ids: [$json.org_id], person_titles: $json.personTitles, per_page: 5 }) }}",
         "options": {
           "batching": {
             "batch": {
-              "batchSize": 1,
-              "batchInterval": 2000
+              "batchSize": 2,
+              "batchInterval": 1000
             }
-          }
+          },
+          "timeout": 30000
         }
       },
-      "id": "hunter-email-lookup",
-      "name": "Find Email (Hunter.io)",
+      "id": "apollo-people-search",
+      "name": "Step 2 - Search Decision Makers",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        2280,
-        0
-      ],
+      "position": [1200, 100],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const hunterResponse = $input.first().json;\nconst leadData = $('Not Duplicate?').first().json;\n\nconst data = hunterResponse.data || {};\nconst emails = data.emails || [];\n\nlet bestEmail = '';\nlet firstName = '';\nlet lastName = '';\n\nif (emails.length > 0) {\n  const sorted = emails.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));\n  const best = sorted[0];\n  bestEmail = best.value || '';\n  firstName = best.first_name || '';\n  lastName = best.last_name || '';\n}\n\nif (!bestEmail) {\n  return [{ json: { _skip: true, reason: 'No email found', business_name: leadData.business_name, domain: leadData.domain } }];\n}\n\nreturn [{\n  json: {\n    business_name: leadData.business_name,\n    email: bestEmail,\n    first_name: firstName,\n    last_name: lastName,\n    phone: leadData.phone,\n    website: leadData.website,\n    domain: leadData.domain,\n    city: leadData.city,\n    state: leadData.state,\n    rating: leadData.rating,\n    reviews: leadData.reviews,\n    source: leadData.source,\n    batchId: leadData.batchId\n  }\n}];"
+        "jsCode": "const response = $input.first().json;\nconst orgData = $('Has Organizations?').first().json;\n\nconst people = response.people || response.contacts || [];\n\nif (!people || people.length === 0) {\n  return [{ json: { _empty: true, reason: 'No decision makers found for ' + orgData.business_name, org_id: orgData.org_id } }];\n}\n\n// Take the top person (most senior / best match)\nconst best = people[0];\n\nreturn [{\n  json: {\n    apollo_id: best.id || '',\n    first_name: best.first_name || '',\n    last_name: best.last_name || '',\n    title: best.title || '',\n    seniority: best.seniority || '',\n    email: best.email || '',\n    phone: best.phone_numbers ? (best.phone_numbers[0] || {}).sanitized_number || '' : (orgData.phone || ''),\n    linkedin_url: best.linkedin_url || orgData.linkedin_url || '',\n    person_city: best.city || '',\n    person_state: best.state || '',\n    // Carry forward org data\n    business_name: orgData.business_name,\n    website: orgData.website,\n    domain: orgData.domain,\n    industry: orgData.industry,\n    company_size: orgData.company_size,\n    annual_revenue: orgData.annual_revenue,\n    city: orgData.city || best.city || '',\n    state: orgData.state || best.state || '',\n    technologies: orgData.technologies,\n    apollo_org_id: orgData.apollo_org_id\n  }\n}];"
       },
-      "id": "extract-best-email",
-      "name": "Extract Best Email",
+      "id": "extract-best-person",
+      "name": "Extract Best Decision Maker",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        2500,
-        0
-      ]
+      "position": [1420, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-person",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-no-person",
+      "name": "Found Decision Maker?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1640, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/people/match",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "{{ $env.APOLLO_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ id: $json.apollo_id, reveal_personal_emails: true, reveal_phone_number: true }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "apollo-enrich",
+      "name": "Step 3 - Enrich Person (Email + Phone)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1860, 50],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const enriched = $input.first().json;\nconst prevData = $('Found Decision Maker?').first().json;\n\nconst person = enriched.person || enriched;\n\n// Get email - prefer work email, fallback to personal\nlet email = '';\nif (person.email) {\n  email = person.email;\n} else if (person.personal_emails && person.personal_emails.length > 0) {\n  email = person.personal_emails[0];\n} else if (prevData.email) {\n  email = prevData.email;\n}\n\n// Get phone\nlet phone = prevData.phone || '';\nif (person.phone_numbers && person.phone_numbers.length > 0) {\n  phone = person.phone_numbers[0].sanitized_number || person.phone_numbers[0].number || phone;\n} else if (person.phone) {\n  phone = person.phone;\n}\n\nif (!email) {\n  return [{ json: { _skip: true, reason: 'No email found after enrichment', business_name: prevData.business_name, apollo_id: prevData.apollo_id } }];\n}\n\nreturn [{\n  json: {\n    ...prevData,\n    email,\n    phone,\n    linkedin_url: person.linkedin_url || prevData.linkedin_url || '',\n    title: person.title || prevData.title || '',\n    seniority: person.seniority || prevData.seniority || ''\n  }\n}];"
+      },
+      "id": "parse-enrichment",
+      "name": "Parse Enrichment Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2080, 50]
     },
     {
       "parameters": {
@@ -332,10 +261,79 @@
       "name": "Has Email?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        2720,
-        0
-      ]
+      "position": [2300, 50]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($json.email) + '&select=id' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 200
+            }
+          }
+        }
+      },
+      "id": "check-supabase-dupe",
+      "name": "Check Existing in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2520, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const dupeCheck = $input.first().json;\nconst leadData = $('Has Email?').first().json;\n\nconst results = Array.isArray(dupeCheck) ? dupeCheck : [];\n\nif (results.length > 0) {\n  return [{ json: { _skip: true, reason: 'Duplicate - already in Supabase', email: leadData.email, business_name: leadData.business_name } }];\n}\n\nreturn [{ json: { ...leadData, _skip: false } }];"
+      },
+      "id": "check-is-new",
+      "name": "Is New Lead?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2740, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "not-skip",
+              "leftValue": "={{ $json._skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-duplicates",
+      "name": "Not Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2960, 0]
     },
     {
       "parameters": {
@@ -351,27 +349,21 @@
         }
       },
       "id": "validate-email",
-      "name": "Validate Email (MillionVerifier)",
+      "name": "Step 4 - Validate Email (MillionVerifier)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        2940,
-        -50
-      ],
+      "position": [3180, -50],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const verifyResponse = $input.first().json;\nconst leadData = $('Has Email?').first().json;\n\nconst result = (verifyResponse.result || '').toLowerCase();\n\nconst acceptable = ['ok', 'catch_all'];\n\nif (!acceptable.includes(result)) {\n  return [{\n    json: {\n      _skip: true,\n      reason: 'Email validation failed: ' + result,\n      email: leadData.email,\n      business_name: leadData.business_name\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...leadData,\n    email_verified: true,\n    email_verify_result: result\n  }\n}];"
+        "jsCode": "const verifyResponse = $input.first().json;\nconst leadData = $('Not Duplicate?').first().json;\n\nconst result = (verifyResponse.result || '').toLowerCase();\nconst acceptable = ['ok', 'catch_all'];\n\nif (!acceptable.includes(result)) {\n  return [{\n    json: {\n      _skip: true,\n      reason: 'Email validation failed: ' + result,\n      email: leadData.email,\n      business_name: leadData.business_name\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...leadData,\n    email_verified: true,\n    email_verify_result: result\n  }\n}];"
       },
       "id": "parse-validation",
       "name": "Parse Validation Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        3160,
-        -50
-      ]
+      "position": [3400, -50]
     },
     {
       "parameters": {
@@ -400,10 +392,7 @@
       "name": "Email Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        3380,
-        -50
-      ]
+      "position": [3620, -50]
     },
     {
       "parameters": {
@@ -432,31 +421,25 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ business_name: $json.business_name, email: $json.email, first_name: $json.first_name, last_name: $json.last_name, phone: $json.phone, website: $json.website, domain: $json.domain, city: $json.city, state: $json.state, rating: $json.rating, reviews: $json.reviews, source: $json.source, status: 'new', email_verified: $json.email_verified || false, email_verify_result: $json.email_verify_result || null, created_at: new Date().toISOString() }) }}",
+        "jsonBody": "={{ JSON.stringify({ business_name: $json.business_name, email: $json.email, first_name: $json.first_name, last_name: $json.last_name, phone: $json.phone, website: $json.website, domain: $json.domain, city: $json.city, state: $json.state, source: 'apollo', status: 'new', email_verified: $json.email_verified || false, email_verify_result: $json.email_verify_result || null, title: $json.title || null, seniority: $json.seniority || null, company_size: $json.company_size || null, annual_revenue: $json.annual_revenue || null, linkedin_url: $json.linkedin_url || null, technologies: $json.technologies || null, apollo_id: $json.apollo_id || null, apollo_org_id: $json.apollo_org_id || null, created_at: new Date().toISOString() }) }}",
         "options": {}
       },
       "id": "save-lead-supabase",
-      "name": "Save Lead to Supabase",
+      "name": "Step 5 - Save Lead to Supabase",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        3600,
-        -100
-      ],
+      "position": [3840, -100],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "// Aggregate results from the entire batch run for reporting\nconst allSaved = $input.all();\nconst now = new Date();\nconst dateStr = now.toISOString().split('T')[0];\n\n// Count successes and failures\nlet savedCount = 0;\nlet failedCount = 0;\nconst citiesSeen = new Set();\nconst statesSeen = new Set();\nconst savedLeads = [];\n\nfor (const item of allSaved) {\n  const d = item.json;\n  if (d.id || (Array.isArray(d) && d.length > 0)) {\n    savedCount++;\n    const lead = Array.isArray(d) ? d[0] : d;\n    if (lead.city) citiesSeen.add(lead.city + ', ' + lead.state);\n    if (lead.state) statesSeen.add(lead.state);\n    savedLeads.push({\n      business: lead.business_name || 'Unknown',\n      email: lead.email || 'N/A',\n      city: lead.city || 'N/A',\n      state: lead.state || 'N/A'\n    });\n  } else {\n    failedCount++;\n  }\n}\n\nconst staticData = $getWorkflowStaticData('global');\nconst totalScraped = Object.keys(staticData.scrapedCities || {}).length;\n\n// Build markdown report\nlet report = `# Mass Lead Gen Report - ${dateStr}\\n\\n`;\nreport += `## Summary\\n`;\nreport += `- **Date**: ${now.toISOString()}\\n`;\nreport += `- **New validated leads saved**: ${savedCount}\\n`;\nreport += `- **Failed/skipped**: ${failedCount}\\n`;\nreport += `- **Cities in batch**: ${citiesSeen.size}\\n`;\nreport += `- **States covered**: ${Array.from(statesSeen).join(', ')}\\n`;\nreport += `- **Total city+query combos scraped to date**: ${totalScraped}\\n\\n`;\n\nif (savedLeads.length > 0) {\n  report += `## New Leads\\n\\n`;\n  report += `| Business | Email | City | State |\\n`;\n  report += `|----------|-------|------|-------|\\n`;\n  for (const lead of savedLeads) {\n    report += `| ${lead.business} | ${lead.email} | ${lead.city} | ${lead.state} |\\n`;\n  }\n}\n\nreturn [{\n  json: {\n    report,\n    dateStr,\n    savedCount,\n    failedCount,\n    totalScraped,\n    citiesInBatch: citiesSeen.size,\n    telegramMessage: `Mass Lead Gen: Scraped ${citiesSeen.size} cities, found ${savedCount} new validated leads. Total city+query combos scraped: ${totalScraped}. Failed/skipped: ${failedCount}.`\n  }\n}];"
+        "jsCode": "const allSaved = $input.all();\nconst now = new Date();\nconst dateStr = $now.toFormat('yyyy-MM-dd');\n\nlet savedCount = 0;\nlet failedCount = 0;\nconst statesSeen = new Set();\nconst savedLeads = [];\n\nfor (const item of allSaved) {\n  const d = item.json;\n  if (d.id || (Array.isArray(d) && d.length > 0)) {\n    savedCount++;\n    const lead = Array.isArray(d) ? d[0] : d;\n    if (lead.state) statesSeen.add(lead.state);\n    savedLeads.push({\n      business: lead.business_name || 'Unknown',\n      email: lead.email || 'N/A',\n      title: lead.title || 'N/A',\n      city: lead.city || 'N/A',\n      state: lead.state || 'N/A'\n    });\n  } else {\n    failedCount++;\n  }\n}\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.totalOrgsProcessed = (staticData.totalOrgsProcessed || 0) + savedCount;\n\nlet report = `# Apollo Lead Gen Report - ${dateStr}\\n\\n`;\nreport += `## Summary\\n`;\nreport += `- **Date**: ${now.toISOString()}\\n`;\nreport += `- **New validated leads saved**: ${savedCount}\\n`;\nreport += `- **Failed/skipped**: ${failedCount}\\n`;\nreport += `- **States covered**: ${Array.from(statesSeen).join(', ')}\\n`;\nreport += `- **Total leads processed to date**: ${staticData.totalOrgsProcessed}\\n`;\nreport += `- **Apollo page**: ${staticData.apolloPage || 1}\\n\\n`;\n\nif (savedLeads.length > 0) {\n  report += `## New Leads\\n\\n`;\n  report += `| Business | Email | Title | City | State |\\n`;\n  report += `|----------|-------|-------|------|-------|\\n`;\n  for (const lead of savedLeads) {\n    report += `| ${lead.business} | ${lead.email} | ${lead.title} | ${lead.city} | ${lead.state} |\\n`;\n  }\n}\n\nreturn [{\n  json: {\n    report,\n    dateStr,\n    savedCount,\n    failedCount,\n    totalProcessed: staticData.totalOrgsProcessed,\n    telegramMessage: `Apollo Lead Gen: Found ${savedCount} new validated leads. States: ${Array.from(statesSeen).join(', ')}. Total to date: ${staticData.totalOrgsProcessed}. Failed/skipped: ${failedCount}.`\n  }\n}];"
       },
       "id": "generate-report",
       "name": "Generate Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        3820,
-        -100
-      ]
+      "position": [4060, -100]
     },
     {
       "parameters": {
@@ -481,17 +464,14 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ message: 'Mass Lead Gen report ' + $json.dateStr, content: Buffer.from($json.report).toString('base64'), branch: 'main' }) }}",
+        "jsonBody": "={{ JSON.stringify({ message: 'Apollo Lead Gen report ' + $json.dateStr, content: Buffer.from($json.report).toString('base64'), branch: 'main' }) }}",
         "options": {}
       },
       "id": "write-report-github",
       "name": "Write Report to GitHub",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        4040,
-        -100
-      ],
+      "position": [4280, -100],
       "continueOnFail": true
     },
     {
@@ -509,31 +489,25 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ message: $json.telegramMessage, source: 'mass-lead-gen' }) }}",
+        "jsonBody": "={{ JSON.stringify({ message: $json.telegramMessage, source: 'mass-lead-gen-apollo' }) }}",
         "options": {}
       },
       "id": "notify-telegram",
       "name": "Notify via Telegram",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        4260,
-        -100
-      ],
+      "position": [4500, -100],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "// No cities to scrape - notify completion\nconst data = $input.first().json;\nreturn [{\n  json: {\n    telegramMessage: 'Mass Lead Gen: All cities have been scraped! Total scraped: ' + (data.totalScraped || 'unknown') + '. Reset static data to re-scrape.',\n    _complete: true\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\nreturn [{\n  json: {\n    telegramMessage: 'Apollo Lead Gen: No organizations found. All pages exhausted or API issue. Total processed: ' + (data.totalProcessed || 'unknown') + '.',\n    _complete: true\n  }\n}];"
       },
-      "id": "all-cities-done",
-      "name": "All Cities Scraped",
+      "id": "no-orgs-found",
+      "name": "No Organizations Found",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        740,
-        300
-      ]
+      "position": [1200, 300]
     },
     {
       "parameters": {
@@ -550,99 +524,118 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ message: $json.telegramMessage, source: 'mass-lead-gen' }) }}",
+        "jsonBody": "={{ JSON.stringify({ message: $json.telegramMessage, source: 'mass-lead-gen-apollo' }) }}",
         "options": {}
       },
-      "id": "notify-all-done",
-      "name": "Notify All Done",
+      "id": "notify-no-orgs",
+      "name": "Notify No Orgs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        960,
-        300
-      ],
+      "position": [1420, 300],
       "continueOnFail": true
     }
   ],
   "connections": {
-    "Weekly Sunday 2AM Scrape": {
+    "Weekly Sunday 2AM": {
       "main": [
         [
           {
-            "node": "Get Next City Batch",
+            "node": "Build Apollo Search Params",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Webhook: Expand Regions": {
+    "Webhook: Expand Lead Gen": {
       "main": [
         [
           {
-            "node": "Get Next City Batch",
+            "node": "Build Apollo Search Params",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Next City Batch": {
+    "Build Apollo Search Params": {
       "main": [
         [
           {
-            "node": "Has Cities to Scrape?",
+            "node": "Step 1 - Search Apollo Organizations",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Has Cities to Scrape?": {
+    "Step 1 - Search Apollo Organizations": {
       "main": [
         [
           {
-            "node": "Scrape Google Maps (SerpAPI)",
+            "node": "Parse Organization Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Organization Results": {
+      "main": [
+        [
+          {
+            "node": "Has Organizations?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Organizations?": {
+      "main": [
+        [
+          {
+            "node": "Step 2 - Search Decision Makers",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "All Cities Scraped",
+            "node": "No Organizations Found",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Scrape Google Maps (SerpAPI)": {
+    "Step 2 - Search Decision Makers": {
       "main": [
         [
           {
-            "node": "Extract & Mark Progress",
+            "node": "Extract Best Decision Maker",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract & Mark Progress": {
+    "Extract Best Decision Maker": {
       "main": [
         [
           {
-            "node": "Has Leads?",
+            "node": "Found Decision Maker?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Has Leads?": {
+    "Found Decision Maker?": {
       "main": [
         [
           {
-            "node": "Deduplicate Within Batch",
+            "node": "Step 3 - Enrich Person (Email + Phone)",
             "type": "main",
             "index": 0
           }
@@ -650,7 +643,29 @@
         []
       ]
     },
-    "Deduplicate Within Batch": {
+    "Step 3 - Enrich Person (Email + Phone)": {
+      "main": [
+        [
+          {
+            "node": "Parse Enrichment Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Enrichment Result": {
+      "main": [
+        [
+          {
+            "node": "Has Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email?": {
       "main": [
         [
           {
@@ -658,7 +673,8 @@
             "type": "main",
             "index": 0
           }
-        ]
+        ],
+        []
       ]
     },
     "Check Existing in Supabase": {
@@ -687,7 +703,7 @@
       "main": [
         [
           {
-            "node": "Find Email (Hunter.io)",
+            "node": "Step 4 - Validate Email (MillionVerifier)",
             "type": "main",
             "index": 0
           }
@@ -695,41 +711,7 @@
         []
       ]
     },
-    "Find Email (Hunter.io)": {
-      "main": [
-        [
-          {
-            "node": "Extract Best Email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract Best Email": {
-      "main": [
-        [
-          {
-            "node": "Has Email?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Email?": {
-      "main": [
-        [
-          {
-            "node": "Validate Email (MillionVerifier)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Validate Email (MillionVerifier)": {
+    "Step 4 - Validate Email (MillionVerifier)": {
       "main": [
         [
           {
@@ -755,7 +737,7 @@
       "main": [
         [
           {
-            "node": "Save Lead to Supabase",
+            "node": "Step 5 - Save Lead to Supabase",
             "type": "main",
             "index": 0
           }
@@ -763,7 +745,7 @@
         []
       ]
     },
-    "Save Lead to Supabase": {
+    "Step 5 - Save Lead to Supabase": {
       "main": [
         [
           {
@@ -796,11 +778,11 @@
         ]
       ]
     },
-    "All Cities Scraped": {
+    "No Organizations Found": {
       "main": [
         [
           {
-            "node": "Notify All Done",
+            "node": "Notify No Orgs",
             "type": "main",
             "index": 0
           }
@@ -813,11 +795,12 @@
   },
   "staticData": {
     "global": {
-      "scrapedCities": {},
-      "batchIndex": 0
+      "apolloPage": 1,
+      "totalOrgsProcessed": 0,
+      "lastRunDate": ""
     }
   },
   "meta": {
-    "notes": "Mass Lead Generator - Systematically scrapes auto repair shops from 100+ US cities. Runs weekly (Sunday 2AM) or on-demand via webhook POST /expand-lead-gen. Processes 10 city+query combos per batch. Uses SerpAPI for Google Maps scraping, Hunter.io for email enrichment, MillionVerifier for email validation. Saves validated leads to Supabase cold_email_leads table with status 'new'. Reports written to GitHub and notifications sent via Telegram agent-notify webhook.\n\nRequired environment variables: SERPAPI_API_KEY, HUNTER_API_KEY, MILLIONVERIFIER_API_KEY, SUPABASE_SERVICE_KEY, GITHUB_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID.\n\nExpected yield: ~5-10 validated leads per city, 1,500-3,000 total over 30 weeks covering all 100+ major US cities with 3 query variations each."
+    "notes": "Mass Lead Generator using Apollo.io API. Replaces SerpAPI + Hunter.io flow.\n\nFlow: Search organizations (auto_repair vertical) -> Find decision makers (owners/managers) -> Enrich for email + phone -> Verify with MillionVerifier -> Save to Supabase cold_email_leads.\n\nTriggers: Weekly Sunday 2AM cron, or POST /expand-lead-gen webhook with { regions, queries, audience_type }.\n\nApollo $79/mo plan = 1,000 enriched leads/month with full company data (title, seniority, company_size, revenue, technologies, LinkedIn).\n\nRequired env vars: APOLLO_API_KEY, MILLIONVERIFIER_API_KEY, SUPABASE_SERVICE_KEY, GITHUB_TOKEN."
   }
 }
