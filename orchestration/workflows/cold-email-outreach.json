@@ -421,14 +421,101 @@
     },
     {
       "parameters": {
-        "jsCode": "const lead = $input.first().json;\nconst { business_name, first_name, city, emailType } = lead;\nconst name = first_name || 'there';\n\nconst signature = 'Best,\\nShalin\\nFounder, BayFlow\\nshalin@bayflow.com';\n\n// CAN-SPAM compliance footer (required on all commercial emails)\nconst canSpamFooter = '\\n\\nBayFlow | [Physical Address TBD] | bayflow.com\\n\\nDon\\'t want to hear from us? Reply \\'unsubscribe\\' and we\\'ll remove you immediately.';\n\nconst templates = {\n  initial: {\n    subject: `Quick question about ${business_name}`,\n    text: `Hi ${name},\\n\\nI noticed ${business_name} is running repairs in ${city}. Are you still using paper tickets or a generic system to track repair orders?\\n\\nWe built BayFlow specifically for independent auto repair shops. It handles scheduling, digital inspections (with photos your customers can see), invoicing, and customer management. Shops using it say they save about 5 hours a week on paperwork.\\n\\nIt's $49/month and you can try it free for 14 days. No credit card needed.\\n\\nWorth a look? Here's a 2-minute demo: https://bayflow.com/demo\\n\\n${signature}${canSpamFooter}`\n  },\n  follow_up_1: {\n    subject: `Re: Quick question about ${business_name}`,\n    text: `Hey ${name},\\n\\nJust bumping this up. Wanted to make sure you saw it.\\n\\nBayFlow's digital inspection feature alone is worth checking out. Your techs snap photos of worn parts, customer gets a text with the photos, and they approve the work right from their phone. Shops see 89% approval rates on recommended services.\\n\\n14-day free trial: https://bayflow.com\\n\\n${signature}${canSpamFooter}`\n  },\n  follow_up_2: {\n    subject: 'Should I close your file?',\n    text: `Hi ${name},\\n\\nI've reached out a couple times about BayFlow for ${business_name}. I don't want to be annoying, so this is my last email.\\n\\nIf you're ever looking for shop management software built specifically for independent repair shops, we're at bayflow.com.\\n\\nGood luck with everything.\\n\\n${signature}${canSpamFooter}`\n  }\n};\n\nconst template = templates[emailType];\n\nreturn [{\n  json: {\n    ...lead,\n    emailSubject: template.subject,\n    emailText: template.text\n  }\n}];"
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/v_outreach_performance?channel=eq.email&audience_type=eq.auto_repair&select=*&order=positive_rate_pct.desc&limit=10",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-outreach-performance",
+      "name": "Fetch Outreach Performance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        350
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/v_best_subject_lines?audience_type=eq.auto_repair&select=*&limit=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-best-subject-lines",
+      "name": "Fetch Best Subject Lines",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        500
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence?channel=eq.email&outcome=in.(replied_positive,booked_demo,converted)&select=tone,angle,hook_type,subject_line,what_worked,learnings&order=created_at.desc&limit=10",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-recent-learnings",
+      "name": "Fetch Recent Learnings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        650
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $input.first().json;\nconst { business_name, first_name, city, emailType } = lead;\nconst name = first_name || 'there';\n\n// ── Fetch learning data from the 3 intelligence queries ──\nlet perfData = [];\nlet subjectLineData = [];\nlet recentLearnings = [];\n\ntry {\n  const perfRaw = $('Fetch Outreach Performance').all().map(i => i.json);\n  perfData = Array.isArray(perfRaw[0]) ? perfRaw[0] : (Array.isArray(perfRaw) ? perfRaw : []);\n  // Filter out error responses\n  perfData = perfData.filter(r => r && r.tone && !r.error);\n} catch (e) { perfData = []; }\n\ntry {\n  const subjRaw = $('Fetch Best Subject Lines').all().map(i => i.json);\n  subjectLineData = Array.isArray(subjRaw[0]) ? subjRaw[0] : (Array.isArray(subjRaw) ? subjRaw : []);\n  subjectLineData = subjectLineData.filter(r => r && r.subject_line && !r.error);\n} catch (e) { subjectLineData = []; }\n\ntry {\n  const learnRaw = $('Fetch Recent Learnings').all().map(i => i.json);\n  recentLearnings = Array.isArray(learnRaw[0]) ? learnRaw[0] : (Array.isArray(learnRaw) ? learnRaw : []);\n  recentLearnings = recentLearnings.filter(r => r && r.tone && !r.error);\n} catch (e) { recentLearnings = []; }\n\nconst signature = 'Best,\\nShalin\\nFounder, BayFlow\\nshalin@bayflow.com';\n\n// CAN-SPAM compliance footer (required on all commercial emails)\nconst canSpamFooter = '\\n\\nBayFlow | 8 The Green, Ste R, Dover, DE 19901 | bayflow.com\\n\\nDon\\'t want to hear from us? Reply \\'unsubscribe\\' and we\\'ll remove you immediately.';\n\n// ── Template Variants ──\n// Each variant has: tone, angle, hook_type, subject generator, body generator\nconst initialVariants = [\n  {\n    id: 'A',\n    tone: 'pain_point',\n    angle: 'problem_aware',\n    hook_type: 'question',\n    subject: (biz) => `Quick question about ${biz}`,\n    body: (n, biz, c) => `Hi ${n},\\n\\nI noticed ${biz} is running repairs in ${c}. Are you still using paper tickets or a generic system to track repair orders?\\n\\nWe built BayFlow specifically for independent auto repair shops. It handles scheduling, digital inspections (with photos your customers can see), invoicing, and customer management. Shops using it say they save about 5 hours a week on paperwork.\\n\\nIt's $49/month and you can try it free for 14 days. No credit card needed.\\n\\nWorth a look? Here's a 2-minute demo: https://bayflow.com/demo\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'B',\n    tone: 'social_proof',\n    angle: 'outcome_focused',\n    hook_type: 'statistic',\n    subject: (biz) => `${biz} + 5 hours back per week`,\n    body: (n, biz, c) => `Hi ${n},\\n\\nShops using BayFlow save an average of 5 hours per week on admin work. That's a full half-day back to focus on cars, not paperwork.\\n\\nWe're a shop management platform built specifically for independent repair shops like ${biz}. Digital inspections with photos, one-click invoicing, and a scheduling board your techs will actually use.\\n\\n$49/month, 14-day free trial, no credit card: https://bayflow.com\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'C',\n    tone: 'curiosity',\n    angle: 'competitor_comparison',\n    hook_type: 'competitor_weakness',\n    subject: (biz) => `Saw ${biz} online, had a thought`,\n    body: (n, biz, c) => `Hi ${n},\\n\\nI was looking at auto repair shops in ${c} and came across ${biz}. Quick question: are you happy with your current shop management setup?\\n\\nMost shops we talk to are either on expensive legacy systems (Mitchell 1, Tekmetric) or duct-taping spreadsheets together. We built BayFlow as the modern alternative: simple, mobile-friendly, and $49/month flat.\\n\\nDigital inspections, scheduling, invoicing, customer texting, all in one place.\\n\\nHere's a quick look: https://bayflow.com/demo\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'D',\n    tone: 'friendly',\n    angle: 'compliment_first',\n    hook_type: 'compliment',\n    subject: (biz) => `Nice reviews, ${biz}!`,\n    body: (n, biz, c) => `Hi ${n},\\n\\nI came across ${biz} while researching shops in ${c}, and your customer reviews are impressive. It's clear your team does great work.\\n\\nI'm curious, are you using any software to manage your repair orders and customer communication? We built BayFlow for shops like yours: digital inspections with photos (customers love these), easy invoicing, and a scheduling board.\\n\\n$49/month, 14-day free trial: https://bayflow.com\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'E',\n    tone: 'urgent',\n    angle: 'roi_focused',\n    hook_type: 'roi',\n    subject: (biz) => `$49/month that pays for itself in week 1`,\n    body: (n, biz, c) => `Hi ${n},\\n\\nQuick math for ${biz}: shops using BayFlow's digital inspection feature see an 89% approval rate on recommended services. That means more approved repairs per car, every single day.\\n\\nAt $49/month, most shops tell us it pays for itself by the end of week one.\\n\\nScheduling, inspections, invoicing, customer texting. Built for independent shops, not enterprise dealerships.\\n\\n14-day free trial, no credit card: https://bayflow.com\\n\\n${signature}${canSpamFooter}`\n  }\n];\n\nconst followUp1Variants = [\n  {\n    id: 'A',\n    tone: 'pain_point',\n    angle: 'feature_highlight',\n    hook_type: 'question',\n    subject: (biz) => `Re: Quick question about ${biz}`,\n    body: (n, biz, c) => `Hey ${n},\\n\\nJust bumping this up. Wanted to make sure you saw it.\\n\\nBayFlow's digital inspection feature alone is worth checking out. Your techs snap photos of worn parts, customer gets a text with the photos, and they approve the work right from their phone. Shops see 89% approval rates on recommended services.\\n\\n14-day free trial: https://bayflow.com\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'B',\n    tone: 'social_proof',\n    angle: 'outcome_focused',\n    hook_type: 'statistic',\n    subject: (biz) => `Re: ${biz} + 5 hours back per week`,\n    body: (n, biz, c) => `Hi ${n},\\n\\nJust following up. Didn't want this to get buried.\\n\\nThe shops on BayFlow tell us the biggest win is getting rid of paper. Everything's digital, techs love it, customers love the photo inspections.\\n\\nWorth 2 minutes to check out: https://bayflow.com/demo\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'C',\n    tone: 'curiosity',\n    angle: 'competitor_comparison',\n    hook_type: 'competitor_weakness',\n    subject: (biz) => `Re: Saw ${biz} online, had a thought`,\n    body: (n, biz, c) => `Hi ${n},\\n\\nFollowing up on my note. If you're currently on Mitchell 1 or a similar system, BayFlow might surprise you. It's a fraction of the cost and shops tell us it's easier to learn.\\n\\nHappy to answer any questions: https://bayflow.com\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'D',\n    tone: 'friendly',\n    angle: 'compliment_first',\n    hook_type: 'compliment',\n    subject: (biz) => `Re: Nice reviews, ${biz}!`,\n    body: (n, biz, c) => `Hey ${n},\\n\\nJust circling back. I know you're busy turning wrenches, so I'll keep it short.\\n\\nBayFlow = scheduling + digital inspections + invoicing + customer texting. $49/month. 14-day free trial.\\n\\nhttps://bayflow.com\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'E',\n    tone: 'urgent',\n    angle: 'roi_focused',\n    hook_type: 'roi',\n    subject: (biz) => `Re: $49/month that pays for itself in week 1`,\n    body: (n, biz, c) => `Hi ${n},\\n\\nFollowing up. One stat that might interest you: shops using digital inspections see approved repair dollars go up 20-30%. At $49/month, BayFlow is a no-brainer if you're not already using something.\\n\\nhttps://bayflow.com\\n\\n${signature}${canSpamFooter}`\n  }\n];\n\nconst followUp2Variants = [\n  {\n    id: 'A',\n    tone: 'friendly',\n    angle: 'breakup',\n    hook_type: 'question',\n    subject: (biz) => 'Should I close your file?',\n    body: (n, biz, c) => `Hi ${n},\\n\\nI've reached out a couple times about BayFlow for ${biz}. I don't want to be annoying, so this is my last email.\\n\\nIf you're ever looking for shop management software built specifically for independent repair shops, we're at bayflow.com.\\n\\nGood luck with everything.\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'B',\n    tone: 'social_proof',\n    angle: 'breakup',\n    hook_type: 'statistic',\n    subject: (biz) => 'Last note from me',\n    body: (n, biz, c) => `Hi ${n},\\n\\nThis is my last email. Just wanted to leave you with this: 92% of shops that start a BayFlow trial stick with it.\\n\\nIf the timing's ever right, we're at bayflow.com. Wishing ${biz} the best.\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'C',\n    tone: 'curiosity',\n    angle: 'breakup',\n    hook_type: 'question',\n    subject: (biz) => 'Closing the loop',\n    body: (n, biz, c) => `Hi ${n},\\n\\nI'll take the hint. This is my last note about BayFlow for ${biz}.\\n\\nIf anything changes and you need a shop management tool that's simple, affordable, and built for independents, you know where to find us: bayflow.com\\n\\nAll the best.\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'D',\n    tone: 'friendly',\n    angle: 'breakup',\n    hook_type: 'compliment',\n    subject: (biz) => 'Good luck out there',\n    body: (n, biz, c) => `Hey ${n},\\n\\nLast email from me, promise. ${biz} clearly has a good thing going based on your reviews.\\n\\nIf you ever want to ditch the paperwork and go digital, BayFlow is at bayflow.com. $49/month, built for shops like yours.\\n\\nKeep up the great work.\\n\\n${signature}${canSpamFooter}`\n  },\n  {\n    id: 'E',\n    tone: 'urgent',\n    angle: 'breakup',\n    hook_type: 'roi',\n    subject: (biz) => 'Final thought for ' + biz,\n    body: (n, biz, c) => `Hi ${n},\\n\\nLast note. If ${biz} ever wants to save 5+ hours/week on admin and boost approved repair rates, BayFlow is here: bayflow.com\\n\\n$49/month, 14-day free trial. No pressure, no more emails from me.\\n\\nBest of luck.\\n\\n${signature}${canSpamFooter}`\n  }\n];\n\nconst variantSets = {\n  initial: initialVariants,\n  follow_up_1: followUp1Variants,\n  follow_up_2: followUp2Variants\n};\n\nconst variants = variantSets[emailType] || initialVariants;\n\n// ── Variant Selection Logic ──\n// Use learning data to pick the best variant, or rotate evenly for A/B testing\nlet selectedVariant = null;\n\nif (perfData.length > 0) {\n  // Find the best tone/angle/hook combo from performance data\n  const bestPerf = perfData[0]; // Already sorted by positive_rate_pct desc\n  \n  // Try to match a variant to the best performing combo\n  selectedVariant = variants.find(v => \n    v.tone === bestPerf.tone && v.angle === bestPerf.angle && v.hook_type === bestPerf.hook_type\n  );\n  \n  // If no exact match, try matching just tone + hook_type\n  if (!selectedVariant) {\n    selectedVariant = variants.find(v => v.tone === bestPerf.tone && v.hook_type === bestPerf.hook_type);\n  }\n  \n  // If still no match, try matching just tone\n  if (!selectedVariant) {\n    selectedVariant = variants.find(v => v.tone === bestPerf.tone);\n  }\n}\n\n// If no learning data or no match, rotate through variants evenly\n// Use lead ID or email hash to distribute evenly\nif (!selectedVariant) {\n  const hashStr = lead.email || lead.id || '';\n  let hash = 0;\n  for (let i = 0; i < hashStr.length; i++) {\n    hash = ((hash << 5) - hash) + hashStr.charCodeAt(i);\n    hash = hash & hash; // Convert to 32-bit int\n  }\n  const variantIndex = Math.abs(hash) % variants.length;\n  selectedVariant = variants[variantIndex];\n}\n\n// ── Subject Line Override ──\n// If we have high-performing subject lines from the learning data, consider using them\nlet emailSubject = selectedVariant.subject(business_name);\n\nif (subjectLineData.length > 0 && emailType === 'initial') {\n  // Use the best subject line template if it has a good positive rate\n  const bestSubject = subjectLineData[0];\n  if (bestSubject.subject_line && bestSubject.positive_rate_pct && bestSubject.positive_rate_pct > 10) {\n    // Replace placeholders in the learned subject line\n    emailSubject = bestSubject.subject_line\n      .replace(/\\{business_name\\}/g, business_name)\n      .replace(/\\{first_name\\}/g, name)\n      .replace(/\\{city\\}/g, city);\n  }\n}\n\nconst emailText = selectedVariant.body(name, business_name, city || 'your area');\n\nreturn [{\n  json: {\n    ...lead,\n    emailSubject,\n    emailText,\n    selectedTone: selectedVariant.tone,\n    selectedAngle: selectedVariant.angle,\n    selectedHook: selectedVariant.hook_type,\n    selectedVariantId: selectedVariant.id,\n    learningDataUsed: perfData.length > 0,\n    learningContext: {\n      perfDataCount: perfData.length,\n      subjectLineCount: subjectLineData.length,\n      recentLearningsCount: recentLearnings.length\n    }\n  }\n}];"
       },
       "id": "build-cold-email",
       "name": "Build Personalized Email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
+        1100,
         500
       ]
     },
@@ -459,21 +546,21 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        1320,
         500
       ],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const emailData = $('Build Personalized Email').first().json;\nconst resendResponse = $input.first().json;\nconst sent = !!(resendResponse.id);\n\nlet newStatus = emailData.newStatus;\n\n// If it was the initial email and it was sent, set to follow_up_1 (waiting for follow-up)\nif (emailData.emailType === 'initial' && sent) {\n  newStatus = 'follow_up_1';\n} else if (emailData.emailType === 'follow_up_1' && sent) {\n  newStatus = 'follow_up_2';\n} else if (emailData.emailType === 'follow_up_2' && sent) {\n  newStatus = 'completed';\n}\n\nreturn [{\n  json: {\n    id: emailData.id,\n    email: emailData.email,\n    emailType: emailData.emailType,\n    newStatus: sent ? newStatus : emailData.status,\n    sent,\n    resendId: resendResponse.id || null,\n    error: resendResponse.error || null\n  }\n}];"
+        "jsCode": "const emailData = $('Build Personalized Email').first().json;\nconst resendResponse = $input.first().json;\nconst sent = !!(resendResponse.id);\n\nlet newStatus = emailData.newStatus;\n\n// If it was the initial email and it was sent, set to follow_up_1 (waiting for follow-up)\nif (emailData.emailType === 'initial' && sent) {\n  newStatus = 'follow_up_1';\n} else if (emailData.emailType === 'follow_up_1' && sent) {\n  newStatus = 'follow_up_2';\n} else if (emailData.emailType === 'follow_up_2' && sent) {\n  newStatus = 'completed';\n}\n\nreturn [{\n  json: {\n    id: emailData.id,\n    email: emailData.email,\n    emailType: emailData.emailType,\n    emailSubject: emailData.emailSubject,\n    emailText: emailData.emailText,\n    newStatus: sent ? newStatus : emailData.status,\n    sent,\n    resendId: resendResponse.id || null,\n    error: resendResponse.error || null,\n    selectedTone: emailData.selectedTone,\n    selectedAngle: emailData.selectedAngle,\n    selectedHook: emailData.selectedHook,\n    selectedVariantId: emailData.selectedVariantId,\n    first_name: emailData.first_name,\n    city: emailData.city,\n    business_name: emailData.business_name\n  }\n}];"
       },
       "id": "process-send-result",
       "name": "Process Send Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
+        1540,
         500
       ]
     },
@@ -508,7 +595,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1540,
+        1760,
         500
       ],
       "continueOnFail": true
@@ -544,7 +631,43 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1760,
+        1980,
+        500
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: 'bayflow', channel: 'email', outreach_type: $('Process Send Result').first().json.emailType, audience_type: 'auto_repair', tone: $('Process Send Result').first().json.selectedTone, angle: $('Process Send Result').first().json.selectedAngle, hook_type: $('Process Send Result').first().json.selectedHook, intent: 'book_demo', subject_line: $('Process Send Result').first().json.emailSubject, content_preview: ($('Process Send Result').first().json.emailText || '').substring(0, 200), personalization_elements: { name: !!$('Process Send Result').first().json.first_name, city: !!$('Process Send Result').first().json.city, business_name: true }, personalization_depth: ($('Process Send Result').first().json.first_name ? 1 : 0) + ($('Process Send Result').first().json.city ? 1 : 0) + 1, day_of_week: new Date().getDay(), hour_of_day: new Date().getHours(), lead_email: $('Process Send Result').first().json.email, outcome: 'pending', sent_at: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "log-outreach-intelligence",
+      "name": "Log to Outreach Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
         500
       ],
       "continueOnFail": true
@@ -685,6 +808,55 @@
     },
     {
       "parameters": {
+        "jsCode": "const replyData = $('Parse Reply').first().json;\nconst fromEmail = replyData.fromEmail;\nconst sentiment = replyData.sentiment;\nconst replyDate = replyData.replyDate;\nconst replyPreview = (replyData.body || '').substring(0, 300);\n\n// Determine outcome based on sentiment\nlet outcome = 'replied_neutral';\nif (sentiment === 'positive') {\n  outcome = 'replied_positive';\n} else if (sentiment === 'negative') {\n  outcome = 'replied_negative';\n} else if (sentiment === 'unsubscribe') {\n  outcome = 'unsubscribed';\n}\n\n// Calculate what_worked note for positive replies\nlet whatWorked = null;\nif (sentiment === 'positive') {\n  whatWorked = 'Lead responded positively. Reply preview: ' + replyPreview.substring(0, 100);\n}\n\nreturn [{\n  json: {\n    fromEmail,\n    outcome,\n    outcome_at: replyDate,\n    notes: replyPreview,\n    what_worked: whatWorked,\n    sentiment\n  }\n}];"
+      },
+      "id": "prepare-intelligence-update",
+      "name": "Prepare Intelligence Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence?lead_email=eq.' + encodeURIComponent($json.fromEmail) + '&outcome=eq.pending&order=created_at.desc&limit=1' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ outcome: $json.outcome, outcome_at: $json.outcome_at, notes: $json.notes, what_worked: $json.what_worked }) }}",
+        "options": {}
+      },
+      "id": "update-outreach-intelligence",
+      "name": "Update Outreach Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        1100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/sendMessage' }}",
         "sendHeaders": true,
@@ -706,7 +878,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        880,
+        1320,
         1100
       ],
       "continueOnFail": true
@@ -739,7 +911,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1100,
+        1540,
         1100
       ]
     },
@@ -774,7 +946,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1320,
+        1760,
         1000
       ],
       "continueOnFail": true
@@ -792,7 +964,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        1320,
+        1760,
         1200
       ]
     },
@@ -999,12 +1171,55 @@
       "main": [
         [
           {
-            "node": "Build Personalized Email",
+            "node": "Fetch Outreach Performance",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Best Subject Lines",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Recent Learnings",
             "type": "main",
             "index": 0
           }
         ],
         []
+      ]
+    },
+    "Fetch Outreach Performance": {
+      "main": [
+        [
+          {
+            "node": "Build Personalized Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Best Subject Lines": {
+      "main": [
+        [
+          {
+            "node": "Build Personalized Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Learnings": {
+      "main": [
+        [
+          {
+            "node": "Build Personalized Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Build Personalized Email": {
@@ -1045,6 +1260,17 @@
         [
           {
             "node": "Log Email to Knowledge Graph",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Email to Knowledge Graph": {
+      "main": [
+        [
+          {
+            "node": "Log to Outreach Intelligence",
             "type": "main",
             "index": 0
           }
@@ -1107,6 +1333,28 @@
       "main": [
         [
           {
+            "node": "Prepare Intelligence Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Intelligence Update": {
+      "main": [
+        [
+          {
+            "node": "Update Outreach Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Outreach Intelligence": {
+      "main": [
+        [
+          {
             "node": "Notify via Telegram",
             "type": "main",
             "index": 0
@@ -1160,6 +1408,6 @@
   },
   "staticData": null,
   "meta": {
-    "notes": "Required environment variables: SERPAPI_API_KEY, HUNTER_API_KEY, SUPABASE_SERVICE_KEY, RESEND_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, MILLIONVERIFIER_API_KEY. DNCScrub API key TBD - see DNC Check (Placeholder) node."
+    "notes": "Required environment variables: SERPAPI_API_KEY, HUNTER_API_KEY, SUPABASE_SERVICE_KEY, RESEND_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, MILLIONVERIFIER_API_KEY. DNCScrub API key TBD - see DNC Check (Placeholder) node. Outreach intelligence integration: reads from v_outreach_performance, v_best_subject_lines, and outreach_intelligence tables; writes back outcomes on send and reply."
   }
 }

@@ -16,7 +16,7 @@
       "name": "Daily 10:30AM Tue-Thu",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [-480, 0]
     },
     {
       "parameters": {
@@ -39,7 +39,7 @@
       "name": "Fetch Warm Leads (RPC)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [260, 0],
+      "position": [200, 0],
       "continueOnFail": true,
       "notes": "Fallback: If RPC doesn't exist, use the Code node below instead. RPC should run: SELECT * FROM cold_email_leads WHERE status = 'replied' AND reply_sentiment = 'positive' AND call_status IS NULL LIMIT 50"
     },
@@ -420,10 +420,78 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [960, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"business_id\": \"{{ $json.business_id }}\",\n  \"channel\": \"call\",\n  \"outreach_type\": \"cold_call\",\n  \"audience_type\": \"auto_repair\",\n  \"tone\": \"professional\",\n  \"angle\": \"product_demo\",\n  \"intent\": \"book_demo\",\n  \"content_preview\": {{ JSON.stringify(($json.transcript || '').substring(0, 200)) }},\n  \"personalization_elements\": { \"name\": true, \"business_name\": true },\n  \"personalization_depth\": 2,\n  \"day_of_week\": {{ new Date().getDay() }},\n  \"hour_of_day\": {{ new Date().getHours() }},\n  \"call_duration_seconds\": {{ $json.duration_seconds || 0 }},\n  \"call_connected\": {{ !$json.is_voicemail }},\n  \"voicemail_left\": {{ $json.is_voicemail || false }},\n  \"outcome\": \"{{ $json.call_outcome === 'interested_booking' ? 'booked_demo' : $json.call_outcome === 'voicemail' ? 'no_response' : $json.call_outcome === 'not_interested' ? 'replied_negative' : $json.call_outcome === 'callback_requested' ? 'replied_positive' : 'no_response' }}\",\n  \"outcome_at\": \"{{ new Date().toISOString() }}\",\n  \"lead_email\": \"{{ $json.lead_email }}\",\n  \"notes\": \"Call lasted {{ $json.duration_seconds || 0 }} seconds. {{ $json.booking_made ? 'Demo booked.' : $json.is_voicemail ? 'Left voicemail.' : 'No booking.' }}\",\n  \"what_worked\": {{ $json.booking_made ? JSON.stringify('Direct pitch with demo offer worked') : 'null' }},\n  \"what_didnt_work\": {{ $json.not_interested ? JSON.stringify('Lead not interested - ' + ($json.disconnect_reason || 'unknown reason')) : 'null' }},\n  \"learnings\": null\n}",
+        "options": {}
+      },
+      "id": "log-to-outreach-intelligence",
+      "name": "Log to Outreach Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 1100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/v_best_outreach_timing?audience_type=eq.auto_repair&channel=eq.call&select=*&limit=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "query-best-outreach-timing",
+      "name": "Query Best Outreach Timing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-260, 0],
+      "continueOnFail": true,
+      "notes": "Queries v_best_outreach_timing view for call channel + auto_repair audience. Data is passed through for CEO Agent to act on later. Could be used to skip low-performing days/hours."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log outreach timing data and decide whether to proceed with calls today\nconst timingData = $input.first().json;\n\n// If the query failed or returned nothing, proceed anyway (no data yet)\nif (!timingData || timingData.error || (Array.isArray(timingData) && timingData.length === 0)) {\n  return [{ json: { _timing_data: [], _skip_today: false, _reason: 'No timing data available yet - proceeding with calls' } }];\n}\n\nconst rows = Array.isArray(timingData) ? timingData : [timingData];\nconst today = new Date().getDay(); // 0=Sun, 1=Mon, ..., 6=Sat\nconst currentHour = new Date().getHours();\n\n// Check if today's day_of_week appears in timing data with very low success\nconst todayRows = rows.filter(r => r.day_of_week === today);\nlet skipToday = false;\nlet skipReason = '';\n\nif (todayRows.length > 0) {\n  // If all rows for today show 0% positive outcome rate and we have enough data (10+ attempts)\n  const totalAttempts = todayRows.reduce((sum, r) => sum + (r.total_attempts || 0), 0);\n  const totalPositive = todayRows.reduce((sum, r) => sum + (r.positive_outcomes || 0), 0);\n  if (totalAttempts >= 10 && totalPositive === 0) {\n    skipToday = true;\n    skipReason = `Day ${today} has 0% connect rate over ${totalAttempts} attempts - skipping`;\n  }\n}\n\nreturn [{ json: { _timing_data: rows, _skip_today: skipToday, _reason: skipReason || 'Timing data logged - proceeding with calls' } }];"
+      },
+      "id": "evaluate-timing-data",
+      "name": "Evaluate Timing Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-40, 0],
+      "continueOnFail": true
     }
   ],
   "connections": {
     "Daily 10:30AM Tue-Thu": {
+      "main": [
+        [{ "node": "Query Best Outreach Timing", "type": "main", "index": 0 }]
+      ]
+    },
+    "Query Best Outreach Timing": {
+      "main": [
+        [{ "node": "Evaluate Timing Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Evaluate Timing Data": {
       "main": [
         [{ "node": "Fetch Warm Leads (RPC)", "type": "main", "index": 0 }]
       ]
@@ -477,6 +545,7 @@
         [
           { "node": "Update Lead: Call Result", "type": "main", "index": 0 },
           { "node": "Log Call to Supabase", "type": "main", "index": 0 },
+          { "node": "Log to Outreach Intelligence", "type": "main", "index": 0 },
           { "node": "Route by Outcome", "type": "main", "index": 0 }
         ]
       ]
@@ -515,7 +584,7 @@
   ],
   "triggerCount": 3,
   "updatedAt": "2026-03-16T00:00:00.000Z",
-  "versionId": "2",
+  "versionId": "3",
   "meta": {
     "notes": [
       {

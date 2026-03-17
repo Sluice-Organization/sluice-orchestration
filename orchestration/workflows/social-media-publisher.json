@@ -23,6 +23,55 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/v_outreach_performance?channel=in.(tiktok,instagram)&audience_type=eq.auto_repair&select=*&order=positive_rate_pct.desc&limit=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "query-outreach-performance",
+      "name": "Query Outreach Performance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        200
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process outreach performance data to build context for content generation\n// This tells the Content Agent what reel formats are working best\nconst input = $('Query Outreach Performance').first().json;\n\n// Handle missing data gracefully - query may return empty array or error\nlet topFormats = [];\nlet contextSummary = 'No outreach performance data available yet. Using default content strategy.';\n\ntry {\n  const rows = Array.isArray(input) ? input : (input.data || input.body || []);\n  if (Array.isArray(rows) && rows.length > 0) {\n    topFormats = rows.map(r => ({\n      channel: r.channel || 'unknown',\n      angle: r.angle || 'unknown',\n      tone: r.tone || 'unknown',\n      positive_rate_pct: r.positive_rate_pct || 0,\n      total_sent: r.total_sent || 0\n    }));\n    contextSummary = 'Top performing formats:\\n' + topFormats.map((f, i) =>\n      `${i + 1}. ${f.channel} / ${f.angle} / ${f.tone} - ${f.positive_rate_pct}% positive (${f.total_sent} posts)`\n    ).join('\\n');\n  }\n} catch (e) {\n  // Gracefully handle any parsing errors\n  contextSummary = 'Outreach performance query failed: ' + (e.message || 'unknown error') + '. Using default content strategy.';\n}\n\nreturn [{\n  json: {\n    topFormats,\n    contextSummary,\n    hasPerformanceData: topFormats.length > 0\n  }\n}];"
+      },
+      "id": "prepare-outreach-context",
+      "name": "Prepare Outreach Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        200
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
@@ -41,14 +90,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// Try today's report first, fall back to checking if we got content\nconst input = $('Read Content Report').first().json;\nconst rawContent = input.content || '';\n\nif (!rawContent) {\n  return [{ json: { error: 'No content report found for today', reels: [], hasReels: false } }];\n}\n\n// Decode base64 if needed (GitHub API returns base64)\nlet content = rawContent;\ntry {\n  if (rawContent.match(/^[A-Za-z0-9+/=\\s]+$/) && rawContent.length > 50) {\n    content = Buffer.from(rawContent, 'base64').toString('utf-8');\n  }\n} catch (e) {\n  // Already plaintext\n}\n\n// Parse reel scripts from content report\n// Content Agent uses ---PIECE--- separators with type indicators\nconst pieces = content.split('---PIECE---').map(p => p.trim()).filter(Boolean);\nconst reels = [];\n\nfor (const piece of pieces) {\n  const typeMatch = piece.match(/type:\\s*reel/i);\n  if (!typeMatch) continue;\n\n  // Extract hook, body, CTA from reel script\n  const hookMatch = piece.match(/hook:\\s*(.+?)(?:\\n|$)/i) || piece.match(/\\*\\*hook\\*\\*:\\s*(.+?)(?:\\n|$)/i);\n  const ctaMatch = piece.match(/cta:\\s*(.+?)(?:\\n|$)/i) || piece.match(/\\*\\*cta\\*\\*:\\s*(.+?)(?:\\n|$)/i);\n  \n  // Get the body: everything between hook/body markers and CTA\n  let body = '';\n  const bodyMatch = piece.match(/body:\\s*([\\s\\S]*?)(?=cta:|\\*\\*cta\\*\\*:|$)/i);\n  if (bodyMatch) {\n    body = bodyMatch[1].trim();\n  }\n\n  // If structured parsing fails, use the whole piece as script text\n  const hook = hookMatch ? hookMatch[1].trim() : '';\n  const cta = ctaMatch ? ctaMatch[1].trim() : '';\n  const fullScript = hook ? `${hook}\\n\\n${body}\\n\\n${cta}` : piece.replace(/type:\\s*reel\\s*/i, '').trim();\n\n  // Extract title if present\n  const titleMatch = piece.match(/title:\\s*(.+?)(?:\\n|$)/i);\n  const title = titleMatch ? titleMatch[1].trim() : `BayFlow Reel ${reels.length + 1}`;\n\n  reels.push({\n    title,\n    hook,\n    body,\n    cta,\n    fullScript,\n    index: reels.length\n  });\n}\n\n// If no structured reels found, try to find reel-like sections by headers\nif (reels.length === 0) {\n  const reelSections = content.match(/##\\s*reel[\\s\\S]*?(?=##\\s|$)/gi) || [];\n  for (const section of reelSections) {\n    const titleMatch = section.match(/##\\s*reel\\s*\\d*:?\\s*(.+?)(?:\\n|$)/i);\n    reels.push({\n      title: titleMatch ? titleMatch[1].trim() : `BayFlow Reel ${reels.length + 1}`,\n      hook: '',\n      body: '',\n      cta: '',\n      fullScript: section.replace(/##\\s*reel\\s*\\d*:?\\s*.+?\\n/i, '').trim(),\n      index: reels.length\n    });\n  }\n}\n\nreturn [{\n  json: {\n    reels,\n    hasReels: reels.length > 0,\n    reelCount: reels.length,\n    reportDate: $now.toFormat('yyyy-MM-dd')\n  }\n}];"
+        "jsCode": "// Try today's report first, fall back to checking if we got content\nconst input = $('Read Content Report').first().json;\nconst rawContent = input.content || '';\n\n// Get outreach performance context (may not exist yet)\nlet outreachContext = 'No outreach performance data available yet.';\ntry {\n  const outreachData = $('Prepare Outreach Context').first().json;\n  outreachContext = outreachData.contextSummary || outreachContext;\n} catch (e) {\n  // Outreach context not available, continue with default\n}\n\nif (!rawContent) {\n  return [{ json: { error: 'No content report found for today', reels: [], hasReels: false, outreachContext } }];\n}\n\n// Decode base64 if needed (GitHub API returns base64)\nlet content = rawContent;\ntry {\n  if (rawContent.match(/^[A-Za-z0-9+/=\\s]+$/) && rawContent.length > 50) {\n    content = Buffer.from(rawContent, 'base64').toString('utf-8');\n  }\n} catch (e) {\n  // Already plaintext\n}\n\n// Parse reel scripts from content report\n// Content Agent uses ---PIECE--- separators with type indicators\nconst pieces = content.split('---PIECE---').map(p => p.trim()).filter(Boolean);\nconst reels = [];\n\nfor (const piece of pieces) {\n  const typeMatch = piece.match(/type:\\s*reel/i);\n  if (!typeMatch) continue;\n\n  // Extract hook, body, CTA from reel script\n  const hookMatch = piece.match(/hook:\\s*(.+?)(?:\\n|$)/i) || piece.match(/\\*\\*hook\\*\\*:\\s*(.+?)(?:\\n|$)/i);\n  const ctaMatch = piece.match(/cta:\\s*(.+?)(?:\\n|$)/i) || piece.match(/\\*\\*cta\\*\\*:\\s*(.+?)(?:\\n|$)/i);\n  \n  // Get the body: everything between hook/body markers and CTA\n  let body = '';\n  const bodyMatch = piece.match(/body:\\s*([\\s\\S]*?)(?=cta:|\\*\\*cta\\*\\*:|$)/i);\n  if (bodyMatch) {\n    body = bodyMatch[1].trim();\n  }\n\n  // If structured parsing fails, use the whole piece as script text\n  const hook = hookMatch ? hookMatch[1].trim() : '';\n  const cta = ctaMatch ? ctaMatch[1].trim() : '';\n  const fullScript = hook ? `${hook}\\n\\n${body}\\n\\n${cta}` : piece.replace(/type:\\s*reel\\s*/i, '').trim();\n\n  // Extract title if present\n  const titleMatch = piece.match(/title:\\s*(.+?)(?:\\n|$)/i);\n  const title = titleMatch ? titleMatch[1].trim() : `BayFlow Reel ${reels.length + 1}`;\n\n  // Extract tone and angle if present in the piece\n  const toneMatch = piece.match(/tone:\\s*(.+?)(?:\\n|$)/i);\n  const angleMatch = piece.match(/angle:\\s*(.+?)(?:\\n|$)/i);\n\n  reels.push({\n    title,\n    hook,\n    body,\n    cta,\n    fullScript,\n    tone: toneMatch ? toneMatch[1].trim() : 'casual',\n    angle: angleMatch ? angleMatch[1].trim() : 'tip',\n    index: reels.length\n  });\n}\n\n// If no structured reels found, try to find reel-like sections by headers\nif (reels.length === 0) {\n  const reelSections = content.match(/##\\s*reel[\\s\\S]*?(?=##\\s|$)/gi) || [];\n  for (const section of reelSections) {\n    const titleMatch = section.match(/##\\s*reel\\s*\\d*:?\\s*(.+?)(?:\\n|$)/i);\n    reels.push({\n      title: titleMatch ? titleMatch[1].trim() : `BayFlow Reel ${reels.length + 1}`,\n      hook: '',\n      body: '',\n      cta: '',\n      fullScript: section.replace(/##\\s*reel\\s*\\d*:?\\s*.+?\\n/i, '').trim(),\n      tone: 'casual',\n      angle: 'tip',\n      index: reels.length\n    });\n  }\n}\n\nreturn [{\n  json: {\n    reels,\n    hasReels: reels.length > 0,\n    reelCount: reels.length,\n    reportDate: $now.toFormat('yyyy-MM-dd'),\n    outreachContext\n  }\n}];"
       },
       "id": "parse-reel-scripts",
       "name": "Parse Reel Scripts",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        440,
+        660,
         0
       ]
     },
@@ -72,20 +121,20 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        660,
+        880,
         0
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Split reels array into individual items for processing\nconst data = $('Parse Reel Scripts').first().json;\nconst reels = data.reels || [];\nconst reportDate = data.reportDate;\n\nreturn reels.map(reel => ({\n  json: {\n    ...reel,\n    reportDate\n  }\n}));"
+        "jsCode": "// Split reels array into individual items for processing\nconst data = $('Parse Reel Scripts').first().json;\nconst reels = data.reels || [];\nconst reportDate = data.reportDate;\nconst outreachContext = data.outreachContext || '';\n\nreturn reels.map(reel => ({\n  json: {\n    ...reel,\n    reportDate,\n    outreachContext\n  }\n}));"
       },
       "id": "split-reels",
       "name": "Split Into Individual Reels",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
+        1100,
         -100
       ]
     },
@@ -116,7 +165,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        1320,
         -100
       ],
       "continueOnFail": true,
@@ -136,7 +185,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
+        1540,
         -100
       ]
     },
@@ -158,7 +207,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1540,
+        1760,
         -100
       ]
     },
@@ -172,7 +221,7 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1760,
+        1980,
         -200
       ]
     },
@@ -191,7 +240,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1980,
+        2200,
         -200
       ],
       "continueOnFail": true,
@@ -211,7 +260,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
+        2420,
         -200
       ]
     },
@@ -224,7 +273,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2420,
+        2640,
         0
       ]
     },
@@ -259,7 +308,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2640,
+        2860,
         -100
       ],
       "continueOnFail": true,
@@ -297,7 +346,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2640,
+        2860,
         100
       ],
       "continueOnFail": true,
@@ -310,27 +359,27 @@
     },
     {
       "parameters": {
-        "jsCode": "// Collect all posting results and build a summary per reel\nconst reel = $('Prepare Social Post').item.json;\nconst mixpostResult = $('Post via Mixpost').item.json;\nconst tiktokResult = $('Post to TikTok (Direct)').item.json;\n\nconst mixpostOk = !(mixpostResult.error || mixpostResult.statusCode >= 400);\nconst tiktokOk = !(tiktokResult.error || tiktokResult.statusCode >= 400);\n\nconst platforms = [];\nif (mixpostOk) platforms.push('Mixpost (draft)');\nif (tiktokOk) platforms.push('TikTok');\n\nreturn [{\n  json: {\n    title: reel.title,\n    index: reel.index,\n    caption: reel.caption,\n    postType: reel.postType,\n    hasVideo: reel.hasVideo,\n    videoUrl: reel.videoUrl || null,\n    videoStatus: reel.videoStatus || 'skipped',\n    mixpostPosted: mixpostOk,\n    tiktokPosted: tiktokOk,\n    platformsPosted: platforms,\n    mixpostError: mixpostOk ? null : (mixpostResult.error || mixpostResult.message || 'Not configured'),\n    tiktokError: tiktokOk ? null : (tiktokResult.error || tiktokResult.message || 'Not configured'),\n    reportDate: reel.reportDate\n  }\n}];"
+        "jsCode": "// Collect all posting results and build a summary per reel\nconst reel = $('Prepare Social Post').item.json;\nconst mixpostResult = $('Post via Mixpost').item.json;\nconst tiktokResult = $('Post to TikTok (Direct)').item.json;\n\nconst mixpostOk = !(mixpostResult.error || mixpostResult.statusCode >= 400);\nconst tiktokOk = !(tiktokResult.error || tiktokResult.statusCode >= 400);\n\nconst platforms = [];\nif (mixpostOk) platforms.push('Mixpost (draft)');\nif (tiktokOk) platforms.push('TikTok');\n\nreturn [{\n  json: {\n    title: reel.title,\n    index: reel.index,\n    caption: reel.caption,\n    postType: reel.postType,\n    hasVideo: reel.hasVideo,\n    videoUrl: reel.videoUrl || null,\n    videoStatus: reel.videoStatus || 'skipped',\n    tone: reel.tone || 'casual',\n    angle: reel.angle || 'tip',\n    mixpostPosted: mixpostOk,\n    tiktokPosted: tiktokOk,\n    platformsPosted: platforms,\n    mixpostError: mixpostOk ? null : (mixpostResult.error || mixpostResult.message || 'Not configured'),\n    tiktokError: tiktokOk ? null : (tiktokResult.error || tiktokResult.message || 'Not configured'),\n    reportDate: reel.reportDate\n  }\n}];"
       },
       "id": "collect-posting-results",
       "name": "Collect Posting Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2860,
+        3080,
         0
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Aggregate all reel results into a single report\nconst items = $input.all();\nconst reportDate = items[0]?.json?.reportDate || new Date().toISOString().split('T')[0];\n\nlet report = `# Social Media Publisher Report - ${reportDate}\\n\\n`;\nreport += `## Summary\\n`;\nreport += `- Reels processed: ${items.length}\\n`;\nreport += `- Videos generated: ${items.filter(i => i.json.hasVideo).length}\\n`;\nreport += `- Successfully posted: ${items.filter(i => i.json.platformsPosted.length > 0).length}\\n\\n`;\n\nfor (const item of items) {\n  const r = item.json;\n  report += `## Reel ${r.index + 1}: ${r.title}\\n`;\n  report += `- Type: ${r.postType}\\n`;\n  report += `- Video status: ${r.videoStatus}\\n`;\n  if (r.videoUrl) report += `- Video URL: ${r.videoUrl}\\n`;\n  report += `- Platforms posted: ${r.platformsPosted.length > 0 ? r.platformsPosted.join(', ') : 'None (services not configured)'}\\n`;\n  if (r.mixpostError) report += `- Mixpost: ${r.mixpostError}\\n`;\n  if (r.tiktokError) report += `- TikTok: ${r.tiktokError}\\n`;\n  report += `\\n`;\n}\n\nreport += `## Next Steps\\n`;\nreport += `- Configure REVID_API_KEY for video generation\\n`;\nreport += `- Configure MIXPOST_URL and MIXPOST_API_KEY for social scheduling\\n`;\nreport += `- Configure TIKTOK_ACCESS_TOKEN for direct TikTok posting\\n`;\n\n// Build Supabase row for knowledge graph\nconst performanceRows = items.map(item => ({\n  business_id: 'bayflow',\n  content_type: 'reel',\n  title: item.json.title,\n  platform: item.json.platformsPosted.join(',') || 'none',\n  published_at: reportDate,\n  video_url: item.json.videoUrl || null,\n  status: item.json.platformsPosted.length > 0 ? 'published' : 'draft'\n}));\n\nreturn [{\n  json: {\n    report,\n    reportDate,\n    performanceRows,\n    totalReels: items.length,\n    videosGenerated: items.filter(i => i.json.hasVideo).length,\n    postsPublished: items.filter(i => i.json.platformsPosted.length > 0).length\n  }\n}];"
+        "jsCode": "// Aggregate all reel results into a single report\nconst items = $input.all();\nconst reportDate = items[0]?.json?.reportDate || new Date().toISOString().split('T')[0];\n\nlet report = `# Social Media Publisher Report - ${reportDate}\\n\\n`;\nreport += `## Summary\\n`;\nreport += `- Reels processed: ${items.length}\\n`;\nreport += `- Videos generated: ${items.filter(i => i.json.hasVideo).length}\\n`;\nreport += `- Successfully posted: ${items.filter(i => i.json.platformsPosted.length > 0).length}\\n\\n`;\n\nfor (const item of items) {\n  const r = item.json;\n  report += `## Reel ${r.index + 1}: ${r.title}\\n`;\n  report += `- Type: ${r.postType}\\n`;\n  report += `- Video status: ${r.videoStatus}\\n`;\n  if (r.videoUrl) report += `- Video URL: ${r.videoUrl}\\n`;\n  report += `- Platforms posted: ${r.platformsPosted.length > 0 ? r.platformsPosted.join(', ') : 'None (services not configured)'}\\n`;\n  if (r.mixpostError) report += `- Mixpost: ${r.mixpostError}\\n`;\n  if (r.tiktokError) report += `- TikTok: ${r.tiktokError}\\n`;\n  report += `\\n`;\n}\n\nreport += `## Next Steps\\n`;\nreport += `- Configure REVID_API_KEY for video generation\\n`;\nreport += `- Configure MIXPOST_URL and MIXPOST_API_KEY for social scheduling\\n`;\nreport += `- Configure TIKTOK_ACCESS_TOKEN for direct TikTok posting\\n`;\n\n// Build Supabase row for knowledge graph\nconst performanceRows = items.map(item => ({\n  business_id: 'bayflow',\n  content_type: 'reel',\n  title: item.json.title,\n  platform: item.json.platformsPosted.join(',') || 'none',\n  published_at: reportDate,\n  video_url: item.json.videoUrl || null,\n  status: item.json.platformsPosted.length > 0 ? 'published' : 'draft'\n}));\n\n// Build outreach_intelligence rows for each platform per reel\nconst now = new Date();\nconst outreachRows = [];\nfor (const item of items) {\n  const r = item.json;\n  const caption = r.caption || '';\n  const platforms = r.platformsPosted || [];\n  const hasVideo = r.hasVideo || false;\n  const platformList = platforms.length > 0 ? platforms.map(p => p.replace(' (draft)', '').toLowerCase()) : ['tiktok', 'instagram'];\n\n  for (const platform of platformList) {\n    outreachRows.push({\n      business_id: 'bayflow',\n      channel: platform,\n      outreach_type: 'social_post',\n      audience_type: 'auto_repair',\n      tone: r.tone || 'casual',\n      angle: r.angle || 'tip',\n      intent: 'build_awareness',\n      content_preview: caption.substring(0, 200),\n      personalization_depth: 0,\n      day_of_week: now.getDay(),\n      hour_of_day: now.getHours(),\n      outcome: 'pending',\n      lead_email: null,\n      notes: 'Posted to ' + platforms.join(', ') + '. Video: ' + (hasVideo ? 'yes' : 'text only')\n    });\n  }\n}\n\nreturn [{\n  json: {\n    report,\n    reportDate,\n    performanceRows,\n    outreachRows,\n    totalReels: items.length,\n    videosGenerated: items.filter(i => i.json.hasVideo).length,\n    postsPublished: items.filter(i => i.json.platformsPosted.length > 0).length\n  }\n}];"
       },
       "id": "build-report",
       "name": "Build Publishing Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3080,
+        3300,
         0
       ]
     },
@@ -349,8 +398,8 @@
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
       "position": [
-        3300,
-        -100
+        3520,
+        -200
       ],
       "continueOnFail": true
     },
@@ -391,8 +440,50 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3300,
-        100
+        3520,
+        0
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.outreachRows) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "log-to-outreach-intelligence",
+      "name": "Log to Outreach Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3520,
+        200
       ],
       "continueOnFail": true
     },
@@ -405,7 +496,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
+        1100,
         100
       ]
     },
@@ -424,7 +515,7 @@
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
       "position": [
-        1100,
+        1320,
         100
       ],
       "continueOnFail": true
@@ -436,6 +527,33 @@
         [
           {
             "node": "Read Content Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Query Outreach Performance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Outreach Performance": {
+      "main": [
+        [
+          {
+            "node": "Prepare Outreach Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Outreach Context": {
+      "main": [
+        [
+          {
+            "node": "Parse Reel Scripts",
             "type": "main",
             "index": 0
           }
@@ -625,6 +743,11 @@
           },
           {
             "node": "Log to Knowledge Graph (Supabase)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Outreach Intelligence",
             "type": "main",
             "index": 0
           }
