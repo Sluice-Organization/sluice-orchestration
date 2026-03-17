@@ -1,5 +1,5 @@
 {
-  "name": "Sales Sequence Engine - Multi-Channel Coordinator",
+  "name": "Sales Sequence Engine - Multi-Channel Coordinator (Smartlead)",
   "nodes": [
     {
       "parameters": {
@@ -194,15 +194,22 @@
     },
     {
       "parameters": {
+        "jsCode": "// Ensure a Smartlead campaign exists for this business.\n// Checks Supabase for an existing campaign_id; if none, creates one via Smartlead API.\n// Stores the campaign_id back in Supabase for reuse on subsequent runs.\n\nconst lead = $input.first().json;\nconst SMARTLEAD_API_KEY = $env.SMARTLEAD_API_KEY;\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_KEY;\nconst BUSINESS_ID = 'bayflow';\n\nlet campaignId = null;\n\n// Step 1: Check Supabase for existing Smartlead campaign_id\ntry {\n  const resp = await fetch(\n    `${SUPABASE_URL}/rest/v1/smartlead_campaigns?business_id=eq.${BUSINESS_ID}&select=campaign_id&limit=1`,\n    {\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`\n      }\n    }\n  );\n  const rows = await resp.json();\n  if (rows && rows.length > 0 && rows[0].campaign_id) {\n    campaignId = rows[0].campaign_id;\n  }\n} catch (e) {\n  // Will attempt to create below\n}\n\n// Step 2: If no campaign exists, create one via Smartlead API\nif (!campaignId) {\n  try {\n    const createResp = await fetch(\n      `https://server.smartlead.ai/api/v1/campaigns/create?api_key=${SMARTLEAD_API_KEY}`,\n      {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({\n          name: `BayFlow Cold Outreach - ${new Date().toISOString().slice(0, 10)}`\n        })\n      }\n    );\n    const createData = await createResp.json();\n    campaignId = createData.id || createData.campaign_id || null;\n\n    if (campaignId) {\n      // Store campaign_id in Supabase for reuse\n      try {\n        await fetch(\n          `${SUPABASE_URL}/rest/v1/smartlead_campaigns`,\n          {\n            method: 'POST',\n            headers: {\n              'apikey': SERVICE_KEY,\n              'Authorization': `Bearer ${SERVICE_KEY}`,\n              'Content-Type': 'application/json',\n              'Prefer': 'return=minimal'\n            },\n            body: JSON.stringify({\n              business_id: BUSINESS_ID,\n              campaign_id: String(campaignId),\n              campaign_name: `BayFlow Cold Outreach - ${new Date().toISOString().slice(0, 10)}`,\n              created_at: new Date().toISOString()\n            })\n          }\n        );\n      } catch (e) {\n        // Non-fatal: campaign was created in Smartlead even if Supabase save fails\n      }\n\n      // Step 3: Set sending schedule on the new campaign\n      try {\n        await fetch(\n          `https://server.smartlead.ai/api/v1/campaigns/${campaignId}/schedule?api_key=${SMARTLEAD_API_KEY}`,\n          {\n            method: 'POST',\n            headers: { 'Content-Type': 'application/json' },\n            body: JSON.stringify({\n              timezone: 'America/New_York',\n              days_of_the_week: [1, 2, 3, 4],\n              start_hour: '08:00',\n              end_hour: '17:00',\n              min_time_btw_emails: 8,\n              max_new_leads_per_day: 30\n            })\n          }\n        );\n      } catch (e) {\n        // Non-fatal: schedule can be set manually in Smartlead dashboard\n      }\n    }\n  } catch (e) {\n    // Campaign creation failed -- will pass campaignId=null downstream\n  }\n}\n\nreturn [{\n  json: {\n    ...lead,\n    smartlead_campaign_id: campaignId\n  }\n}];"
+      },
+      "id": "ensure-smartlead-campaign",
+      "name": "Ensure Smartlead Campaign",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "method": "POST",
-        "url": "https://api.resend.com/emails",
+        "url": "=https://server.smartlead.ai/api/v1/campaigns/{{ $json.smartlead_campaign_id }}/leads?api_key={{ $env.SMARTLEAD_API_KEY }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.RESEND_API_KEY }}"
-            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -211,17 +218,18 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"from\": \"{{ $json.emailFromName }} <{{ $json.emailFrom }}>\",\n  \"to\": [\"{{ $json.emailTo }}\"],\n  \"subject\": \"{{ $json.emailSubject }}\",\n  \"text\": {{ JSON.stringify($json.emailBody) }}\n}",
+        "jsonBody": "={\n  \"lead_list\": [\n    {\n      \"email\": \"{{ $json.emailTo }}\",\n      \"first_name\": \"{{ $json.first_name || 'there' }}\",\n      \"last_name\": \"{{ $json.last_name || '' }}\",\n      \"company_name\": \"{{ $json.business_name || '' }}\",\n      \"custom_fields\": {\n        \"emailSubject\": {{ JSON.stringify($json.emailSubject) }},\n        \"emailBody\": {{ JSON.stringify($json.emailBody) }},\n        \"touchType\": \"{{ $json.type }}\",\n        \"touchNumber\": {{ $json.touchNumber }},\n        \"leadId\": \"{{ $json.id }}\",\n        \"fromEmail\": \"{{ $json.emailFrom }}\",\n        \"fromName\": \"{{ $json.emailFromName }}\"\n      }\n    }\n  ],\n  \"settings\": {\n    \"ignore_global_block_list\": false,\n    \"ignore_unsubscribe_list\": false\n  }\n}",
         "options": {
           "timeout": 30000
         }
       },
-      "id": "send-email-resend",
-      "name": "Send Email (Resend)",
+      "id": "add-lead-to-smartlead",
+      "name": "Add Lead to Smartlead Campaign",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1800, 100],
-      "continueOnFail": true
+      "position": [2050, 100],
+      "continueOnFail": true,
+      "notes": "Adds the lead to the Smartlead campaign. Smartlead handles deliverability, warmup, inbox rotation, and actual sending according to its schedule. The email subject/body are passed as custom fields so Smartlead can use them in the campaign sequence."
     },
     {
       "parameters": {
@@ -291,13 +299,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Update lead after EMAIL action\nconst lead = $('Gate Check + Build Email').first().json;\nconst resendResult = $input.first().json;\nconst now = new Date().toISOString();\nconst touchNumber = lead.touchNumber || 1;\n\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_KEY;\n\n// Determine new status based on touch type\nlet newStatus = lead.status;\nif (lead.type === 'initial') newStatus = 'contacted';\nelse if (lead.type === 'follow_up_1') newStatus = 'follow_up_1';\nelse if (lead.type === 'follow_up_2') newStatus = 'follow_up_2';\nelse if (lead.type === 'breakup') newStatus = 'completed';\n\n// Update lead record\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?id=eq.${lead.id}`,\n    {\n      method: 'PATCH',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify({\n        touch_count: touchNumber,\n        last_contacted_at: now,\n        last_touch_channel: 'email',\n        sequence_stage: lead.type === 'breakup' ? 'completed' : 'contacted',\n        status: newStatus,\n        last_email_type: lead.type,\n        last_resend_id: resendResult?.id || null,\n        updated_at: now\n      })\n    }\n  );\n} catch (e) {\n  // Log but don't fail\n}\n\n// Log to activities\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/activities`,\n    {\n      method: 'POST',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify({\n        lead_id: lead.id,\n        business_id: 'bayflow',\n        activity_type: 'email_sent',\n        channel: 'email',\n        details: {\n          touch_number: touchNumber,\n          email_type: lead.type,\n          subject: lead.emailSubject,\n          resend_id: resendResult?.id || null\n        }\n      })\n    }\n  );\n} catch (e) {}\n\n// Log to outreach_intelligence\ntry {\n  const dayOfWeek = new Date().getDay();\n  const hourOfDay = new Date().getHours();\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/outreach_intelligence`,\n    {\n      method: 'POST',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify({\n        business_id: 'bayflow',\n        channel: 'email',\n        outreach_type: lead.type,\n        audience_type: 'auto_repair',\n        tone: 'friendly',\n        angle: lead.type === 'follow_up_2' ? 'social_proof' : 'pain_point',\n        intent: 'book_demo',\n        subject_line: lead.emailSubject,\n        content_preview: (lead.emailBody || '').substring(0, 200),\n        content_full: lead.emailBody,\n        personalization_depth: 2,\n        day_of_week: dayOfWeek,\n        hour_of_day: hourOfDay,\n        lead_id: lead.id,\n        lead_email: lead.email\n      })\n    }\n  );\n} catch (e) {}\n\nreturn [{\n  json: {\n    action: 'EMAIL_SENT',\n    leadId: lead.id,\n    email: lead.email,\n    type: lead.type,\n    touchNumber: touchNumber,\n    resendId: resendResult?.id || 'unknown'\n  }\n}];"
+        "jsCode": "// Update lead after EMAIL action (via Smartlead)\nconst lead = $('Gate Check + Build Email').first().json;\nconst smartleadResult = $input.first().json;\nconst now = new Date().toISOString();\nconst touchNumber = lead.touchNumber || 1;\n\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_KEY;\n\n// Determine new status based on touch type\nlet newStatus = lead.status;\nif (lead.type === 'initial') newStatus = 'contacted';\nelse if (lead.type === 'follow_up_1') newStatus = 'follow_up_1';\nelse if (lead.type === 'follow_up_2') newStatus = 'follow_up_2';\nelse if (lead.type === 'breakup') newStatus = 'completed';\n\n// Extract Smartlead upload status\nconst smartleadOk = !!(smartleadResult && !smartleadResult.error);\nconst smartleadCampaignId = lead.smartlead_campaign_id || $('Ensure Smartlead Campaign').first().json.smartlead_campaign_id || null;\n\n// Update lead record\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?id=eq.${lead.id}`,\n    {\n      method: 'PATCH',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify({\n        touch_count: touchNumber,\n        last_contacted_at: now,\n        last_touch_channel: 'email',\n        sequence_stage: lead.type === 'breakup' ? 'completed' : 'contacted',\n        status: newStatus,\n        last_email_type: lead.type,\n        smartlead_campaign_id: smartleadCampaignId ? String(smartleadCampaignId) : null,\n        updated_at: now\n      })\n    }\n  );\n} catch (e) {\n  // Log but don't fail\n}\n\n// Log to activities\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/activities`,\n    {\n      method: 'POST',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify({\n        lead_id: lead.id,\n        business_id: 'bayflow',\n        activity_type: 'email_queued_smartlead',\n        channel: 'email',\n        details: {\n          touch_number: touchNumber,\n          email_type: lead.type,\n          subject: lead.emailSubject,\n          smartlead_campaign_id: smartleadCampaignId,\n          smartlead_upload_ok: smartleadOk\n        }\n      })\n    }\n  );\n} catch (e) {}\n\n// Log to outreach_intelligence\ntry {\n  const dayOfWeek = new Date().getDay();\n  const hourOfDay = new Date().getHours();\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/outreach_intelligence`,\n    {\n      method: 'POST',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify({\n        business_id: 'bayflow',\n        channel: 'email',\n        outreach_type: lead.type,\n        audience_type: 'auto_repair',\n        tone: 'friendly',\n        angle: lead.type === 'follow_up_2' ? 'social_proof' : 'pain_point',\n        intent: 'book_demo',\n        subject_line: lead.emailSubject,\n        content_preview: (lead.emailBody || '').substring(0, 200),\n        content_full: lead.emailBody,\n        personalization_depth: 2,\n        day_of_week: dayOfWeek,\n        hour_of_day: hourOfDay,\n        lead_id: lead.id,\n        lead_email: lead.email,\n        sending_provider: 'smartlead',\n        smartlead_campaign_id: smartleadCampaignId\n      })\n    }\n  );\n} catch (e) {}\n\nreturn [{\n  json: {\n    action: 'EMAIL_QUEUED_SMARTLEAD',\n    leadId: lead.id,\n    email: lead.email,\n    type: lead.type,\n    touchNumber: touchNumber,\n    smartleadCampaignId: smartleadCampaignId,\n    smartleadUploadOk: smartleadOk\n  }\n}];"
       },
       "id": "update-lead-after-email",
       "name": "Update Lead After Email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2100, 100]
+      "position": [2300, 100]
     },
     {
       "parameters": {
@@ -321,13 +329,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Aggregate all actions taken for summary\nconst emailActions = [];\nconst callActions = [];\nconst completeActions = [];\n\ntry {\n  const emailItems = $('Update Lead After Email').all();\n  emailItems.forEach(i => emailActions.push(i.json));\n} catch (e) {}\n\ntry {\n  const callItems = $('Update Lead After Call').all();\n  callItems.forEach(i => callActions.push(i.json));\n} catch (e) {}\n\ntry {\n  const completeItems = $('Mark Sequence Complete').all();\n  completeItems.forEach(i => completeActions.push(i.json));\n} catch (e) {}\n\nconst totalActions = emailActions.length + callActions.length + completeActions.length;\n\nconst summary = `Sales Sequence Summary:\\n- Emails sent: ${emailActions.length}\\n- Calls triggered: ${callActions.length}\\n- Sequences completed: ${completeActions.length}\\n- Total actions: ${totalActions}`;\n\nreturn [{\n  json: {\n    summary,\n    emailsSent: emailActions.length,\n    callsTriggered: callActions.length,\n    sequencesCompleted: completeActions.length,\n    totalActions\n  }\n}];"
+        "jsCode": "// Aggregate all actions taken for summary\nconst emailActions = [];\nconst callActions = [];\nconst completeActions = [];\n\ntry {\n  const emailItems = $('Update Lead After Email').all();\n  emailItems.forEach(i => emailActions.push(i.json));\n} catch (e) {}\n\ntry {\n  const callItems = $('Update Lead After Call').all();\n  callItems.forEach(i => callActions.push(i.json));\n} catch (e) {}\n\ntry {\n  const completeItems = $('Mark Sequence Complete').all();\n  completeItems.forEach(i => completeActions.push(i.json));\n} catch (e) {}\n\nconst totalActions = emailActions.length + callActions.length + completeActions.length;\n\nconst summary = `Sales Sequence Summary (via Smartlead):\\n- Emails queued to Smartlead: ${emailActions.length}\\n- Calls triggered: ${callActions.length}\\n- Sequences completed: ${completeActions.length}\\n- Total actions: ${totalActions}`;\n\nreturn [{\n  json: {\n    summary,\n    emailsQueued: emailActions.length,\n    callsTriggered: callActions.length,\n    sequencesCompleted: completeActions.length,\n    totalActions\n  }\n}];"
       },
       "id": "build-summary",
       "name": "Build Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2400, 400]
+      "position": [2600, 400]
     },
     {
       "parameters": {
@@ -356,7 +364,7 @@
       "name": "Any Actions Taken?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2650, 400]
+      "position": [2850, 400]
     },
     {
       "parameters": {
@@ -373,7 +381,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"agent\": \"Sales Sequence Engine\",\n  \"message\": \"{{ $json.summary }}\",\n  \"severity\": \"info\",\n  \"businessId\": \"bayflow\",\n  \"requiresResponse\": false\n}",
+        "jsonBody": "={\n  \"agent\": \"Sales Sequence Engine (Smartlead)\",\n  \"message\": \"{{ $json.summary }}\",\n  \"severity\": \"info\",\n  \"businessId\": \"bayflow\",\n  \"requiresResponse\": false\n}",
         "options": {
           "timeout": 15000
         }
@@ -382,8 +390,164 @@
       "name": "Notify: Sequence Summary",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2900, 300],
+      "position": [3100, 300],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "smartlead-reply-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "smartlead-reply-webhook",
+      "name": "Smartlead Reply Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 800],
+      "notes": "Receives reply notifications from Smartlead webhook. Configure in Smartlead dashboard: Settings > Webhooks > Reply webhook URL = https://n8n-production-bb4b.up.railway.app/webhook/smartlead-reply-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Smartlead reply webhook payload\n// Smartlead webhook sends: { event_type, lead_email, campaign_id, reply_text, reply_subject, ... }\nconst payload = $input.first().json.body || $input.first().json;\n\nconst fromEmail = payload.lead_email || payload.to_email || payload.email || '';\nconst subject = payload.reply_subject || payload.subject || '';\nconst body = payload.reply_text || payload.reply_body || payload.text || '';\nconst campaignId = payload.campaign_id || null;\nconst replyDate = new Date().toISOString();\n\n// Unsubscribe detection (CAN-SPAM compliance)\nconst unsubscribeKeywords = ['unsubscribe', 'remove me', 'stop emailing', 'opt out', 'opt-out', 'take me off', 'remove my email'];\nconst bodyLower = body.toLowerCase();\nconst subjectLower = subject.toLowerCase();\nconst isUnsubscribe = unsubscribeKeywords.some(kw => bodyLower.includes(kw) || subjectLower.includes(kw));\n\nif (isUnsubscribe) {\n  return [{\n    json: {\n      fromEmail: fromEmail.replace(/<|>/g, '').trim(),\n      subject,\n      body: body.substring(0, 2000),\n      sentiment: 'unsubscribe',\n      isUnsubscribe: true,\n      smartleadCampaignId: campaignId,\n      replyDate\n    }\n  }];\n}\n\n// Standard sentiment detection for non-unsubscribe replies\nconst positiveKeywords = ['interested', 'yes', 'sure', 'tell me more', 'demo', 'try', 'sign up', 'pricing', 'sounds good', 'let\\'s talk', 'schedule', 'call me'];\nconst negativeKeywords = ['not interested', 'no thanks', 'no thank', 'pass', 'not for us'];\n\nlet sentiment = 'neutral';\n\nif (positiveKeywords.some(kw => bodyLower.includes(kw))) {\n  sentiment = 'positive';\n} else if (negativeKeywords.some(kw => bodyLower.includes(kw))) {\n  sentiment = 'negative';\n}\n\nreturn [{\n  json: {\n    fromEmail: fromEmail.replace(/<|>/g, '').trim(),\n    subject,\n    body: body.substring(0, 2000),\n    sentiment,\n    isUnsubscribe: false,\n    smartleadCampaignId: campaignId,\n    replyDate\n  }\n}];"
+      },
+      "id": "parse-smartlead-reply",
+      "name": "Parse Smartlead Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [250, 800]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-unsubscribe",
+              "leftValue": "={{ $json.isUnsubscribe }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-unsubscribe-smartlead",
+      "name": "Is Unsubscribe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [500, 800]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mark lead as unsubscribed in Supabase\nconst reply = $('Parse Smartlead Reply').first().json;\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_KEY;\n\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?email=eq.${encodeURIComponent(reply.fromEmail)}`,\n    {\n      method: 'PATCH',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify({\n        status: 'unsubscribed',\n        unsubscribed_at: reply.replyDate\n      })\n    }\n  );\n} catch (e) {}\n\nreturn [{ json: { action: 'UNSUBSCRIBED', email: reply.fromEmail } }];"
+      },
+      "id": "mark-unsubscribed-smartlead",
+      "name": "Mark Lead Unsubscribed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 700],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update lead as replied + log to outreach intelligence + notify\nconst reply = $('Parse Smartlead Reply').first().json;\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_KEY;\n\n// Update lead status to replied\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?email=eq.${encodeURIComponent(reply.fromEmail)}`,\n    {\n      method: 'PATCH',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify({\n        status: 'replied',\n        replied_at: reply.replyDate,\n        reply_sentiment: reply.sentiment\n      })\n    }\n  );\n} catch (e) {}\n\n// Determine outcome for outreach intelligence\nlet outcome = 'replied_neutral';\nif (reply.sentiment === 'positive') outcome = 'replied_positive';\nelse if (reply.sentiment === 'negative') outcome = 'replied_negative';\n\n// Update outreach_intelligence with outcome\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/outreach_intelligence?lead_email=eq.${encodeURIComponent(reply.fromEmail)}&outcome=eq.pending&order=created_at.desc&limit=1`,\n    {\n      method: 'PATCH',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify({\n        outcome: outcome,\n        outcome_at: reply.replyDate,\n        notes: reply.body.substring(0, 300),\n        what_worked: reply.sentiment === 'positive' ? 'Lead responded positively via Smartlead. Preview: ' + reply.body.substring(0, 100) : null\n      })\n    }\n  );\n} catch (e) {}\n\nreturn [{\n  json: {\n    action: 'REPLY_PROCESSED',\n    email: reply.fromEmail,\n    sentiment: reply.sentiment,\n    smartleadCampaignId: reply.smartleadCampaignId\n  }\n}];"
+      },
+      "id": "process-reply-smartlead",
+      "name": "Process Reply + Update Intelligence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"agent\": \"Sales Sequence Engine (Smartlead)\",\n  \"message\": \"Smartlead Reply Received\\nFrom: {{ $('Parse Smartlead Reply').first().json.fromEmail }}\\nSentiment: {{ $('Parse Smartlead Reply').first().json.sentiment }}\\nSubject: {{ $('Parse Smartlead Reply').first().json.subject }}\\nPreview: {{ $('Parse Smartlead Reply').first().json.body.substring(0, 200) }}\",\n  \"severity\": \"{{ $('Parse Smartlead Reply').first().json.sentiment === 'positive' ? 'high' : 'info' }}\",\n  \"businessId\": \"bayflow\",\n  \"requiresResponse\": {{ $('Parse Smartlead Reply').first().json.sentiment === 'positive' }}\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "notify-reply-telegram",
+      "name": "Notify: Smartlead Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', email: $('Parse Smartlead Reply').first().json.fromEmail, sentiment: $('Parse Smartlead Reply').first().json.sentiment }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-smartlead-webhook",
+      "name": "Respond OK (Smartlead)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 900]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', action: 'unsubscribed', email: $('Parse Smartlead Reply').first().json.fromEmail }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-unsub-smartlead-webhook",
+      "name": "Respond OK (Unsubscribe)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1000, 700]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://server.smartlead.ai/api/v1/campaigns/{{ $json.smartlead_campaign_id || 'unknown' }}/statistics?api_key={{ $env.SMARTLEAD_API_KEY }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-smartlead-stats",
+      "name": "Fetch Smartlead Campaign Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3100, 500],
+      "disabled": true,
+      "continueOnFail": true,
+      "notes": "OPTIONAL: Enable to pull Smartlead campaign statistics after each run. Disabled by default to avoid unnecessary API calls. Can be triggered manually or on a separate schedule."
     }
   ],
   "connections": {
@@ -472,7 +636,7 @@
       "main": [
         [
           {
-            "node": "Send Email (Resend)",
+            "node": "Ensure Smartlead Campaign",
             "type": "main",
             "index": 0
           }
@@ -480,7 +644,18 @@
         []
       ]
     },
-    "Send Email (Resend)": {
+    "Ensure Smartlead Campaign": {
+      "main": [
+        [
+          {
+            "node": "Add Lead to Smartlead Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Lead to Smartlead Campaign": {
       "main": [
         [
           {
@@ -580,6 +755,79 @@
         ],
         []
       ]
+    },
+    "Smartlead Reply Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Smartlead Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Smartlead Reply": {
+      "main": [
+        [
+          {
+            "node": "Is Unsubscribe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Unsubscribe?": {
+      "main": [
+        [
+          {
+            "node": "Mark Lead Unsubscribed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Reply + Update Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Lead Unsubscribed": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (Unsubscribe)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Reply + Update Intelligence": {
+      "main": [
+        [
+          {
+            "node": "Notify: Smartlead Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify: Smartlead Reply": {
+      "main": [
+        [
+          {
+            "node": "Respond OK (Smartlead)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -595,8 +843,11 @@
     },
     {
       "name": "bayflow"
+    },
+    {
+      "name": "smartlead"
     }
   ],
-  "triggerCount": 1,
-  "notes": "PRIMARY outreach coordinator. Replaces loose email+call approach. Runs Tue-Fri at 8:30 AM after cold-email-metrics. The cold-email-outreach.json email sender should be DISABLED to avoid duplicate sends - this workflow handles all email and call sequencing with gating."
+  "triggerCount": 2,
+  "notes": "PRIMARY outreach coordinator using Smartlead for cold email deliverability.\n\nARCHITECTURE:\n- Sales sequence engine determines WHAT to send and WHEN\n- Smartlead handles deliverability, warmup, inbox rotation, and actual sending\n- On first run, creates a Smartlead campaign and stores campaign_id in Supabase (smartlead_campaigns table)\n- Each email touch adds the lead to the Smartlead campaign with personalized content as custom fields\n- Smartlead reply webhook notifies n8n of replies for sentiment analysis + lead status updates\n\nENV VARS REQUIRED:\n- $env.SMARTLEAD_API_KEY - Smartlead API key\n- $env.SUPABASE_SERVICE_KEY - Supabase service role key\n\nSMARTLEAD SETUP:\n1. Create Smartlead account and get API key\n2. Set $env.SMARTLEAD_API_KEY in n8n\n3. Configure Smartlead reply webhook: Settings > Webhooks > URL = https://n8n-production-bb4b.up.railway.app/webhook/smartlead-reply-webhook\n4. Create a 'smartlead_campaigns' table in Supabase: (id uuid, business_id text, campaign_id text, campaign_name text, created_at timestamptz)\n\nResend is NO LONGER used for cold outreach. Resend stays for transactional emails only (onboarding, churn-prevention, review-collector, cal-booking-handler, demo-lifecycle).\n\nThe cold-email-outreach.json Flow B (Email Sender) is DISABLED -- this workflow is the sole outreach coordinator."
 }
