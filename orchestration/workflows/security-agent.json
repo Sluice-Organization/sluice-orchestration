@@ -439,6 +439,28 @@
       }
     },
     {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'security-agent', level: 'critical', severity: 'critical', agent: 'Security Agent', message: 'SECURITY ALERT: ' + $('Analyze Security Results').first().json.criticalCount + ' critical, ' + $('Analyze Security Results').first().json.highCount + ' high findings on ' + $('Analyze Security Results').first().json.date + '. ' + $('Analyze Security Results').first().json.criticalFindings.map(function(f) { return f.title; }).join(', '), requiresResponse: true }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "notify-telegram-security",
+      "name": "Notify Telegram (Security)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 600],
+      "continueOnFail": true
+    },
+    {
       "parameters": {},
       "id": "no-alert-needed",
       "name": "No Alert Needed",
@@ -533,7 +555,8 @@
       "main": [
         [
           { "node": "Send Alert Email", "type": "main", "index": 0 },
-          { "node": "Build GitHub Issues", "type": "main", "index": 0 }
+          { "node": "Build GitHub Issues", "type": "main", "index": 0 },
+          { "node": "Notify Telegram (Security)", "type": "main", "index": 0 }
         ],
         [
           { "node": "No Alert Needed", "type": "main", "index": 0 }
