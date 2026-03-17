@@ -276,6 +276,654 @@
         }
       },
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "id": "telegram-message-trigger",
+      "name": "Telegram Message Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 1200],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "chat-id-check",
+              "leftValue": "={{ String($json.message?.chat?.id || '') }}",
+              "rightValue": "={{ $env.TELEGRAM_CHAT_ID }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "security-check",
+      "name": "Security: Check Chat ID",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [500, 1200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.message?.text || '';\nconst textLower = text.toLowerCase().trim();\n\n// Structured commands\nif (textLower.startsWith('converted ')) {\n  const email = text.split(' ')[1];\n  return [{ json: { intent: 'UPDATE_LEAD', action: 'converted', email, raw: text } }];\n}\n\nif (textLower.startsWith('demo completed ')) {\n  const parts = text.split(' ');\n  const email = parts[2];\n  const notes = parts.slice(3).join(' ');\n  return [{ json: { intent: 'DEMO_COMPLETED', email, notes, raw: text } }];\n}\n\nif (textLower.startsWith('rejected ')) {\n  const email = text.split(' ')[1];\n  return [{ json: { intent: 'UPDATE_LEAD', action: 'rejected', email, raw: text } }];\n}\n\nif (textLower.startsWith('pause ')) {\n  const businessId = text.split(' ')[1];\n  return [{ json: { intent: 'PAUSE_BUSINESS', businessId, raw: text } }];\n}\n\nif (textLower.startsWith('resume ')) {\n  const businessId = text.split(' ')[1];\n  return [{ json: { intent: 'RESUME_BUSINESS', businessId, raw: text } }];\n}\n\nif (textLower.startsWith('kill ')) {\n  const businessId = text.split(' ')[1];\n  return [{ json: { intent: 'KILL_BUSINESS', businessId, raw: text } }];\n}\n\nif (textLower === 'status') {\n  return [{ json: { intent: 'STATUS_REQUEST', raw: text } }];\n}\n\nif (textLower === 'help') {\n  return [{ json: { intent: 'HELP', raw: text } }];\n}\n\n// Freeform message \u2014 route to CEO Agent for interpretation\n// Try to detect if a known business is referenced\nconst knownBusinesses = ['bayflow', 'yogaflow', 'petcare'];\nlet detectedBusiness = null;\nfor (const biz of knownBusinesses) {\n  if (textLower.includes(biz)) {\n    detectedBusiness = biz;\n    break;\n  }\n}\n\nreturn [{ json: { intent: 'FREEFORM', raw: text, detectedBusiness } }];"
+      },
+      "id": "parse-message",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 1200]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "UPDATE_LEAD",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "UPDATE_LEAD"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "DEMO_COMPLETED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "DEMO_COMPLETED"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "PAUSE_BUSINESS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "PAUSE_BUSINESS"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "RESUME_BUSINESS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "RESUME_BUSINESS"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "STATUS_REQUEST",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "STATUS_REQUEST"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "HELP",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "HELP"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "FREEFORM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "FREEFORM"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "KILL_BUSINESS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "KILL_BUSINESS"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "route-by-intent",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1000, 1200]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/cold_email_leads?email=eq.{{ $json.email }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: $json.action, outreach_active: false, updated_at: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "update-lead-status",
+      "name": "Update Lead Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u2705 Lead *{{ $('Parse Message').first().json.email }}* marked as *{{ $('Parse Message').first().json.action }}*. Outreach stopped.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "confirm-lead-update",
+      "name": "Confirm: Lead Updated",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1550, 900],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/demo-completed",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ email: $json.email, notes: $json.notes, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "post-demo-completed",
+      "name": "POST Demo Completed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 1050],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u2705 Demo logged for *{{ $('Parse Message').first().json.email }}*\nNotes: {{ $('Parse Message').first().json.notes || 'none' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "confirm-demo",
+      "name": "Confirm: Demo Logged",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1550, 1050],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_config?business_id=eq.{{ $json.businessId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ cold_email: { active: false }, ai_calling: { active: false }, content: { active: false }, paused_at: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "pause-business",
+      "name": "Pause Business Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 1200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u23f8\ufe0f *{{ $('Parse Message').first().json.businessId }}* paused. All operations (email, calling, content) stopped.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "confirm-pause",
+      "name": "Confirm: Business Paused",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1550, 1200],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_config?business_id=eq.{{ $json.businessId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ cold_email: { active: true }, ai_calling: { active: true }, content: { active: true }, resumed_at: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "resume-business",
+      "name": "Resume Business Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 1350],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\u25b6\ufe0f *{{ $('Parse Message').first().json.businessId }}* resumed. All operations re-enabled.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "confirm-resume",
+      "name": "Confirm: Business Resumed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1550, 1350],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_context?select=business_id,mrr,customer_count,leads_in_pipeline,status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "fetch-status",
+      "name": "Fetch All Business Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 1500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const businesses = $input.first().json;\nconst data = Array.isArray(businesses) ? businesses : [businesses];\n\nlet activeCount = 0;\nlet lines = [];\n\nfor (const biz of data) {\n  if (!biz || !biz.business_id) continue;\n  activeCount++;\n  const mrr = biz.mrr ? `$${Number(biz.mrr).toLocaleString()}` : '$0';\n  const customers = biz.customer_count || 0;\n  const leads = biz.leads_in_pipeline || 0;\n  const status = biz.status || 'unknown';\n  lines.push(`*${biz.business_id}*: ${mrr} MRR | ${customers} customers | ${leads} leads (${status})`);\n}\n\nif (lines.length === 0) {\n  lines.push('No businesses found in system_context.');\n}\n\nconst summary = `\\ud83d\\udcca *Forge Status*\\n\\nActive businesses: ${activeCount}\\n\\n${lines.join('\\n')}\\n\\n_Updated: ${new Date().toISOString().replace('T', ' ').substring(0, 19)} UTC_`;\n\nreturn [{ json: { statusMessage: summary } }];"
+      },
+      "id": "format-status",
+      "name": "Format Status Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1550, 1500]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.statusMessage }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "send-status",
+      "name": "Send Status",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1800, 1500],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "\ud83e\udd16 *Forge Agent Commands:*\n\n*Sales:*\n\u2022 `converted [email]` \u2014 Mark lead as converted\n\u2022 `demo completed [email] [notes]` \u2014 Log demo outcome\n\u2022 `rejected [email]` \u2014 Mark lead as not interested\n\n*Business:*\n\u2022 `pause [business_id]` \u2014 Pause all operations\n\u2022 `resume [business_id]` \u2014 Resume operations\n\u2022 `kill [business_id]` \u2014 Trigger death protocol\n\u2022 `status` \u2014 Get full pipeline summary\n\n*General:*\n\u2022 Any other message is forwarded to the CEO Agent\n\n*Examples:*\n`converted john@joeauto.com`\n`demo completed mike@shop.com loved the inspection feature`\n`pause yogaflow`\n`status`",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "send-help",
+      "name": "Send Help",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1300, 1650],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.raw || '';\nconst detectedBusiness = $json.detectedBusiness || null;\nconst now = new Date();\nconst dateStr = now.toISOString().substring(0, 10);\nconst timestamp = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';\n\n// File for memory-bank\nconst fileName = `${dateStr}.md`;\nconst filePath = `memory-bank/system/human-feedback/${fileName}`;\nconst fileContent = `# Human Feedback - ${dateStr}\\n\\n- **Timestamp**: ${timestamp}\\n- **Message**: ${raw}\\n- **Detected Business**: ${detectedBusiness || 'none'}\\n`;\n\n// GitHub issue\nconst issueTitle = `Human feedback: ${raw.substring(0, 60)}${raw.length > 60 ? '...' : ''}`;\nconst issueBody = `## Human Message\\n\\n> ${raw}\\n\\n- **Received**: ${timestamp}\\n- **Detected Business**: ${detectedBusiness || 'none'}\\n\\nThis message was sent via Telegram and needs CEO Agent review.`;\nconst issueRepo = detectedBusiness ? `sluice-${detectedBusiness}` : 'sluice-orchestration';\n\nreturn [{\n  json: {\n    raw,\n    detectedBusiness,\n    filePath,\n    fileContent: Buffer.from(fileContent).toString('base64'),\n    issueTitle,\n    issueBody,\n    issueRepo\n  }\n}];"
+      },
+      "id": "prepare-freeform",
+      "name": "Prepare Freeform Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 1800]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "owner": "ShalinPatel670",
+        "repository": "sluice-orchestration",
+        "filePath": "={{ $json.filePath }}",
+        "fileContent": "={{ $json.fileContent }}",
+        "commitMessage": "=Human feedback: {{ $json.raw.substring(0, 50) }}",
+        "additionalParameters": {}
+      },
+      "id": "write-freeform-github",
+      "name": "Save Feedback to GitHub",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1550, 1750],
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/ShalinPatel670/{{ $json.issueRepo }}/issues",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $json.issueTitle, body: $json.issueBody, labels: ['human-feedback'] }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi"
+      },
+      "id": "create-freeform-issue",
+      "name": "Create GitHub Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1550, 1900],
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "\u2705 Got it, forwarded to CEO Agent.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "confirm-freeform",
+      "name": "Confirm: Freeform Saved",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1800, 1800],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/system_config?business_id=eq.{{ $json.businessId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'death_protocol', cold_email: { active: false }, ai_calling: { active: false }, content: { active: false }, killed_at: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "kill-business",
+      "name": "Kill Business Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 1950],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=\ud83d\udca0 *{{ $('Parse Message').first().json.businessId }}* death protocol initiated. All operations killed.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "confirm-kill",
+      "name": "Confirm: Business Killed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1550, 1950],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-cred",
+          "name": "Telegram Bot"
+        }
+      },
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -402,6 +1050,204 @@
         [
           {
             "node": "Notify: Pipeline Triggered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Message Trigger": {
+      "main": [
+        [
+          {
+            "node": "Security: Check Chat ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Security: Check Chat ID": {
+      "main": [
+        [
+          {
+            "node": "Parse Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Parse Message": {
+      "main": [
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "POST Demo Completed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pause Business Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resume Business Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch All Business Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Help",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Freeform Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Kill Business Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Status": {
+      "main": [
+        [
+          {
+            "node": "Confirm: Lead Updated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Demo Completed": {
+      "main": [
+        [
+          {
+            "node": "Confirm: Demo Logged",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause Business Config": {
+      "main": [
+        [
+          {
+            "node": "Confirm: Business Paused",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Business Config": {
+      "main": [
+        [
+          {
+            "node": "Confirm: Business Resumed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch All Business Status": {
+      "main": [
+        [
+          {
+            "node": "Format Status Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Status Summary": {
+      "main": [
+        [
+          {
+            "node": "Send Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Freeform Data": {
+      "main": [
+        [
+          {
+            "node": "Save Feedback to GitHub",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create GitHub Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Feedback to GitHub": {
+      "main": [
+        [
+          {
+            "node": "Confirm: Freeform Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kill Business Config": {
+      "main": [
+        [
+          {
+            "node": "Confirm: Business Killed",
             "type": "main",
             "index": 0
           }

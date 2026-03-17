@@ -224,13 +224,39 @@
     },
     {
       "parameters": {
+        "method": "PATCH",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/system_config?business_id=eq.{{ $('Check Circuit Breakers').first().json.business_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"cold_email_active\": false,\n  \"google_ads_active\": false,\n  \"circuit_breaker_paused_at\": \"{{ new Date().toISOString() }}\",\n  \"circuit_breaker_reason\": {{ JSON.stringify($('Check Circuit Breakers').first().json.circuit_breaker_reason) }}\n}",
+        "options": {}
+      },
+      "id": "pause-system-config",
+      "name": "Pause Cold Email & Ads (system_config)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2800, 0],
+      "continueOnFail": true,
+      "notes": "Resilience gate: When circuit breaker fires, automatically disable cold email and ads for this business in system_config to prevent further spend."
+    },
+    {
+      "parameters": {
         "jsCode": "// Collect summary from the breaker check after alert actions\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.summaryLines) staticData.summaryLines = [];\n\nconst data = $('Check Circuit Breakers').first().json;\nstaticData.summaryLines.push(data.summary_line);\n\nreturn [{ json: { done: true, summary_line: data.summary_line } }];"
       },
       "id": "collect-triggered",
       "name": "Collect Summary (Triggered)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2800, 150]
+      "position": [3050, 150]
     },
     {
       "parameters": {
@@ -241,7 +267,7 @@
       "name": "Merge Back to Loop",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [3050, 300]
+      "position": [3300, 300]
     },
     {
       "parameters": {
@@ -251,7 +277,7 @@
       "name": "Build Daily Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3300, 300]
+      "position": [3550, 300]
     },
     {
       "parameters": {
@@ -267,7 +293,7 @@
       "name": "Write Report to GitHub",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [3550, 300]
+      "position": [3800, 300]
     }
   ],
   "connections": {
@@ -316,6 +342,9 @@
       "main": [[{ "node": "Send Alert Email", "type": "main", "index": 0 }]]
     },
     "Send Alert Email": {
+      "main": [[{ "node": "Pause Cold Email & Ads (system_config)", "type": "main", "index": 0 }]]
+    },
+    "Pause Cold Email & Ads (system_config)": {
       "main": [[{ "node": "Collect Summary (Triggered)", "type": "main", "index": 0 }]]
     },
     "Collect Summary (No Trigger)": {

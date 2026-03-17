@@ -348,7 +348,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?or=(status.eq.new,status.eq.follow_up_1,status.eq.follow_up_2)&select=*&limit=30&order=created_at.asc",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?or=(status.eq.new,status.eq.follow_up_1,status.eq.follow_up_2)&status=not.in.(converted,unsubscribed,rejected,demo_booked,paying)&select=*&limit=30&order=created_at.asc",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

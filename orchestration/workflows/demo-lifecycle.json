@@ -1,0 +1,899 @@
+{
+  "name": "Demo Lifecycle - Post-Demo Tracking & Conversion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "demo-completed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-demo-completed",
+      "name": "Webhook: Demo Completed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body || $input.first().json;\nconst email = (payload.email || '').trim().toLowerCase();\nconst businessId = payload.businessId || 'bayflow';\nconst outcome = payload.outcome || 'interested';\nconst notes = payload.notes || '';\nconst nextSteps = payload.next_steps || '';\nconst firstName = email.split('@')[0].replace(/[._]/g, ' ').split(' ')[0];\n\nif (!email) {\n  throw new Error('Missing required field: email');\n}\n\nconst validOutcomes = ['interested', 'needs_time', 'not_interested', 'no_show'];\nif (!validOutcomes.includes(outcome)) {\n  throw new Error('Invalid outcome. Must be one of: ' + validOutcomes.join(', '));\n}\n\nreturn [{\n  json: {\n    email,\n    businessId,\n    outcome,\n    notes,\n    nextSteps,\n    firstName,\n    now: $now.toFormat('yyyy-MM-dd HH:mm:ss')\n  }\n}];"
+      },
+      "id": "parse-demo-payload",
+      "name": "Parse Demo Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($json.email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'demo_completed', demo_completed_at: $('Parse Demo Payload').first().json.now, demo_notes: $('Parse Demo Payload').first().json.notes, demo_outcome: $('Parse Demo Payload').first().json.outcome }) }}",
+        "options": {}
+      },
+      "id": "update-lead-demo-completed",
+      "name": "Update Lead: demo_completed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Parse Demo Payload').first().json.outcome }}",
+                    "rightValue": "interested",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": "interested"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Parse Demo Payload').first().json.outcome }}",
+                    "rightValue": "needs_time",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": "needs_time"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Parse Demo Payload').first().json.outcome }}",
+                    "rightValue": "not_interested",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": "not_interested"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Parse Demo Payload').first().json.outcome }}",
+                    "rightValue": "no_show",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": "no_show"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "route-by-outcome",
+      "name": "Route by Outcome",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [660, 0]
+    },
+
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($('Parse Demo Payload').first().json.email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'trial_started', trial_started_at: $('Parse Demo Payload').first().json.now }) }}",
+        "options": {}
+      },
+      "id": "update-lead-trial-started",
+      "name": "Update Lead: trial_started",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$('Parse Demo Payload').first().json.email], subject: 'Your BayFlow trial is ready to go', html: '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head><body style=\"margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f9fafb;padding:40px 20px;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);\"><tr><td style=\"background-color:#dc2626;padding:32px 40px;\"><h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;\">BayFlow</h1></td></tr><tr><td style=\"padding:40px;\"><h2 style=\"margin:0 0 8px;color:#111827;font-size:22px;font-weight:600;\">Great talking with you, ' + $('Parse Demo Payload').first().json.firstName + '!</h2><p style=\"margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;\">Enjoyed walking through BayFlow with you today. As promised, here is your trial link to get started:</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom:24px;\"><tr><td align=\"center\"><a href=\"https://app.bayflow.com/signup?ref=demo\" style=\"display:inline-block;background-color:#dc2626;color:#ffffff;font-size:16px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;\">Start Your Free Trial</a></td></tr></table><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">You get 14 days to try everything. No credit card needed. Set up your shop, create a few repair orders, run a digital inspection. See if it feels right for how you work.</p><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">If anything comes up or you want help getting set up, just reply to this email. I read every one.</p><p style=\"margin:16px 0 0;color:#374151;font-size:15px;\">Talk soon,<br>Shalin</p></td></tr><tr><td style=\"padding:24px 40px;background-color:#f9fafb;border-top:1px solid #e5e7eb;\"><p style=\"margin:0;color:#9ca3af;font-size:13px;text-align:center;\">BayFlow \\u2014 Shop management software for independent auto repair shops</p></td></tr></table></td></tr></table></body></html>' }) }}",
+        "options": {}
+      },
+      "id": "send-trial-email",
+      "name": "Send Trial Link Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $('Parse Demo Payload').first().json.businessId, activity_type: 'demo_interested', description: 'Demo completed - interested. Trial started for ' + $('Parse Demo Payload').first().json.email + '. Notes: ' + $('Parse Demo Payload').first().json.notes, metadata: { email: $('Parse Demo Payload').first().json.email, outcome: 'interested', notes: $('Parse Demo Payload').first().json.notes } }) }}",
+        "options": {}
+      },
+      "id": "log-activity-interested",
+      "name": "Log Activity: Interested",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Demo Lifecycle', businessId: $('Parse Demo Payload').first().json.businessId, severity: 'info', message: 'Lead interested, trial started: ' + $('Parse Demo Payload').first().json.email + '. Notes: ' + $('Parse Demo Payload').first().json.notes }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram-interested",
+      "name": "Notify: Interested & Trial Started",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, -400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', outcome: 'interested', email: $('Parse Demo Payload').first().json.email, action: 'trial_started' }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-interested",
+      "name": "Respond OK (Interested)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, -400]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const data = $('Parse Demo Payload').first().json;\nconst now = new Date();\nconst followUp = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);\nconst followUpDate = followUp.toISOString().split('T')[0];\n\nreturn [{ json: { ...data, nextFollowUpDate: followUpDate } }];"
+      },
+      "id": "calc-followup-date",
+      "name": "Calculate Follow-Up Date (+3d)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, -100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($json.email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ next_follow_up_date: $json.nextFollowUpDate }) }}",
+        "options": {}
+      },
+      "id": "save-followup-date",
+      "name": "Save Follow-Up Date",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, -100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$json.email], subject: 'Thanks for checking out BayFlow', html: '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head><body style=\"margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f9fafb;padding:40px 20px;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);\"><tr><td style=\"background-color:#dc2626;padding:32px 40px;\"><h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;\">BayFlow</h1></td></tr><tr><td style=\"padding:40px;\"><h2 style=\"margin:0 0 8px;color:#111827;font-size:22px;font-weight:600;\">Thanks for your time, ' + $json.firstName + '</h2><p style=\"margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;\">Appreciated you taking the time to look at BayFlow today. Totally understand if you need to think it over or check with your team.</p><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">Whenever you are ready, the trial is here for you. 14 days, no credit card, no strings:</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom:24px;\"><tr><td align=\"center\"><a href=\"https://app.bayflow.com/signup?ref=demo\" style=\"display:inline-block;background-color:#dc2626;color:#ffffff;font-size:16px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;\">Start Free Trial</a></td></tr></table><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">If you had any questions we did not get to, just reply here. Happy to help.</p><p style=\"margin:16px 0 0;color:#374151;font-size:15px;\">Talk soon,<br>Shalin</p></td></tr><tr><td style=\"padding:24px 40px;background-color:#f9fafb;border-top:1px solid #e5e7eb;\"><p style=\"margin:0;color:#9ca3af;font-size:13px;text-align:center;\">BayFlow \\u2014 Shop management software for independent auto repair shops</p></td></tr></table></td></tr></table></body></html>' }) }}",
+        "options": {}
+      },
+      "id": "send-needs-time-email",
+      "name": "Send Thanks Email (Needs Time)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, -100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $json.businessId, activity_type: 'demo_needs_time', description: 'Demo completed - needs time. Follow-up scheduled for ' + $json.nextFollowUpDate + '. Email: ' + $json.email, metadata: { email: $json.email, outcome: 'needs_time', follow_up: $json.nextFollowUpDate, notes: $json.notes } }) }}",
+        "options": {}
+      },
+      "id": "log-activity-needs-time",
+      "name": "Log Activity: Needs Time",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, -100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', outcome: 'needs_time', email: $('Parse Demo Payload').first().json.email, action: 'follow_up_scheduled', follow_up_date: $json.nextFollowUpDate }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-needs-time",
+      "name": "Respond OK (Needs Time)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, -100]
+    },
+
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($('Parse Demo Payload').first().json.email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'rejected' }) }}",
+        "options": {}
+      },
+      "id": "update-lead-rejected",
+      "name": "Update Lead: rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $('Parse Demo Payload').first().json.businessId, email: $('Parse Demo Payload').first().json.email, what_didnt_work: $('Parse Demo Payload').first().json.notes || 'Not interested after demo', stage: 'demo', recorded_at: $('Parse Demo Payload').first().json.now }) }}",
+        "options": {}
+      },
+      "id": "log-rejection-intel",
+      "name": "Log to Outreach Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $('Parse Demo Payload').first().json.businessId, activity_type: 'demo_not_interested', description: 'Demo completed - not interested. Outreach stopped for ' + $('Parse Demo Payload').first().json.email + '. Reason: ' + $('Parse Demo Payload').first().json.notes, metadata: { email: $('Parse Demo Payload').first().json.email, outcome: 'not_interested', notes: $('Parse Demo Payload').first().json.notes } }) }}",
+        "options": {}
+      },
+      "id": "log-activity-not-interested",
+      "name": "Log Activity: Not Interested",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', outcome: 'not_interested', email: $('Parse Demo Payload').first().json.email, action: 'rejected_outreach_stopped' }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-not-interested",
+      "name": "Respond OK (Not Interested)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 200]
+    },
+
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.' + encodeURIComponent($('Parse Demo Payload').first().json.email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'replied', demo_date: null, demo_outcome: 'no_show' }) }}",
+        "options": {}
+      },
+      "id": "update-lead-no-show",
+      "name": "Update Lead: replied (no-show re-enter)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$('Parse Demo Payload').first().json.email], subject: 'We missed you today', html: '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head><body style=\"margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f9fafb;padding:40px 20px;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);\"><tr><td style=\"background-color:#dc2626;padding:32px 40px;\"><h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;\">BayFlow</h1></td></tr><tr><td style=\"padding:40px;\"><h2 style=\"margin:0 0 8px;color:#111827;font-size:22px;font-weight:600;\">No worries, ' + $('Parse Demo Payload').first().json.firstName + '</h2><p style=\"margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;\">Looks like we missed each other for the BayFlow demo. Happens to the best of us, especially when you are running a shop.</p><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">Whenever you have 15 minutes free, grab a new time that works for you:</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom:24px;\"><tr><td align=\"center\"><a href=\"https://cal.com/bayflow/demo\" style=\"display:inline-block;background-color:#dc2626;color:#ffffff;font-size:16px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;\">Pick a New Time</a></td></tr></table><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">Or if you changed your mind, no hard feelings at all. Just ignore this and we will not bug you again.</p><p style=\"margin:16px 0 0;color:#374151;font-size:15px;\">- Shalin</p></td></tr><tr><td style=\"padding:24px 40px;background-color:#f9fafb;border-top:1px solid #e5e7eb;\"><p style=\"margin:0;color:#9ca3af;font-size:13px;text-align:center;\">BayFlow \\u2014 Shop management software for independent auto repair shops</p></td></tr></table></td></tr></table></body></html>' }) }}",
+        "options": {}
+      },
+      "id": "send-no-show-email",
+      "name": "Send No-Show Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $('Parse Demo Payload').first().json.businessId, activity_type: 'demo_no_show', description: 'Demo no-show. Reschedule email sent, lead re-entered sequence: ' + $('Parse Demo Payload').first().json.email, metadata: { email: $('Parse Demo Payload').first().json.email, outcome: 'no_show' } }) }}",
+        "options": {}
+      },
+      "id": "log-activity-no-show",
+      "name": "Log Activity: No-Show",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', outcome: 'no_show', email: $('Parse Demo Payload').first().json.email, action: 'reschedule_sent_reentered_sequence' }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-no-show",
+      "name": "Respond OK (No-Show)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 500]
+    },
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-followup-trigger",
+      "name": "Daily 9:30 AM Follow-Up Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 1000]
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = $now.toFormat('yyyy-MM-dd');\nreturn [{ json: { today } }];"
+      },
+      "id": "build-today-followup",
+      "name": "Get Today's Date",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 1000]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?demo_outcome=eq.needs_time&next_follow_up_date=lte.' + $json.today + '&status=eq.demo_completed&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-followup-leads",
+      "name": "Fetch Follow-Up Leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 1000],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.all().map(i => i.json);\nconst leads = Array.isArray(response[0]) ? response[0] : response;\nconst valid = leads.filter(l => l.email);\n\nif (valid.length === 0) {\n  return [{ json: { _empty: true, count: 0 } }];\n}\n\nreturn valid.map(l => ({\n  json: {\n    _empty: false,\n    email: l.email,\n    firstName: l.first_name || l.email.split('@')[0].replace(/[._]/g, ' ').split(' ')[0],\n    businessName: l.business_name || '',\n    businessId: l.business_id || 'bayflow'\n  }\n}));"
+      },
+      "id": "process-followup-leads",
+      "name": "Process Follow-Up Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 1000]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "not-empty",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notTrue" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-followup-leads",
+      "name": "Has Follow-Up Leads?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 1000]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$json.email], subject: 'Quick follow-up on BayFlow', html: '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head><body style=\"margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f9fafb;padding:40px 20px;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);\"><tr><td style=\"background-color:#dc2626;padding:32px 40px;\"><h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;\">BayFlow</h1></td></tr><tr><td style=\"padding:40px;\"><h2 style=\"margin:0 0 8px;color:#111827;font-size:22px;font-weight:600;\">Hey ' + $json.firstName + '</h2><p style=\"margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;\">Just checking in on that BayFlow trial. Had a great conversation the other day and wanted to see if you have had a chance to think about it.</p><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">The trial is still ready whenever you are. 14 days, no credit card needed. Just sign up and start adding your repair orders:</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom:24px;\"><tr><td align=\"center\"><a href=\"https://app.bayflow.com/signup?ref=demo-followup\" style=\"display:inline-block;background-color:#dc2626;color:#ffffff;font-size:16px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;\">Start Free Trial</a></td></tr></table><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">Or if you have questions, just hit reply. I am happy to jump on another quick call too.</p><p style=\"margin:16px 0 0;color:#374151;font-size:15px;\">- Shalin</p></td></tr><tr><td style=\"padding:24px 40px;background-color:#f9fafb;border-top:1px solid #e5e7eb;\"><p style=\"margin:0;color:#9ca3af;font-size:13px;text-align:center;\">BayFlow \\u2014 Shop management software for independent auto repair shops</p></td></tr></table></td></tr></table></body></html>' }) }}",
+        "options": {}
+      },
+      "id": "send-followup-email",
+      "name": "Send Follow-Up Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $json.businessId || 'bayflow', activity_type: 'demo_followup_sent', description: 'Scheduled follow-up email sent to ' + $json.email, metadata: { email: $json.email } }) }}",
+        "options": {}
+      },
+      "id": "log-followup-activity",
+      "name": "Log Follow-Up Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Demo Lifecycle', businessId: 'bayflow', severity: 'info', message: 'Follow-up check: sent ' + $('Process Follow-Up Leads').all().filter(i => !i.json._empty).length + ' follow-up email(s) to needs_time leads.' }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram-followup",
+      "name": "Notify Telegram: Follow-Ups Sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 1100],
+      "continueOnFail": true
+    },
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-trial-conversion-trigger",
+      "name": "Daily 10 AM Trial Conversion Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 1600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\n// 12 days ago\nconst d12 = new Date(now.getTime() - 12 * 24 * 60 * 60 * 1000);\n// 14 days ago (start of window = trials started 12-13 days ago)\nconst d14 = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);\n\n// We want trial_started_at between d14 and d12 (i.e., 12-13 days ago)\nconst rangeStart = d14.toISOString().split('T')[0];\nconst rangeEnd = d12.toISOString().split('T')[0];\n\nreturn [{ json: { rangeStart, rangeEnd } }];"
+      },
+      "id": "calc-trial-window",
+      "name": "Calculate Trial Window (12-13d ago)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 1600]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?status=eq.trial_started&trial_started_at=gte.' + $json.rangeStart + '&trial_started_at=lte.' + $json.rangeEnd + '&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-expiring-trials",
+      "name": "Fetch Expiring Trials",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 1600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.all().map(i => i.json);\nconst leads = Array.isArray(response[0]) ? response[0] : response;\nconst valid = leads.filter(l => l.email);\n\nif (valid.length === 0) {\n  return [{ json: { _empty: true, count: 0 } }];\n}\n\nconst now = new Date();\nreturn valid.map(l => {\n  const trialStart = new Date(l.trial_started_at);\n  const daysLeft = 14 - Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));\n  return {\n    json: {\n      _empty: false,\n      email: l.email,\n      firstName: l.first_name || l.email.split('@')[0].replace(/[._]/g, ' ').split(' ')[0],\n      businessName: l.business_name || '',\n      businessId: l.business_id || 'bayflow',\n      daysLeft: Math.max(daysLeft, 1)\n    }\n  };\n});"
+      },
+      "id": "process-expiring-trials",
+      "name": "Process Expiring Trials",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 1600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "not-empty",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notTrue" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-expiring-trials",
+      "name": "Has Expiring Trials?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 1600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$json.email], subject: $json.firstName + ', your BayFlow trial ends in ' + $json.daysLeft + ' day' + ($json.daysLeft === 1 ? '' : 's'), html: '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head><body style=\"margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f9fafb;padding:40px 20px;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);\"><tr><td style=\"background-color:#dc2626;padding:32px 40px;\"><h1 style=\"margin:0;color:#ffffff;font-size:24px;font-weight:700;\">BayFlow</h1></td></tr><tr><td style=\"padding:40px;\"><h2 style=\"margin:0 0 8px;color:#111827;font-size:22px;font-weight:600;\">Heads up, ' + $json.firstName + '</h2><p style=\"margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;\">Your BayFlow trial wraps up in ' + $json.daysLeft + ' day' + ($json.daysLeft === 1 ? '' : 's') + '. All the repair orders, customer info, and inspections you have built are still there and ready to go.</p><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">If you want to keep everything, just upgrade here:</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom:24px;\"><tr><td align=\"center\"><a href=\"https://app.bayflow.com/billing\" style=\"display:inline-block;background-color:#dc2626;color:#ffffff;font-size:16px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;\">Upgrade Now</a></td></tr></table><p style=\"margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;\">And if something has been holding you back from pulling the trigger, just reply and tell me. I would rather fix it than lose you.</p><p style=\"margin:16px 0 0;color:#374151;font-size:15px;\">- Shalin</p></td></tr><tr><td style=\"padding:24px 40px;background-color:#f9fafb;border-top:1px solid #e5e7eb;\"><p style=\"margin:0;color:#9ca3af;font-size:13px;text-align:center;\">BayFlow \\u2014 Shop management software for independent auto repair shops</p></td></tr></table></td></tr></table></body></html>' }) }}",
+        "options": {}
+      },
+      "id": "send-trial-ending-email",
+      "name": "Send Trial Ending Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 1500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $json.businessId || 'bayflow', activity_type: 'trial_ending_reminder', description: 'Trial ending reminder sent to ' + $json.email + '. ' + $json.daysLeft + ' day(s) left.', metadata: { email: $json.email, days_left: $json.daysLeft } }) }}",
+        "options": {}
+      },
+      "id": "log-trial-ending-activity",
+      "name": "Log Trial Ending Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 1500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Demo Lifecycle', businessId: 'bayflow', severity: 'info', message: 'Trial conversion check: ' + $('Process Expiring Trials').all().filter(i => !i.json._empty).length + ' trial(s) expiring soon. Reminder emails sent.' }) }}",
+        "options": {}
+      },
+      "id": "notify-telegram-trials",
+      "name": "Notify Telegram: Trial Reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 1700],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook: Demo Completed": {
+      "main": [[{ "node": "Parse Demo Payload", "type": "main", "index": 0 }]]
+    },
+    "Parse Demo Payload": {
+      "main": [[{ "node": "Update Lead: demo_completed", "type": "main", "index": 0 }]]
+    },
+    "Update Lead: demo_completed": {
+      "main": [[{ "node": "Route by Outcome", "type": "main", "index": 0 }]]
+    },
+    "Route by Outcome": {
+      "main": [
+        [{ "node": "Update Lead: trial_started", "type": "main", "index": 0 }],
+        [{ "node": "Calculate Follow-Up Date (+3d)", "type": "main", "index": 0 }],
+        [{ "node": "Update Lead: rejected", "type": "main", "index": 0 }],
+        [{ "node": "Update Lead: replied (no-show re-enter)", "type": "main", "index": 0 }]
+      ]
+    },
+
+    "Update Lead: trial_started": {
+      "main": [[{ "node": "Send Trial Link Email", "type": "main", "index": 0 }]]
+    },
+    "Send Trial Link Email": {
+      "main": [[{ "node": "Log Activity: Interested", "type": "main", "index": 0 }]]
+    },
+    "Log Activity: Interested": {
+      "main": [[{ "node": "Notify: Interested & Trial Started", "type": "main", "index": 0 }]]
+    },
+    "Notify: Interested & Trial Started": {
+      "main": [[{ "node": "Respond OK (Interested)", "type": "main", "index": 0 }]]
+    },
+
+    "Calculate Follow-Up Date (+3d)": {
+      "main": [[{ "node": "Save Follow-Up Date", "type": "main", "index": 0 }]]
+    },
+    "Save Follow-Up Date": {
+      "main": [[{ "node": "Send Thanks Email (Needs Time)", "type": "main", "index": 0 }]]
+    },
+    "Send Thanks Email (Needs Time)": {
+      "main": [[{ "node": "Log Activity: Needs Time", "type": "main", "index": 0 }]]
+    },
+    "Log Activity: Needs Time": {
+      "main": [[{ "node": "Respond OK (Needs Time)", "type": "main", "index": 0 }]]
+    },
+
+    "Update Lead: rejected": {
+      "main": [[{ "node": "Log to Outreach Intelligence", "type": "main", "index": 0 }]]
+    },
+    "Log to Outreach Intelligence": {
+      "main": [[{ "node": "Log Activity: Not Interested", "type": "main", "index": 0 }]]
+    },
+    "Log Activity: Not Interested": {
+      "main": [[{ "node": "Respond OK (Not Interested)", "type": "main", "index": 0 }]]
+    },
+
+    "Update Lead: replied (no-show re-enter)": {
+      "main": [[{ "node": "Send No-Show Email", "type": "main", "index": 0 }]]
+    },
+    "Send No-Show Email": {
+      "main": [[{ "node": "Log Activity: No-Show", "type": "main", "index": 0 }]]
+    },
+    "Log Activity: No-Show": {
+      "main": [[{ "node": "Respond OK (No-Show)", "type": "main", "index": 0 }]]
+    },
+
+    "Daily 9:30 AM Follow-Up Check": {
+      "main": [[{ "node": "Get Today's Date", "type": "main", "index": 0 }]]
+    },
+    "Get Today's Date": {
+      "main": [[{ "node": "Fetch Follow-Up Leads", "type": "main", "index": 0 }]]
+    },
+    "Fetch Follow-Up Leads": {
+      "main": [[{ "node": "Process Follow-Up Leads", "type": "main", "index": 0 }]]
+    },
+    "Process Follow-Up Leads": {
+      "main": [[{ "node": "Has Follow-Up Leads?", "type": "main", "index": 0 }]]
+    },
+    "Has Follow-Up Leads?": {
+      "main": [
+        [
+          { "node": "Send Follow-Up Email", "type": "main", "index": 0 },
+          { "node": "Notify Telegram: Follow-Ups Sent", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Send Follow-Up Email": {
+      "main": [[{ "node": "Log Follow-Up Activity", "type": "main", "index": 0 }]]
+    },
+
+    "Daily 10 AM Trial Conversion Check": {
+      "main": [[{ "node": "Calculate Trial Window (12-13d ago)", "type": "main", "index": 0 }]]
+    },
+    "Calculate Trial Window (12-13d ago)": {
+      "main": [[{ "node": "Fetch Expiring Trials", "type": "main", "index": 0 }]]
+    },
+    "Fetch Expiring Trials": {
+      "main": [[{ "node": "Process Expiring Trials", "type": "main", "index": 0 }]]
+    },
+    "Process Expiring Trials": {
+      "main": [[{ "node": "Has Expiring Trials?", "type": "main", "index": 0 }]]
+    },
+    "Has Expiring Trials?": {
+      "main": [
+        [
+          { "node": "Send Trial Ending Email", "type": "main", "index": 0 },
+          { "node": "Notify Telegram: Trial Reminders", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Send Trial Ending Email": {
+      "main": [[{ "node": "Log Trial Ending Activity", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
