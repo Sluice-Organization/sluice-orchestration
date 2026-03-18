@@ -27,7 +27,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.github.com/user/repos",
+        "url": "https://api.github.com/orgs/Sluice-Organization/repos",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

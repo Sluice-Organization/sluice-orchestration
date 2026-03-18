@@ -1,1 +1,612 @@
-{}
+{
+  "name": "AI Email Responder - Smartlead Reply Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "smartlead-reply",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-smartlead-reply",
+      "name": "Webhook: Smartlead Reply",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 400],
+      "webhookId": "smartlead-reply"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\n\n// Extract fields from Smartlead webhook payload\nconst leadEmail = body.to_email || body.lead_email || body.email || '';\nconst fromEmail = body.from_email || leadEmail;\nconst replyText = body.reply_text || body.message || body.body || '';\nconst subject = body.subject || '';\nconst campaignId = body.campaign_id || body.sl_campaign_id || '';\nconst leadId = body.lead_id || body.sl_lead_id || '';\nconst messageId = body.message_id || body.sl_message_id || '';\nconst businessId = body.business_id || '';\nconst leadName = body.lead_name || body.name || fromEmail.split('@')[0] || 'there';\nconst companyName = body.company_name || body.company || '';\n\n// Clean reply text - strip quoted/forwarded content\nlet cleanReply = replyText;\nconst splitMarkers = ['On ', '-----Original Message', 'From:', '> On', '---'];\nfor (const marker of splitMarkers) {\n  const idx = cleanReply.indexOf(marker);\n  if (idx > 20) {\n    cleanReply = cleanReply.substring(0, idx).trim();\n  }\n}\n\nconst replyLower = cleanReply.toLowerCase().trim();\n\n// Intent detection\nlet intent = 'OTHER';\n\n// UNSUBSCRIBE\nconst unsubWords = ['unsubscribe', 'remove me', 'opt out', 'stop emailing', 'take me off', 'do not contact', 'don\\'t email', 'don\\'t contact', 'remove from list', 'stop sending'];\nif (unsubWords.some(w => replyLower.includes(w))) {\n  intent = 'UNSUBSCRIBE';\n}\n\n// NEGATIVE\nconst negativeWords = ['not interested', 'no thanks', 'no thank you', 'pass', 'we\\'re good', 'we are good', 'not for us', 'don\\'t need', 'do not need', 'already have', 'go away', 'spam', 'junk'];\nif (intent === 'OTHER' && negativeWords.some(w => replyLower.includes(w))) {\n  intent = 'NEGATIVE';\n}\n\n// READY_FOR_DEMO\nconst demoWords = ['schedule a demo', 'book a demo', 'set up a call', 'let\\'s talk', 'let\\'s chat', 'let\\'s connect', 'schedule a call', 'available for a call', 'i\\'d love a demo', 'show me', 'when can we meet', 'book a time', 'interested in a demo', 'set up a meeting', 'love to see', 'would love to see', 'can we talk', 'can you show', 'free for a call', 'let me know when'];\nif (intent === 'OTHER' && demoWords.some(w => replyLower.includes(w))) {\n  intent = 'READY_FOR_DEMO';\n}\n\n// INTERESTED (general positive but not demo-ready)\nconst interestedWords = ['sounds interesting', 'tell me more', 'send more info', 'more details', 'more information', 'sounds good', 'interesting', 'curious', 'intrigued', 'we might need', 'could be useful', 'send me details'];\nif (intent === 'OTHER' && interestedWords.some(w => replyLower.includes(w))) {\n  intent = 'INTERESTED';\n}\n\n// PRICING_QUESTION\nconst pricingWords = ['how much', 'pricing', 'price', 'cost', 'rate', 'subscription', 'monthly fee', 'per month', 'annual', 'discount', 'free trial', 'trial period', 'what does it cost'];\nif (intent === 'OTHER' && pricingWords.some(w => replyLower.includes(w))) {\n  intent = 'PRICING_QUESTION';\n}\n\n// COMPETITOR_OBJECTION\nconst competitorWords = ['already using', 'we use', 'switched to', 'compared to', 'vs ', 'versus', 'better than', 'how is this different', 'what makes you different', 'why should we switch'];\nif (intent === 'OTHER' && competitorWords.some(w => replyLower.includes(w))) {\n  intent = 'COMPETITOR_OBJECTION';\n}\n\n// TECHNICAL_QUESTION\nconst techWords = ['integrate', 'integration', 'api', 'connect with', 'compatible', 'does it work with', 'support for', 'feature', 'functionality', 'how does it', 'can it', 'does it have', 'export', 'import', 'migrate', 'data'];\nif (intent === 'OTHER' && techWords.some(w => replyLower.includes(w))) {\n  intent = 'TECHNICAL_QUESTION';\n}\n\nreturn [{\n  json: {\n    intent,\n    leadEmail: fromEmail,\n    leadName,\n    companyName,\n    replyText: cleanReply,\n    rawReplyText: replyText,\n    subject,\n    campaignId,\n    leadId,\n    messageId,\n    businessId,\n    receivedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "parse-reply-intent",
+      "name": "Parse Reply Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [250, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\n// Dedup check: if messageId is empty, generate one from content hash\nconst messageId = data.messageId || '';\nconst leadEmail = data.leadEmail || '';\nconst businessId = data.businessId || '';\n\n// We'll check Supabase for existing message_id and lead status\n// For now, pass through with gate flags\nreturn [{\n  json: {\n    ...data,\n    _gateCheckNeeded: true,\n    _dedupKey: messageId || `${leadEmail}-${Date.now()}`\n  }\n}];"
+      },
+      "id": "prepare-gate-check",
+      "name": "Prepare Gate Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.{{ encodeURIComponent($json.leadEmail) }}&select=id,email,status,business_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "check-lead-status",
+      "name": "Check Lead Status (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence?message_id=eq.{{ encodeURIComponent($('Prepare Gate Check').first().json._dedupKey) }}&select=id&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "check-dedup",
+      "name": "Check Message Dedup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse Reply Intent').first().json;\nconst leadStatusResp = $('Check Lead Status (Supabase)').first().json;\nconst dedupResp = $('Check Message Dedup').first().json;\n\n// Check dedup\nconst dedupResults = Array.isArray(dedupResp) ? dedupResp : [dedupResp];\nif (dedupResults.length > 0 && dedupResults[0]?.id) {\n  return [{ json: { ...parsed, _blocked: true, _blockReason: 'DUPLICATE_MESSAGE' } }];\n}\n\n// Check lead status\nconst leadResults = Array.isArray(leadStatusResp) ? leadStatusResp : [leadStatusResp];\nconst lead = leadResults.length > 0 ? leadResults[0] : null;\nconst terminalStatuses = ['converted', 'unsubscribed', 'rejected', 'paying'];\n\nif (lead && terminalStatuses.includes(lead.status)) {\n  return [{ json: { ...parsed, _blocked: true, _blockReason: `LEAD_STATUS_${lead.status.toUpperCase()}` } }];\n}\n\n// Passed gating\nreturn [{ json: { ...parsed, _blocked: false, _blockReason: null, _leadDbId: lead?.id || null } }];"
+      },
+      "id": "gate-decision",
+      "name": "Gate Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "not-blocked",
+              "leftValue": "={{ $json._blocked }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notTrue" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "gate-check",
+      "name": "Passed Gate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "UNSUBSCRIBE",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "UNSUBSCRIBE"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "NEGATIVE",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "NEGATIVE"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "READY_FOR_DEMO",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "READY_FOR_DEMO"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "route-by-intent",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1500, 400]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.{{ encodeURIComponent($json.leadEmail) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'unsubscribed', outreach_active: false, updated_at: new Date().toISOString() }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "unsub-update-lead",
+      "name": "Update Lead: Unsubscribed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://server.smartlead.ai/api/v1/campaigns/{{ $('Parse Reply Intent').first().json.campaignId }}/reply?api_key={{ $env.SMARTLEAD_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $('Parse Reply Intent').first().json.leadId, message_id: $('Parse Reply Intent').first().json.messageId, reply_body: 'Done, you won\\'t hear from us again. Apologies for the interruption.' }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "unsub-send-reply",
+      "name": "Reply: Unsubscribe Confirm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2100, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.{{ encodeURIComponent($json.leadEmail) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'rejected', outreach_active: false, updated_at: new Date().toISOString() }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "negative-update-lead",
+      "name": "Update Lead: Rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://server.smartlead.ai/api/v1/campaigns/{{ $('Parse Reply Intent').first().json.campaignId }}/reply?api_key={{ $env.SMARTLEAD_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $('Parse Reply Intent').first().json.leadId, message_id: $('Parse Reply Intent').first().json.messageId, reply_body: 'Totally understand, appreciate you letting me know. If anything changes down the road, we\\'ll be here. Best of luck!' }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "negative-send-reply",
+      "name": "Reply: Polite Close",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2100, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?email=eq.{{ encodeURIComponent($json.leadEmail) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'demo_booked', updated_at: new Date().toISOString() }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "demo-update-lead",
+      "name": "Update Lead: Demo Booked",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://server.smartlead.ai/api/v1/campaigns/{{ $('Parse Reply Intent').first().json.campaignId }}/reply?api_key={{ $env.SMARTLEAD_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $('Parse Reply Intent').first().json.leadId, message_id: $('Parse Reply Intent').first().json.messageId, reply_body: 'Great to hear you\\'re interested! Here\\'s my calendar link so you can pick a time that works best: https://cal.com/forge-demo\\n\\nLooking forward to showing you what we\\'ve built.' }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "demo-send-reply",
+      "name": "Reply: Cal.com Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2100, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'Email Responder', severity: 'critical', businessId: $('Parse Reply Intent').first().json.businessId, message: 'DEMO REQUEST from ' + $('Parse Reply Intent').first().json.leadName + ' (' + $('Parse Reply Intent').first().json.leadEmail + ') at ' + $('Parse Reply Intent').first().json.companyName + '\\n\\nTheir reply: ' + $('Parse Reply Intent').first().json.replyText.substring(0, 500), requiresResponse: false }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "demo-notify-telegram",
+      "name": "Notify Telegram: Demo Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2100, 650],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst intent = data.intent;\nconst businessId = data.businessId;\n\n// Build context lookup URLs\nreturn [{\n  json: {\n    ...data,\n    _prdUrl: `https://api.github.com/repos/Sluice-Organization/sluice-${businessId || 'orchestration'}/contents/memory-bank/prd.md`,\n    _configUrl: `https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/system_config?business_id=eq.${businessId}&select=*`,\n    _intelUrl: `https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence?business_id=eq.${businessId}&intent_type=in.(${intent},POSITIVE)&order=created_at.desc&limit=5`\n  }\n}];"
+      },
+      "id": "prepare-context-lookup",
+      "name": "Prepare Context Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 800]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json._prdUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github+json" }
+          ]
+        },
+        "options": { "timeout": 15000 },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi"
+      },
+      "id": "fetch-prd",
+      "name": "Fetch PRD from GitHub",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2050, 750],
+      "credentials": {
+        "githubApi": { "id": "github-cred", "name": "GitHub API" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Prepare Context Lookup').first().json._configUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "fetch-pricing",
+      "name": "Fetch Pricing (system_config)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2050, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Prepare Context Lookup').first().json._intelUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "fetch-outreach-intel",
+      "name": "Fetch Outreach Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2050, 1050],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Prepare Context Lookup').first().json;\nconst prdResp = $('Fetch PRD from GitHub').first().json;\nconst configResp = $('Fetch Pricing (system_config)').first().json;\nconst intelResp = $('Fetch Outreach Intelligence').first().json;\n\n// Decode PRD\nlet prdContent = 'No PRD available.';\ntry {\n  if (prdResp.content) {\n    prdContent = Buffer.from(prdResp.content, 'base64').toString('utf-8');\n    if (prdContent.length > 2000) prdContent = prdContent.substring(0, 2000) + '...';\n  }\n} catch(e) { /* ignore */ }\n\n// Extract pricing\nlet pricingInfo = 'No pricing info available.';\ntry {\n  const configs = Array.isArray(configResp) ? configResp : [configResp];\n  if (configs[0]?.pricing) {\n    pricingInfo = JSON.stringify(configs[0].pricing);\n  } else if (configs[0]) {\n    pricingInfo = JSON.stringify(configs[0]);\n  }\n} catch(e) { /* ignore */ }\n\n// Extract past successful replies\nlet pastReplies = 'No past intelligence available.';\ntry {\n  const intel = Array.isArray(intelResp) ? intelResp : [intelResp];\n  if (intel.length > 0 && intel[0]?.id) {\n    pastReplies = intel.map(i => `Intent: ${i.intent_type}, Reply: ${(i.reply_sent || '').substring(0, 200)}`).join('\\n');\n  }\n} catch(e) { /* ignore */ }\n\nreturn [{\n  json: {\n    ...parsed,\n    prdContext: prdContent,\n    pricingContext: pricingInfo,\n    pastRepliesContext: pastReplies\n  }\n}];"
+      },
+      "id": "assemble-context",
+      "name": "Assemble Business Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst prompt = `You are a sales rep replying to a lead's email. Your job is to write a short, natural, helpful reply.\n\nRULES (CRITICAL - follow every single one):\n- Write like a real person. Short sentences. Casual but professional.\n- NEVER use these words: leverage, utilize, streamline, cutting-edge, revolutionary, innovative, game-changer, synergy, robust, seamless, holistic, paradigm, empower, delighted, thrilled\n- NEVER start with \"Great question!\" or \"Thanks for reaching out!\" or \"I appreciate your interest!\"\n- NEVER use exclamation marks more than once in the entire reply\n- Keep it under 100 words\n- Match the lead's tone and energy level\n- Be direct and specific, not vague and salesy\n- If you don't know something, say so honestly\n- Sign off with just a first name, no title\n\nLEAD INFO:\n- Name: ${data.leadName}\n- Company: ${data.companyName}\n- Their reply intent: ${data.intent}\n- Their actual reply: \"${data.replyText}\"\n\nBUSINESS CONTEXT:\nProduct info: ${data.prdContext.substring(0, 800)}\nPricing: ${data.pricingContext.substring(0, 500)}\n\nPAST SUCCESSFUL REPLIES FOR REFERENCE:\n${data.pastRepliesContext.substring(0, 500)}\n\nINTENT-SPECIFIC GUIDANCE:\n${data.intent === 'PRICING_QUESTION' ? 'Answer their pricing question directly. Include actual numbers if available. Offer to hop on a quick call if pricing is complex.' : ''}\n${data.intent === 'COMPETITOR_OBJECTION' ? 'Acknowledge what they use. Don\\'t trash competitors. Focus on 1-2 specific differences that matter for their use case.' : ''}\n${data.intent === 'INTERESTED' ? 'Keep momentum. Ask a specific question about their current workflow to qualify them. Offer a concrete next step.' : ''}\n${data.intent === 'TECHNICAL_QUESTION' ? 'Answer technically and accurately. If unsure, say \"let me confirm with our team and get back to you.\" Don\\'t make things up.' : ''}\n${data.intent === 'OTHER' ? 'Read their message carefully and respond helpfully. If unclear, ask a clarifying question.' : ''}\n\nWrite ONLY the reply body. No subject line. No greeting like \"Hi [Name],\" - just the body text and sign-off.`;\n\nreturn [{ json: { ...data, _llmPrompt: prompt } }];"
+      },
+      "id": "build-llm-prompt",
+      "name": "Build LLM Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2550, 900]
+    },
+    {
+      "parameters": {
+        "prompt": "={{ $json._llmPrompt }}",
+        "options": {}
+      },
+      "id": "llm-chain",
+      "name": "Generate Reply (LLM Chain)",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [2800, 900]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-haiku-20241022",
+        "options": {
+          "maxTokensToSample": 300,
+          "temperature": 0.7
+        }
+      },
+      "id": "haiku-model",
+      "name": "Anthropic Haiku",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [2800, 1100],
+      "credentials": {
+        "anthropicApi": { "id": "anthropic-cred", "name": "Anthropic API" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Build LLM Prompt').first().json;\nconst llmOutput = $('Generate Reply (LLM Chain)').first().json;\n\n// Extract the generated reply text\nconst generatedReply = llmOutput.text || llmOutput.response || llmOutput.output || 'Sorry, I need a moment to get back to you on this. Will follow up shortly.';\n\n// Clean up: add greeting\nconst greeting = `Hi ${parsed.leadName.split(' ')[0]},\\n\\n`;\nconst fullReply = greeting + generatedReply.trim();\n\nreturn [{\n  json: {\n    ...parsed,\n    generatedReply: fullReply\n  }\n}];"
+      },
+      "id": "format-reply",
+      "name": "Format Generated Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3050, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://server.smartlead.ai/api/v1/campaigns/{{ $json.campaignId }}/reply?api_key={{ $env.SMARTLEAD_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.leadId, message_id: $json.messageId, reply_body: $json.generatedReply }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "send-smartlead-reply",
+      "name": "Send Reply via Smartlead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, 900],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge all paths back for logging\n// Try to get data from whichever path executed\nconst parsed = $('Parse Reply Intent').first().json;\n\nlet replySent = '';\nlet action = '';\n\n// Check which path we came from\ntry {\n  const formatted = $('Format Generated Reply').first();\n  if (formatted) {\n    replySent = formatted.json.generatedReply || '';\n    action = 'AI_REPLY_SENT';\n  }\n} catch(e) {}\n\nif (!action) {\n  // Must be from a fixed-reply path\n  if (parsed.intent === 'UNSUBSCRIBE') {\n    replySent = 'Done, you won\\'t hear from us again.';\n    action = 'UNSUBSCRIBE_CONFIRMED';\n  } else if (parsed.intent === 'NEGATIVE') {\n    replySent = 'Polite close sent.';\n    action = 'NEGATIVE_CLOSED';\n  } else if (parsed.intent === 'READY_FOR_DEMO') {\n    replySent = 'Cal.com link sent.';\n    action = 'DEMO_LINK_SENT';\n  }\n}\n\nreturn [{\n  json: {\n    business_id: parsed.businessId,\n    lead_email: parsed.leadEmail,\n    lead_name: parsed.leadName,\n    company_name: parsed.companyName,\n    intent_type: parsed.intent,\n    incoming_message: parsed.replyText,\n    reply_sent: replySent,\n    action: action,\n    message_id: parsed.messageId,\n    campaign_id: parsed.campaignId,\n    created_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "prepare-log-data",
+      "name": "Prepare Log Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3550, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "log-outreach-intel",
+      "name": "Log to outreach_intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3800, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ business_id: $json.business_id, agent: 'email-responder', action: $json.action, details: JSON.stringify({ lead: $json.lead_email, intent: $json.intent_type, company: $json.company_name }), created_at: $json.created_at }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "log-activity",
+      "name": "Log to activities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3800, 500],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook: Smartlead Reply": {
+      "main": [[ { "node": "Parse Reply Intent", "type": "main", "index": 0 } ]]
+    },
+    "Parse Reply Intent": {
+      "main": [[ { "node": "Prepare Gate Check", "type": "main", "index": 0 } ]]
+    },
+    "Prepare Gate Check": {
+      "main": [[
+        { "node": "Check Lead Status (Supabase)", "type": "main", "index": 0 },
+        { "node": "Check Message Dedup", "type": "main", "index": 0 }
+      ]]
+    },
+    "Check Lead Status (Supabase)": {
+      "main": [[ { "node": "Gate Decision", "type": "main", "index": 0 } ]]
+    },
+    "Check Message Dedup": {
+      "main": [[ { "node": "Gate Decision", "type": "main", "index": 0 } ]]
+    },
+    "Gate Decision": {
+      "main": [[ { "node": "Passed Gate?", "type": "main", "index": 0 } ]]
+    },
+    "Passed Gate?": {
+      "main": [
+        [ { "node": "Route by Intent", "type": "main", "index": 0 } ],
+        []
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [ { "node": "Update Lead: Unsubscribed", "type": "main", "index": 0 } ],
+        [ { "node": "Update Lead: Rejected", "type": "main", "index": 0 } ],
+        [ { "node": "Update Lead: Demo Booked", "type": "main", "index": 0 } ],
+        [ { "node": "Prepare Context Lookup", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Update Lead: Unsubscribed": {
+      "main": [[ { "node": "Reply: Unsubscribe Confirm", "type": "main", "index": 0 } ]]
+    },
+    "Reply: Unsubscribe Confirm": {
+      "main": [[ { "node": "Prepare Log Data", "type": "main", "index": 0 } ]]
+    },
+    "Update Lead: Rejected": {
+      "main": [[ { "node": "Reply: Polite Close", "type": "main", "index": 0 } ]]
+    },
+    "Reply: Polite Close": {
+      "main": [[ { "node": "Prepare Log Data", "type": "main", "index": 0 } ]]
+    },
+    "Update Lead: Demo Booked": {
+      "main": [[ { "node": "Reply: Cal.com Link", "type": "main", "index": 0 } ]]
+    },
+    "Reply: Cal.com Link": {
+      "main": [
+        [
+          { "node": "Notify Telegram: Demo Request", "type": "main", "index": 0 },
+          { "node": "Prepare Log Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Prepare Context Lookup": {
+      "main": [[
+        { "node": "Fetch PRD from GitHub", "type": "main", "index": 0 },
+        { "node": "Fetch Pricing (system_config)", "type": "main", "index": 0 },
+        { "node": "Fetch Outreach Intelligence", "type": "main", "index": 0 }
+      ]]
+    },
+    "Fetch PRD from GitHub": {
+      "main": [[ { "node": "Assemble Business Context", "type": "main", "index": 0 } ]]
+    },
+    "Fetch Pricing (system_config)": {
+      "main": [[ { "node": "Assemble Business Context", "type": "main", "index": 0 } ]]
+    },
+    "Fetch Outreach Intelligence": {
+      "main": [[ { "node": "Assemble Business Context", "type": "main", "index": 0 } ]]
+    },
+    "Assemble Business Context": {
+      "main": [[ { "node": "Build LLM Prompt", "type": "main", "index": 0 } ]]
+    },
+    "Build LLM Prompt": {
+      "main": [[ { "node": "Generate Reply (LLM Chain)", "type": "main", "index": 0 } ]]
+    },
+    "Generate Reply (LLM Chain)": {
+      "main": [[ { "node": "Format Generated Reply", "type": "main", "index": 0 } ]]
+    },
+    "Format Generated Reply": {
+      "main": [[ { "node": "Send Reply via Smartlead", "type": "main", "index": 0 } ]]
+    },
+    "Send Reply via Smartlead": {
+      "main": [[ { "node": "Prepare Log Data", "type": "main", "index": 0 } ]]
+    },
+    "Prepare Log Data": {
+      "main": [[
+        { "node": "Log to outreach_intelligence", "type": "main", "index": 0 },
+        { "node": "Log to activities", "type": "main", "index": 0 }
+      ]]
+    },
+    "Anthropic Haiku": {
+      "ai_languageModel": [[ { "node": "Generate Reply (LLM Chain)", "type": "ai_languageModel", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}
