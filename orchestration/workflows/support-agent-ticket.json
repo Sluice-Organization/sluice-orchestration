@@ -46,7 +46,11 @@
     },
     {
       "parameters": {
-        "model": "claude-haiku-4-5-20251001",
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-haiku-4-5-20251001"
+        },
         "options": {
           "temperature": 0.2,
           "maxTokensToSample": 1000
@@ -199,13 +203,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ agent: 'Support Agent', message: 'Ticket escalated - From: ' + $json.customerEmail + ' | Subject: ' + $json.subject + ' | Severity: ' + $json.severity + ' | Reason: ' + $json.escalation_reason, severity: 'warning', businessId: $json.businessId, requiresResponse: false }) }}",
-        "options": { "timeout": 10000 }
+        "options": {
+          "timeout": 10000
+        }
       },
       "id": "notify-telegram",
       "name": "Notify Human (Telegram)",

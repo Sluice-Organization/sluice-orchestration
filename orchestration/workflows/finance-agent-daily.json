@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "0 7 * * *" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
         }
       },
       "id": "daily-trigger",
       "name": "Daily 7 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -20,8 +28,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            }
           ]
         },
         "options": {}
@@ -30,7 +44,10 @@
       "name": "Fetch Active Businesses",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -41,7 +58,10 @@
       "name": "Split Into Businesses",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -55,7 +75,10 @@
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [660, -100],
+      "position": [
+        660,
+        -100
+      ],
       "continueOnFail": true
     },
     {
@@ -70,7 +93,10 @@
       "name": "Read Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [660, 100],
+      "position": [
+        660,
+        100
+      ],
       "continueOnFail": true
     },
     {
@@ -81,7 +107,10 @@
       "name": "Build Finance Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -92,11 +121,18 @@
       "name": "Finance LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
-        "model": "claude-haiku-4-5-20251001",
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-haiku-4-5-20251001"
+        },
         "options": {
           "temperature": 0.2,
           "maxTokensToSample": 1500
@@ -106,7 +142,10 @@
       "name": "Haiku Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [880, 220]
+      "position": [
+        880,
+        220
+      ]
     },
     {
       "parameters": {
@@ -116,7 +155,10 @@
       "name": "Parse Metrics",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {
@@ -125,15 +167,27 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "business_id", "value": "=eq.{{ $('Split Into Businesses').first().json.businessId }}" },
-            { "name": "select", "value": "id" }
+            {
+              "name": "business_id",
+              "value": "=eq.{{ $('Split Into Businesses').first().json.businessId }}"
+            },
+            {
+              "name": "select",
+              "value": "id"
+            }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            }
           ]
         },
         "options": {}
@@ -142,7 +196,10 @@
       "name": "Lookup Business ID",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 0],
+      "position": [
+        1320,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -159,7 +216,10 @@
       "name": "Write Finance Report",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1540, -200]
+      "position": [
+        1540,
+        -200
+      ]
     },
     {
       "parameters": {
@@ -168,10 +228,22 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "resolution=merge-duplicates,return=representation" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
           ]
         },
         "sendBody": true,
@@ -183,7 +255,10 @@
       "name": "Insert Daily Metrics",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 0],
+      "position": [
+        1540,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -193,16 +268,31 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "business_id", "value": "=eq.{{ $('Split Into Businesses').first().json.businessId }}" }
+            {
+              "name": "business_id",
+              "value": "=eq.{{ $('Split Into Businesses').first().json.businessId }}"
+            }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=representation" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
           ]
         },
         "sendBody": true,
@@ -214,7 +304,10 @@
       "name": "Update Business MRR",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 200],
+      "position": [
+        1540,
+        200
+      ],
       "continueOnFail": true
     },
     {
@@ -224,10 +317,22 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "resolution=merge-duplicates,return=representation" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
           ]
         },
         "sendBody": true,
@@ -239,46 +344,146 @@
       "name": "Insert Budget Tracking",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 400],
+      "position": [
+        1540,
+        400
+      ],
       "continueOnFail": true
     }
   ],
   "connections": {
     "Daily 7 AM Trigger": {
-      "main": [[{ "node": "Fetch Active Businesses", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch Active Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch Active Businesses": {
-      "main": [[{ "node": "Split Into Businesses", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Split Into Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Split Into Businesses": {
-      "main": [[{ "node": "Read State", "type": "main", "index": 0 }, { "node": "Read Strategy", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Read State",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read State": {
-      "main": [[{ "node": "Build Finance Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Finance Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Strategy": {
-      "main": [[{ "node": "Build Finance Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Finance Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Finance Prompt": {
-      "main": [[{ "node": "Finance LLM Chain", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Finance LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Haiku Model": {
-      "ai_languageModel": [[{ "node": "Finance LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "Finance LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Finance LLM Chain": {
-      "main": [[{ "node": "Parse Metrics", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse Metrics": {
-      "main": [[{ "node": "Lookup Business ID", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Lookup Business ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Lookup Business ID": {
-      "main": [[
-        { "node": "Write Finance Report", "type": "main", "index": 0 },
-        { "node": "Insert Daily Metrics", "type": "main", "index": 0 },
-        { "node": "Update Business MRR", "type": "main", "index": 0 },
-        { "node": "Insert Budget Tracking", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "Write Finance Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert Daily Metrics",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Business MRR",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert Budget Tracking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }

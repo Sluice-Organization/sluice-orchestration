@@ -16,7 +16,10 @@
       "name": "Monday 10 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -25,8 +28,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            }
           ]
         },
         "options": {}
@@ -35,7 +44,10 @@
       "name": "List Businesses",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -46,7 +58,10 @@
       "name": "Filter Active Businesses",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -60,7 +75,10 @@
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -74,7 +92,10 @@
       "name": "Read Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -88,7 +109,10 @@
       "name": "Read Content Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {
@@ -102,7 +126,10 @@
       "name": "Read Weekly Plan",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1320, 0]
+      "position": [
+        1320,
+        0
+      ]
     },
     {
       "parameters": {
@@ -112,7 +139,10 @@
       "name": "Compute Report Dates",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, 0]
+      "position": [
+        1540,
+        0
+      ]
     },
     {
       "parameters": {
@@ -126,7 +156,10 @@
       "name": "Read CEO Report Today",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1760, -200],
+      "position": [
+        1760,
+        -200
+      ],
       "continueOnFail": true
     },
     {
@@ -141,7 +174,10 @@
       "name": "Read CEO Report Yesterday",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1980, -200],
+      "position": [
+        1980,
+        -200
+      ],
       "continueOnFail": true
     },
     {
@@ -156,7 +192,10 @@
       "name": "Read Finance Report Today",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [2200, -200],
+      "position": [
+        2200,
+        -200
+      ],
       "continueOnFail": true
     },
     {
@@ -171,7 +210,10 @@
       "name": "Read Finance Report Yesterday",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [2420, -200],
+      "position": [
+        2420,
+        -200
+      ],
       "continueOnFail": true
     },
     {
@@ -186,7 +228,10 @@
       "name": "Read Content Report Today",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [2640, -200],
+      "position": [
+        2640,
+        -200
+      ],
       "continueOnFail": true
     },
     {
@@ -201,7 +246,10 @@
       "name": "Read Content Report Yesterday",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [2860, -200],
+      "position": [
+        2860,
+        -200
+      ],
       "continueOnFail": true
     },
     {
@@ -212,7 +260,10 @@
       "name": "Merge Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3080, 0]
+      "position": [
+        3080,
+        0
+      ]
     },
     {
       "parameters": {
@@ -223,11 +274,18 @@
       "name": "Comptroller LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [3300, 0]
+      "position": [
+        3300,
+        0
+      ]
     },
     {
       "parameters": {
-        "model": "claude-sonnet-4-6",
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-sonnet-4-6"
+        },
         "options": {
           "temperature": 0.2,
           "maxTokensToSample": 2500
@@ -237,7 +295,10 @@
       "name": "Anthropic Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [3300, 220]
+      "position": [
+        3300,
+        220
+      ]
     },
     {
       "parameters": {
@@ -247,7 +308,10 @@
       "name": "Parse Verdict",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3520, 0]
+      "position": [
+        3520,
+        0
+      ]
     },
     {
       "parameters": {
@@ -276,7 +340,10 @@
       "name": "IF Rejected",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [3740, 0]
+      "position": [
+        3740,
+        0
+      ]
     },
     {
       "parameters": {
@@ -295,7 +362,10 @@
       "name": "Update Weekly Plan",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [3960, -100]
+      "position": [
+        3960,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -311,7 +381,10 @@
       "name": "Write Review (Rejected)",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [4180, -100]
+      "position": [
+        4180,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -327,7 +400,10 @@
       "name": "Write Review (Approved)",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [3960, 150]
+      "position": [
+        3960,
+        150
+      ]
     },
     {
       "parameters": {
@@ -336,19 +412,27 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ agent: 'Comptroller', message: 'Weekly plan REJECTED for ' + $json.businessId + '. Revised plan has been committed. Review: ' + $json.reviewText.substring(0, 500), severity: 'warning', businessId: $json.businessId, requiresResponse: false }) }}",
-        "options": { "timeout": 10000 }
+        "options": {
+          "timeout": 10000
+        }
       },
       "id": "notify-telegram",
       "name": "Notify Human (Telegram)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3960, -300],
+      "position": [
+        3960,
+        -300
+      ],
       "continueOnFail": true
     }
   ],

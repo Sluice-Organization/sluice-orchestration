@@ -16,7 +16,10 @@
       "name": "Daily 6 AM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, -200]
+      "position": [
+        0,
+        -200
+      ]
     },
     {
       "parameters": {
@@ -28,7 +31,10 @@
       "name": "Webhook Huginn Signal",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [0, 200]
+      "position": [
+        0,
+        200
+      ]
     },
     {
       "parameters": {
@@ -39,7 +45,10 @@
       "name": "Webhook Response",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [2100, 200]
+      "position": [
+        2100,
+        200
+      ]
     },
     {
       "parameters": {
@@ -53,7 +62,10 @@
       "name": "Read Operating Bible (Schedule)",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [250, -300],
+      "position": [
+        250,
+        -300
+      ],
       "continueOnFail": true
     },
     {
@@ -100,7 +112,10 @@
       "name": "Fetch Raw Opportunities (KG)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [250, -100],
+      "position": [
+        250,
+        -100
+      ],
       "continueOnFail": true
     },
     {
@@ -111,7 +126,10 @@
       "name": "Build Prompt (Schedule Path)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [520, -200]
+      "position": [
+        520,
+        -200
+      ]
     },
     {
       "parameters": {
@@ -121,7 +139,10 @@
       "name": "Build Prompt (Webhook Path)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [520, 200]
+      "position": [
+        520,
+        200
+      ]
     },
     {
       "parameters": {
@@ -132,11 +153,18 @@
       "name": "Discovery LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [780, 0]
+      "position": [
+        780,
+        0
+      ]
     },
     {
       "parameters": {
-        "model": "claude-opus-4-6",
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-opus-4-6"
+        },
         "options": {
           "temperature": 0.5,
           "maxTokensToSample": 4000
@@ -146,7 +174,10 @@
       "name": "Opus Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [780, 220]
+      "position": [
+        780,
+        220
+      ]
     },
     {
       "parameters": {
@@ -156,7 +187,10 @@
       "name": "Parse Scores & Build Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1020, 0]
+      "position": [
+        1020,
+        0
+      ]
     },
     {
       "parameters": {
@@ -192,7 +226,10 @@
       "name": "Write Scores to Knowledge Graph",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1280, -100],
+      "position": [
+        1280,
+        -100
+      ],
       "continueOnFail": true
     },
     {
@@ -209,7 +246,10 @@
       "name": "Write Report to GitHub",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1280, 100]
+      "position": [
+        1280,
+        100
+      ]
     },
     {
       "parameters": {
@@ -239,7 +279,10 @@
       "name": "Has High Scorers?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1540, 0]
+      "position": [
+        1540,
+        0
+      ]
     },
     {
       "parameters": {
@@ -249,7 +292,10 @@
       "name": "Prepare Post-Mortem Query",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1780, -100]
+      "position": [
+        1780,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -291,7 +337,10 @@
       "name": "Fetch Related Post-Mortems",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2000, -100],
+      "position": [
+        2000,
+        -100
+      ],
       "continueOnFail": true
     },
     {
@@ -302,7 +351,10 @@
       "name": "Enrich with Post-Mortem Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2100, -100]
+      "position": [
+        2100,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -312,7 +364,10 @@
       "name": "Build Opportunity Notifications",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2300, -100]
+      "position": [
+        2300,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -322,13 +377,31 @@
       "name": "Route by Score",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2400, -100]
+      "position": [
+        2400,
+        -100
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [{ "id": "auto-approve", "leftValue": "={{ $json._autoApprove }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals", "singleValue": true } }],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "auto-approve",
+              "leftValue": "={{ $json._autoApprove }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
           "combinator": "and"
         }
       },
@@ -336,24 +409,39 @@
       "name": "Auto Approve?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2500, -100]
+      "position": [
+        2500,
+        -100
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://n8n-production-bb4b.up.railway.app/webhook/approve-opportunity",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ businessId: $json.businessId, businessName: $json.businessName, businessDescription: $json.message.substring(0, 200), category: $json.category }) }}",
-        "options": { "timeout": 10000 }
+        "options": {
+          "timeout": 10000
+        }
       },
       "id": "auto-trigger-pipeline",
       "name": "Auto-Trigger Creation Pipeline",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2700, -200],
+      "position": [
+        2700,
+        -200
+      ],
       "continueOnFail": true
     },
     {
@@ -366,11 +454,11 @@
             "inline_keyboard": [
               [
                 {
-                  "text": "\u2705 Approve & Build",
+                  "text": "✅ Approve & Build",
                   "callback_data": "={{ $json.approveData }}"
                 },
                 {
-                  "text": "\u274c Reject",
+                  "text": "❌ Reject",
                   "callback_data": "={{ $json.rejectData }}"
                 }
               ]
@@ -382,7 +470,10 @@
       "name": "Send Opportunity to Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2550, -100],
+      "position": [
+        2550,
+        -100
+      ],
       "credentials": {
         "telegramApi": {
           "id": "telegram-cred",

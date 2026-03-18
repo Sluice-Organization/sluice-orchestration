@@ -16,7 +16,10 @@
       "name": "Daily 11AM Reddit Scan",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 400]
+      "position": [
+        0,
+        400
+      ]
     },
     {
       "parameters": {
@@ -25,17 +28,28 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
           ]
         },
-        "options": { "timeout": 15000 }
+        "options": {
+          "timeout": 15000
+        }
       },
       "id": "fetch-businesses",
       "name": "Fetch Active Businesses",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [250, 400],
+      "position": [
+        250,
+        400
+      ],
       "continueOnFail": true
     },
     {
@@ -46,18 +60,28 @@
       "name": "Map Businesses to Subreddits",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 400]
+      "position": [
+        500,
+        400
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "not-empty",
               "leftValue": "={{ $json._empty }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "notTrue" }
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
             }
           ],
           "combinator": "and"
@@ -68,7 +92,10 @@
       "name": "Has Search Tasks?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [750, 400]
+      "position": [
+        750,
+        400
+      ]
     },
     {
       "parameters": {
@@ -77,7 +104,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "User-Agent", "value": "ForgeBot/1.0 (community engagement)" }
+            {
+              "name": "User-Agent",
+              "value": "ForgeBot/1.0 (community engagement)"
+            }
           ]
         },
         "options": {
@@ -94,7 +124,10 @@
       "name": "Search Reddit Posts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1000, 300],
+      "position": [
+        1000,
+        300
+      ],
       "continueOnFail": true
     },
     {
@@ -105,18 +138,28 @@
       "name": "Score Posts by Intent",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300]
+      "position": [
+        1250,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "not-empty",
               "leftValue": "={{ $json._empty }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "notTrue" }
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
             }
           ],
           "combinator": "and"
@@ -127,7 +170,10 @@
       "name": "Has Scored Posts?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1500, 300]
+      "position": [
+        1500,
+        300
+      ]
     },
     {
       "parameters": {
@@ -136,17 +182,28 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
           ]
         },
-        "options": { "timeout": 15000 }
+        "options": {
+          "timeout": 15000
+        }
       },
       "id": "fetch-existing-drafts",
       "name": "Fetch Already-Replied Posts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1750, 200],
+      "position": [
+        1750,
+        200
+      ],
       "continueOnFail": true
     },
     {
@@ -157,18 +214,28 @@
       "name": "Filter Already-Replied",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2000, 300]
+      "position": [
+        2000,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "not-empty",
               "leftValue": "={{ $json._empty }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "notTrue" }
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
             }
           ],
           "combinator": "and"
@@ -179,7 +246,10 @@
       "name": "Has New Posts?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2250, 300]
+      "position": [
+        2250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -189,7 +259,10 @@
       "name": "Build Reddit Reply Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2500, 200]
+      "position": [
+        2500,
+        200
+      ]
     },
     {
       "parameters": {
@@ -200,11 +273,18 @@
       "name": "Generate Reddit Reply (LLM Chain)",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [2750, 200]
+      "position": [
+        2750,
+        200
+      ]
     },
     {
       "parameters": {
-        "model": "claude-haiku-4-5-20251001",
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-haiku-4-5-20251001"
+        },
         "options": {
           "maxTokensToSample": 400,
           "temperature": 0.8
@@ -214,9 +294,15 @@
       "name": "Anthropic Haiku (Reddit)",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.2,
-      "position": [2750, 450],
+      "position": [
+        2750,
+        450
+      ],
       "credentials": {
-        "anthropicApi": { "id": "anthropic-cred", "name": "Anthropic API" }
+        "anthropicApi": {
+          "id": "anthropic-cred",
+          "name": "Anthropic API"
+        }
       }
     },
     {
@@ -227,7 +313,10 @@
       "name": "Format Draft for Storage",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3000, 200]
+      "position": [
+        3000,
+        200
+      ]
     },
     {
       "parameters": {
@@ -236,22 +325,39 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json) }}",
-        "options": { "timeout": 15000 }
+        "options": {
+          "timeout": 15000
+        }
       },
       "id": "save-draft",
       "name": "Save Draft to reddit_drafts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3250, 200],
+      "position": [
+        3250,
+        200
+      ],
       "continueOnFail": true
     },
     {
@@ -262,7 +368,10 @@
       "name": "Build Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3500, 200]
+      "position": [
+        3500,
+        200
+      ]
     },
     {
       "parameters": {
@@ -271,13 +380,18 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ agent: 'Reddit Engagement', severity: 'info', businessId: 'portfolio', message: $json.summary, requiresResponse: false }) }}",
-        "options": { "timeout": 10000 }
+        "options": {
+          "timeout": 10000
+        }
       },
       "id": "notify-telegram",
       "name": "Notify Telegram: Drafts Ready",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3750, 200],
+      "position": [
+        3750,
+        200
+      ],
       "continueOnFail": true
     },
     {
@@ -287,86 +401,229 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
+            {
+              "name": "apikey",
+              "value": "{{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ business_id: 'portfolio', channel: 'reddit', action: 'daily_scan', intent_type: 'REDDIT_ENGAGEMENT', details: JSON.stringify({ drafts_created: $json.count }), created_at: new Date().toISOString() }) }}",
-        "options": { "timeout": 15000 }
+        "options": {
+          "timeout": 15000
+        }
       },
       "id": "log-outreach-intel",
       "name": "Log to outreach_intelligence",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3750, 400],
+      "position": [
+        3750,
+        400
+      ],
       "continueOnFail": true
     }
   ],
   "connections": {
     "Daily 11AM Reddit Scan": {
-      "main": [[ { "node": "Fetch Active Businesses", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Fetch Active Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch Active Businesses": {
-      "main": [[ { "node": "Map Businesses to Subreddits", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Map Businesses to Subreddits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Map Businesses to Subreddits": {
-      "main": [[ { "node": "Has Search Tasks?", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Has Search Tasks?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Search Tasks?": {
       "main": [
-        [ { "node": "Search Reddit Posts", "type": "main", "index": 0 } ],
+        [
+          {
+            "node": "Search Reddit Posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Search Reddit Posts": {
-      "main": [[ { "node": "Score Posts by Intent", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Score Posts by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Score Posts by Intent": {
-      "main": [[ { "node": "Has Scored Posts?", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Has Scored Posts?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Scored Posts?": {
       "main": [
-        [ { "node": "Fetch Already-Replied Posts", "type": "main", "index": 0 } ],
+        [
+          {
+            "node": "Fetch Already-Replied Posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Fetch Already-Replied Posts": {
-      "main": [[ { "node": "Filter Already-Replied", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Filter Already-Replied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Filter Already-Replied": {
-      "main": [[ { "node": "Has New Posts?", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Has New Posts?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has New Posts?": {
       "main": [
-        [ { "node": "Build Reddit Reply Prompt", "type": "main", "index": 0 } ],
+        [
+          {
+            "node": "Build Reddit Reply Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Build Reddit Reply Prompt": {
-      "main": [[ { "node": "Generate Reddit Reply (LLM Chain)", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Generate Reddit Reply (LLM Chain)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Generate Reddit Reply (LLM Chain)": {
-      "main": [[ { "node": "Format Draft for Storage", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Format Draft for Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Format Draft for Storage": {
-      "main": [[ { "node": "Save Draft to reddit_drafts", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Save Draft to reddit_drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Save Draft to reddit_drafts": {
-      "main": [[ { "node": "Build Summary", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Build Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Summary": {
-      "main": [[
-        { "node": "Notify Telegram: Drafts Ready", "type": "main", "index": 0 },
-        { "node": "Log to outreach_intelligence", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "Notify Telegram: Drafts Ready",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to outreach_intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Anthropic Haiku (Reddit)": {
-      "ai_languageModel": [[ { "node": "Generate Reddit Reply (LLM Chain)", "type": "ai_languageModel", "index": 0 } ]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Reddit Reply (LLM Chain)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }

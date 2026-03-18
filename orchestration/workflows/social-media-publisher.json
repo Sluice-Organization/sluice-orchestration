@@ -104,13 +104,21 @@
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "condition-1",
               "leftValue": "={{ $json.hasReels }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals", "singleValue": true }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -192,13 +200,22 @@
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [{
-            "id": "video-processing",
-            "leftValue": "={{ $json.videoStatus }}",
-            "rightValue": "processing",
-            "operator": { "type": "string", "operation": "equals" }
-          }],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "video-processing",
+              "leftValue": "={{ $json.videoStatus }}",
+              "rightValue": "processing",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
           "combinator": "and"
         }
       },
@@ -516,7 +533,11 @@
     },
     {
       "parameters": {
-        "model": "claude-haiku-4-5-20251001",
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-haiku-4-5-20251001"
+        },
         "options": {
           "maxTokensToSample": 1000,
           "temperature": 0.6

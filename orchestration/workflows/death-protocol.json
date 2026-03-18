@@ -12,7 +12,10 @@
       "name": "Kill Business Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -27,7 +30,10 @@
       "name": "Read State",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [240, 0],
+      "position": [
+        240,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -43,7 +49,10 @@
       "name": "Read Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [480, 0],
+      "position": [
+        480,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -59,7 +68,10 @@
       "name": "Read Weekly Plan",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [720, 0],
+      "position": [
+        720,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -75,7 +87,10 @@
       "name": "Read Content Strategy",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [960, 0],
+      "position": [
+        960,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -91,7 +106,10 @@
       "name": "Read Support Log",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [1200, 0],
+      "position": [
+        1200,
+        0
+      ],
       "continueOnFail": true
     },
     {
@@ -102,7 +120,10 @@
       "name": "Build Post-Mortem Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1440, 0]
+      "position": [
+        1440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -113,11 +134,18 @@
       "name": "CEO Post-Mortem LLM Chain",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [1680, 0]
+      "position": [
+        1680,
+        0
+      ]
     },
     {
       "parameters": {
-        "model": "claude-opus-4-6",
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-opus-4-6"
+        },
         "options": {
           "temperature": 0.3,
           "maxTokensToSample": 4000
@@ -127,7 +155,10 @@
       "name": "Anthropic Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [1680, 220]
+      "position": [
+        1680,
+        220
+      ]
     },
     {
       "parameters": {
@@ -137,7 +168,10 @@
       "name": "Parse Post-Mortem",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1920, 0]
+      "position": [
+        1920,
+        0
+      ]
     },
     {
       "parameters": {
@@ -153,7 +187,10 @@
       "name": "Write Post-Mortem to GitHub",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [2200, -300]
+      "position": [
+        2200,
+        -300
+      ]
     },
     {
       "parameters": {
@@ -188,7 +225,10 @@
       "name": "Insert Post-Mortem into Knowledge Graph",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2200, -100],
+      "position": [
+        2200,
+        -100
+      ],
       "continueOnFail": true
     },
     {
@@ -224,7 +264,10 @@
       "name": "Update Business Status in Knowledge Graph",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2200, 100],
+      "position": [
+        2200,
+        100
+      ],
       "continueOnFail": true
     },
     {
@@ -244,7 +287,10 @@
       "name": "Update state.md to KILLED",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [2200, 300]
+      "position": [
+        2200,
+        300
+      ]
     },
     {
       "parameters": {
@@ -258,7 +304,10 @@
       "name": "Respond - Death Protocol Complete",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [2500, 0]
+      "position": [
+        2500,
+        0
+      ]
     },
     {
       "parameters": {
@@ -267,19 +316,27 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ agent: 'Death Protocol', message: 'KILLING BUSINESS: ' + $json.businessName + ' (ID: ' + $json.businessId + '). Reason: ' + $('Build Post-Mortem Prompt').first().json.killReason + '. Cause of death: ' + ($json.postMortem.cause_of_death || 'See post-mortem').substring(0, 300), severity: 'critical', businessId: $json.businessId, requiresResponse: false }) }}",
-        "options": { "timeout": 10000 }
+        "options": {
+          "timeout": 10000
+        }
       },
       "id": "notify-telegram",
       "name": "Notify Human (Telegram)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2200, 500],
+      "position": [
+        2200,
+        500
+      ],
       "continueOnFail": true
     }
   ],

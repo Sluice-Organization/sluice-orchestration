@@ -12,7 +12,10 @@
       "name": "Webhook: Generate PRD",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 300],
+      "position": [
+        0,
+        300
+      ],
       "webhookId": "generate-prd"
     },
     {
@@ -23,7 +26,10 @@
       "name": "Extract Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [250, 300]
+      "position": [
+        250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -67,7 +73,10 @@
       "name": "Fetch Post Mortems",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 200],
+      "position": [
+        500,
+        200
+      ],
       "continueOnFail": true
     },
     {
@@ -112,7 +121,10 @@
       "name": "Fetch Content Performance",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 400],
+      "position": [
+        500,
+        400
+      ],
       "continueOnFail": true
     },
     {
@@ -123,7 +135,10 @@
       "name": "Build PRD Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [750, 300]
+      "position": [
+        750,
+        300
+      ]
     },
     {
       "parameters": {
@@ -134,11 +149,18 @@
       "name": "CEO: Generate PRD",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [1000, 300]
+      "position": [
+        1000,
+        300
+      ]
     },
     {
       "parameters": {
-        "model": "claude-opus-4-6",
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-opus-4-6"
+        },
         "options": {
           "maxTokensToSample": 8000,
           "temperature": 0.4
@@ -148,7 +170,10 @@
       "name": "Opus (PRD Generation)",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [1000, 500],
+      "position": [
+        1000,
+        500
+      ],
       "credentials": {
         "anthropicApi": {
           "id": "anthropic-cred",
@@ -164,7 +189,10 @@
       "name": "Extract PRD Content",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300]
+      "position": [
+        1250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -175,11 +203,18 @@
       "name": "Comptroller: Review PRD",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [1500, 300]
+      "position": [
+        1500,
+        300
+      ]
     },
     {
       "parameters": {
-        "model": "claude-sonnet-4-6",
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-sonnet-4-6"
+        },
         "options": {
           "maxTokensToSample": 2000,
           "temperature": 0.2
@@ -189,7 +224,10 @@
       "name": "Sonnet (Comptroller Review)",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [1500, 500],
+      "position": [
+        1500,
+        500
+      ],
       "credentials": {
         "anthropicApi": {
           "id": "anthropic-cred",
@@ -205,7 +243,10 @@
       "name": "Parse Comptroller Review",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1750, 300]
+      "position": [
+        1750,
+        300
+      ]
     },
     {
       "parameters": {
@@ -235,7 +276,10 @@
       "name": "PRD Approved?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2000, 300]
+      "position": [
+        2000,
+        300
+      ]
     },
     {
       "parameters": {
@@ -265,7 +309,10 @@
       "name": "Save PRD to GitHub",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2250, 150],
+      "position": [
+        2250,
+        150
+      ],
       "continueOnFail": true
     },
     {
@@ -304,7 +351,10 @@
       "name": "Update Opportunity with PRD",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2250, 350],
+      "position": [
+        2250,
+        350
+      ],
       "continueOnFail": true
     },
     {
@@ -319,7 +369,10 @@
       "name": "Respond: PRD Approved",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [2500, 250]
+      "position": [
+        2500,
+        250
+      ]
     },
     {
       "parameters": {
@@ -336,7 +389,10 @@
       "name": "Notify: PRD Rejected",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2250, 500],
+      "position": [
+        2250,
+        500
+      ],
       "continueOnFail": true
     },
     {
@@ -351,7 +407,10 @@
       "name": "Respond: PRD Rejected",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [2500, 500]
+      "position": [
+        2500,
+        500
+      ]
     }
   ],
   "connections": {
