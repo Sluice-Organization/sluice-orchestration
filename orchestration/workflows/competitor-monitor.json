@@ -106,9 +106,9 @@
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "={{ 'memory-bank/businesses/bayflow/reports/competitor-intel-' + $json.date + '.md' }}",
+        "filePath": "={{ 'memory-bank/businesses/' + ($json.businessId || 'bayflow') + '/reports/competitor-intel-' + $json.date + '.md' }}",
         "fileContent": "={{ $json.report }}",
-        "commitMessage": "={{ 'Competitor Monitor report - bayflow - ' + $json.date }}"
+        "commitMessage": "={{ 'Competitor Monitor report - ' + ($json.businessId || 'bayflow') + ' -' + $json.date }}"
       },
       "id": "write-report",
       "name": "Write Report to GitHub",

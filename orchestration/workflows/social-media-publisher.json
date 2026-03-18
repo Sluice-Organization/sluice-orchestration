@@ -75,7 +75,7 @@
         "operation": "get",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "=memory-bank/businesses/bayflow/reports/content-{{ $now.toFormat('yyyy-MM-dd') }}.md",
+        "filePath": "=memory-bank/businesses/' + ($json.businessId || 'bayflow') + '/reports/content-{{ $now.toFormat('yyyy-MM-dd') }}.md",
         "resource": "file"
       },
       "id": "read-content-report",
@@ -388,7 +388,7 @@
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "=memory-bank/businesses/bayflow/reports/social-publish-{{ $json.reportDate }}.md",
+        "filePath": "=memory-bank/businesses/' + ($json.businessId || 'bayflow') + '/reports/social-publish-{{ $json.reportDate }}.md",
         "fileContent": "={{ $json.report }}",
         "commitMessage": "Social Media Publisher report - bayflow - {{ $json.reportDate }}",
         "resource": "file"
@@ -505,7 +505,7 @@
         "operation": "create",
         "owner": "ShalinPatel670",
         "repository": "sluice-orchestration",
-        "filePath": "=memory-bank/businesses/bayflow/reports/social-publish-{{ $json.reportDate }}.md",
+        "filePath": "=memory-bank/businesses/' + ($json.businessId || 'bayflow') + '/reports/social-publish-{{ $json.reportDate }}.md",
         "fileContent": "={{ $json.report }}",
         "commitMessage": "Social Media Publisher - no reels found - {{ $json.reportDate }}",
         "resource": "file"
