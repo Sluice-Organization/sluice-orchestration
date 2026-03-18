@@ -139,7 +139,7 @@
     },
     {
       "parameters": {
-        "updates": ["*"],
+        "updates": ["message", "callback_query"],
         "additionalFields": {}
       },
       "id": "telegram-callback-trigger",
