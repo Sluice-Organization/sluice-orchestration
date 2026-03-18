@@ -316,6 +316,48 @@
     },
     {
       "parameters": {
+        "jsCode": "const opp = $json;\nconst score = parseFloat(opp.message.match(/Score: \\*(\\d+\\.?\\d*)/)?.[1] || '0');\n\n// Auto-approve above 8.0, manual review 7.0-8.0, auto-reject below 7.0\nif (score >= 8.0) {\n  return [{ json: { ...opp, _autoApprove: true, _score: score } }];\n} else if (score >= 7.0) {\n  return [{ json: { ...opp, _autoApprove: false, _manualReview: true, _score: score } }];\n} else {\n  return [{ json: { ...opp, _autoApprove: false, _manualReview: false, _autoReject: true, _score: score } }];\n}"
+      },
+      "id": "score-routing",
+      "name": "Route by Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2400, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "auto-approve", "leftValue": "={{ $json._autoApprove }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals", "singleValue": true } }],
+          "combinator": "and"
+        }
+      },
+      "id": "if-auto-approve",
+      "name": "Auto Approve?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2500, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/approve-opportunity",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ businessId: $json.businessId, businessName: $json.businessName, businessDescription: $json.message.substring(0, 200), category: $json.category }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "auto-trigger-pipeline",
+      "name": "Auto-Trigger Creation Pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2700, -200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
         "text": "={{ $json.message }}",
         "additionalFields": {
@@ -517,6 +559,35 @@
     },
     "Build Opportunity Notifications": {
       "main": [
+        [
+          {
+            "node": "Route by Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Score": {
+      "main": [
+        [
+          {
+            "node": "Auto Approve?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto Approve?": {
+      "main": [
+        [
+          {
+            "node": "Auto-Trigger Creation Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Send Opportunity to Telegram",
