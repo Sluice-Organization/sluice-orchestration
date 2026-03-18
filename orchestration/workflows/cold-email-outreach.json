@@ -1,5 +1,5 @@
 {
-  "name": "Cold Email Outreach - BayFlow (Flow B DISABLED - use sales-sequence-engine.json)",
+  "name": "Cold Email Outreach - Multi-Business (Flow B DISABLED - use sales-sequence-engine.json)",
   "nodes": [
     {
       "parameters": {
@@ -546,7 +546,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at BayFlow <shalin@bayflow.com>', to: [$json.email], subject: $json.emailSubject, text: $json.emailText }) }}",
+        "jsonBody": "={{ JSON.stringify({ from: 'Shalin at ' + ($json._bizName || 'BayFlow') + ' <shalin@' + ($json._bizDomain || 'bayflow.com') + '>', to: [$json.email], subject: $json.emailSubject, text: $json.emailText }) }}",
         "options": {}
       },
       "id": "send-cold-email",
@@ -671,7 +671,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ business_id: 'bayflow', channel: 'email', outreach_type: $('Process Send Result').first().json.emailType, audience_type: 'auto_repair', tone: $('Process Send Result').first().json.selectedTone, angle: $('Process Send Result').first().json.selectedAngle, hook_type: $('Process Send Result').first().json.selectedHook, intent: 'book_demo', subject_line: $('Process Send Result').first().json.emailSubject, content_preview: ($('Process Send Result').first().json.emailText || '').substring(0, 200), personalization_elements: { name: !!$('Process Send Result').first().json.first_name, city: !!$('Process Send Result').first().json.city, business_name: true }, personalization_depth: ($('Process Send Result').first().json.first_name ? 1 : 0) + ($('Process Send Result').first().json.city ? 1 : 0) + 1, day_of_week: new Date().getDay(), hour_of_day: new Date().getHours(), lead_email: $('Process Send Result').first().json.email, outcome: 'pending', sent_at: new Date().toISOString() }) }}",
+        "jsonBody": "={{ JSON.stringify({ business_id: $('Process Send Result').first().json.business_id || 'bayflow', channel: 'email', outreach_type: $('Process Send Result').first().json.emailType, audience_type: 'auto_repair', tone: $('Process Send Result').first().json.selectedTone, angle: $('Process Send Result').first().json.selectedAngle, hook_type: $('Process Send Result').first().json.selectedHook, intent: 'book_demo', subject_line: $('Process Send Result').first().json.emailSubject, content_preview: ($('Process Send Result').first().json.emailText || '').substring(0, 200), personalization_elements: { name: !!$('Process Send Result').first().json.first_name, city: !!$('Process Send Result').first().json.city, business_name: true }, personalization_depth: ($('Process Send Result').first().json.first_name ? 1 : 0) + ($('Process Send Result').first().json.city ? 1 : 0) + 1, day_of_week: new Date().getDay(), hour_of_day: new Date().getHours(), lead_email: $('Process Send Result').first().json.email, outcome: 'pending', sent_at: new Date().toISOString() }) }}",
         "options": {}
       },
       "id": "log-outreach-intelligence",

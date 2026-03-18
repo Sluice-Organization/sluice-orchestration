@@ -390,7 +390,7 @@
         "repository": "sluice-orchestration",
         "filePath": "=memory-bank/businesses/' + ($json.businessId || 'bayflow') + '/reports/social-publish-{{ $json.reportDate }}.md",
         "fileContent": "={{ $json.report }}",
-        "commitMessage": "Social Media Publisher report - bayflow - {{ $json.reportDate }}",
+        "commitMessage": "=Social Media Publisher report - {{ $json.businessId || 'bayflow' }} - {{ $json.reportDate }}",
         "resource": "file"
       },
       "id": "save-publish-report",

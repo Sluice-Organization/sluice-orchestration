@@ -26,8 +26,8 @@
           "timeout": 10000
         }
       },
-      "id": "check-bayflow",
-      "name": "Check BayFlow Site",
+      "id": "check-business-site",
+      "name": "Check Business Site",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [260, 100],
@@ -71,7 +71,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// Get responses from all checks\nconst bayflowResp = $('Check BayFlow Site').first().json;\nconst n8nResp = $('Check n8n Instance').first().json;\nconst supabaseResp = $('Check Supabase Health').first().json;\n\n// Determine status based on HTTP status codes\nconst bayflowStatus = (bayflowResp.statusCode >= 200 && bayflowResp.statusCode < 400) || bayflowResp.headers ? 'UP' : 'DOWN';\nconst n8nStatus = (n8nResp.statusCode >= 200 && n8nResp.statusCode < 400) || n8nResp.status === 'ok' ? 'UP' : 'DOWN';\nconst supabaseStatus = (supabaseResp.statusCode >= 200 && supabaseResp.statusCode < 400) || (typeof supabaseResp === 'object' && !supabaseResp.error) ? 'UP' : 'DOWN';\n\nconst services = [\n  { name: 'BayFlow Site', status: bayflowStatus, url: 'https://bayflow.com' },\n  { name: 'n8n Instance', status: n8nStatus, url: 'https://n8n-production-bb4b.up.railway.app' },\n  { name: 'Supabase', status: supabaseStatus, url: 'https://wjukfdziomnejtlmegvv.supabase.co' }\n];\n\n// Compare with previous state\nconst previousState = staticData.serviceState || {};\nconst alerts = [];\nconst recoveries = [];\n\nfor (const svc of services) {\n  const prevStatus = previousState[svc.name] || 'UP';\n  if (svc.status === 'DOWN' && prevStatus !== 'DOWN') {\n    alerts.push(svc);\n  } else if (svc.status === 'UP' && prevStatus === 'DOWN') {\n    recoveries.push(svc);\n  }\n}\n\n// Update static data with current state\nconst newState = {};\nfor (const svc of services) {\n  newState[svc.name] = svc.status;\n}\nstaticData.serviceState = newState;\nstaticData.lastChecked = new Date().toISOString();\n\nreturn [{\n  json: {\n    services,\n    alerts,\n    recoveries,\n    hasAlerts: alerts.length > 0,\n    hasRecoveries: recoveries.length > 0,\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// Get responses from all checks\nconst bayflowResp = $('Check Business Site').first().json;\nconst n8nResp = $('Check n8n Instance').first().json;\nconst supabaseResp = $('Check Supabase Health').first().json;\n\n// Determine status based on HTTP status codes\nconst bayflowStatus = (bayflowResp.statusCode >= 200 && bayflowResp.statusCode < 400) || bayflowResp.headers ? 'UP' : 'DOWN';\nconst n8nStatus = (n8nResp.statusCode >= 200 && n8nResp.statusCode < 400) || n8nResp.status === 'ok' ? 'UP' : 'DOWN';\nconst supabaseStatus = (supabaseResp.statusCode >= 200 && supabaseResp.statusCode < 400) || (typeof supabaseResp === 'object' && !supabaseResp.error) ? 'UP' : 'DOWN';\n\nconst services = [\n  { name: 'Business Site', status: bayflowStatus, url: 'https://bayflow.com' },\n  { name: 'n8n Instance', status: n8nStatus, url: 'https://n8n-production-bb4b.up.railway.app' },\n  { name: 'Supabase', status: supabaseStatus, url: 'https://wjukfdziomnejtlmegvv.supabase.co' }\n];\n\n// Compare with previous state\nconst previousState = staticData.serviceState || {};\nconst alerts = [];\nconst recoveries = [];\n\nfor (const svc of services) {\n  const prevStatus = previousState[svc.name] || 'UP';\n  if (svc.status === 'DOWN' && prevStatus !== 'DOWN') {\n    alerts.push(svc);\n  } else if (svc.status === 'UP' && prevStatus === 'DOWN') {\n    recoveries.push(svc);\n  }\n}\n\n// Update static data with current state\nconst newState = {};\nfor (const svc of services) {\n  newState[svc.name] = svc.status;\n}\nstaticData.serviceState = newState;\nstaticData.lastChecked = new Date().toISOString();\n\nreturn [{\n  json: {\n    services,\n    alerts,\n    recoveries,\n    hasAlerts: alerts.length > 0,\n    hasRecoveries: recoveries.length > 0,\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
       "id": "evaluate-status",
       "name": "Evaluate Status",
@@ -190,12 +190,12 @@
   "connections": {
     "Every 5 Minutes": {
       "main": [[
-        { "node": "Check BayFlow Site", "type": "main", "index": 0 },
+        { "node": "Check Business Site", "type": "main", "index": 0 },
         { "node": "Check n8n Instance", "type": "main", "index": 0 },
         { "node": "Check Supabase Health", "type": "main", "index": 0 }
       ]]
     },
-    "Check BayFlow Site": {
+    "Check Business Site": {
       "main": [[{ "node": "Evaluate Status", "type": "main", "index": 0 }]]
     },
     "Check n8n Instance": {

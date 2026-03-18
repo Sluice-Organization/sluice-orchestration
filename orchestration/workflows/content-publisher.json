@@ -1,5 +1,5 @@
 {
-  "name": "Content Publisher - BayFlow Blog",
+  "name": "Content Publisher - Multi-Business Blog",
   "nodes": [
     {
       "parameters": {
@@ -43,7 +43,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.all().map(i => i.json);\nconst businesses = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;\nconst results = [];\nfor (const biz of businesses) {\n  const id = biz.business_id || biz.name;\n  if (!id || id === '_template') continue;\n  results.push({ json: { businessId: id, businessName: biz.name || id, businessPath: 'memory-bank/businesses/' + id, repo_name: biz.repo_name || id } });\n}\nif (results.length === 0) results.push({ json: { businessId: 'bayflow', businessName: 'BayFlow', businessPath: 'memory-bank/businesses/bayflow', repo_name: 'bayflow' } });\nreturn results;"
+        "jsCode": "const raw = $input.all().map(i => i.json);\nconst businesses = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;\nconst results = [];\nfor (const biz of businesses) {\n  const id = biz.business_id || biz.name;\n  if (!id || id === '_template') continue;\n  results.push({ json: { businessId: id, businessName: biz.name || id, businessPath: 'memory-bank/businesses/' + id, repo_name: biz.repo_name || id } });\n}\nif (results.length === 0) results.push({ json: { businessId: 'bayflow', businessName: 'BayFlow', businessPath: 'memory-bank/businesses/bayflow', repo_name: 'bayflow-app' } });\nreturn results;"
       },
       "id": "split-businesses",
       "name": "Split Into Businesses",
@@ -108,7 +108,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Decode the base64 content from GitHub API response\nconst rawContent = Buffer.from($('Step 1 - Read Content Report').first().json.content, 'base64').toString('utf-8');\n\n// Split content by the ---PIECE--- markers used by Content Agent\nconst pieces = rawContent.split('---PIECE---').filter(p => p.trim().length > 0);\n\nconst today = $now.toFormat('yyyy-MM-dd');\nconst blogPosts = [];\n\nfor (const piece of pieces) {\n  const trimmed = piece.trim();\n  \n  // Only process blog type pieces (skip reels)\n  const typeMatch = trimmed.match(/type:\\s*(blog|reel)/i);\n  if (typeMatch && typeMatch[1].toLowerCase() === 'reel') {\n    continue; // Skip reel scripts\n  }\n  \n  let title = '';\n  let excerpt = '';\n  let tags = ['auto repair', 'shop management'];\n  let bodyContent = trimmed;\n  \n  // Check if piece already has frontmatter\n  const frontmatterMatch = trimmed.match(/^---\\n([\\s\\S]*?)\\n---\\n([\\s\\S]*)$/);\n  if (frontmatterMatch) {\n    const fm = frontmatterMatch[1];\n    bodyContent = frontmatterMatch[2].trim();\n    \n    const titleMatch = fm.match(/title:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (titleMatch) title = titleMatch[1];\n    \n    const descMatch = fm.match(/description:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (descMatch) excerpt = descMatch[1];\n    \n    const excerptMatch = fm.match(/excerpt:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (excerptMatch) excerpt = excerptMatch[1];\n    \n    const tagsMatch = fm.match(/tags:\\s*\\[(.+?)\\]/m);\n    if (tagsMatch) {\n      tags = tagsMatch[1].split(',').map(t => t.trim().replace(/[\"']/g, ''));\n    }\n  } else {\n    // Extract title from first markdown heading\n    const headingMatch = trimmed.match(/^#\\s+(.+)$/m);\n    if (headingMatch) {\n      title = headingMatch[1].trim();\n      bodyContent = trimmed.replace(/^#\\s+.+$/m, '').trim();\n    }\n    \n    // Try to extract title from metadata line\n    const metaTitleMatch = trimmed.match(/title:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (metaTitleMatch && !title) {\n      title = metaTitleMatch[1];\n    }\n  }\n  \n  // Skip pieces without a title (not a blog post)\n  if (!title) continue;\n  \n  // Generate excerpt from first paragraph if not found\n  if (!excerpt) {\n    const firstParagraph = bodyContent.split('\\n\\n').find(p => p.trim().length > 20 && !p.startsWith('#') && !p.startsWith('type:') && !p.startsWith('tags:'));\n    if (firstParagraph) {\n      excerpt = firstParagraph.trim().substring(0, 160).replace(/\\n/g, ' ');\n      if (excerpt.length >= 160) excerpt += '...';\n    } else {\n      excerpt = title;\n    }\n  }\n  \n  // Strip metadata lines from body content\n  bodyContent = bodyContent\n    .replace(/^type:\\s*.+$/gm, '')\n    .replace(/^tags:\\s*.+$/gm, '')\n    .replace(/^title:\\s*.+$/gm, '')\n    .replace(/^description:\\s*.+$/gm, '')\n    .replace(/^excerpt:\\s*.+$/gm, '')\n    .replace(/^author:\\s*.+$/gm, '')\n    .replace(/^date:\\s*.+$/gm, '')\n    .trim();\n  \n  // Generate URL-friendly slug from title\n  const slug = title\n    .toLowerCase()\n    .replace(/[^a-z0-9\\s-]/g, '')\n    .replace(/\\s+/g, '-')\n    .replace(/-+/g, '-')\n    .replace(/^-|-$/g, '')\n    .substring(0, 80);\n  \n  // Build proper gray-matter frontmatter\n  const tagsFormatted = JSON.stringify(tags);\n  const fullContent = `---\\ntitle: \"${title.replace(/\"/g, '\\\\\"')}\"\\nexcerpt: \"${excerpt.replace(/\"/g, '\\\\\"')}\"\\ndate: \"${today}\"\\nauthor: \"BayFlow Team\"\\ntags: ${tagsFormatted}\\n---\\n\\n${bodyContent}`;\n  \n  blogPosts.push({\n    slug,\n    title,\n    content_with_frontmatter: fullContent\n  });\n}\n\nif (blogPosts.length === 0) {\n  return [{ json: { noPosts: true, message: 'No blog posts found in content report' } }];\n}\n\nreturn blogPosts.map(post => ({ json: post }));"
+        "jsCode": "// Decode the base64 content from GitHub API response\nconst rawContent = Buffer.from($('Step 1 - Read Content Report').first().json.content, 'base64').toString('utf-8');\n\n// Split content by the ---PIECE--- markers used by Content Agent\nconst pieces = rawContent.split('---PIECE---').filter(p => p.trim().length > 0);\n\nconst today = $now.toFormat('yyyy-MM-dd');\nconst blogPosts = [];\n\nfor (const piece of pieces) {\n  const trimmed = piece.trim();\n  \n  // Only process blog type pieces (skip reels)\n  const typeMatch = trimmed.match(/type:\\s*(blog|reel)/i);\n  if (typeMatch && typeMatch[1].toLowerCase() === 'reel') {\n    continue; // Skip reel scripts\n  }\n  \n  let title = '';\n  let excerpt = '';\n  let tags = ['auto repair', 'shop management'];\n  let bodyContent = trimmed;\n  \n  // Check if piece already has frontmatter\n  const frontmatterMatch = trimmed.match(/^---\\n([\\s\\S]*?)\\n---\\n([\\s\\S]*)$/);\n  if (frontmatterMatch) {\n    const fm = frontmatterMatch[1];\n    bodyContent = frontmatterMatch[2].trim();\n    \n    const titleMatch = fm.match(/title:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (titleMatch) title = titleMatch[1];\n    \n    const descMatch = fm.match(/description:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (descMatch) excerpt = descMatch[1];\n    \n    const excerptMatch = fm.match(/excerpt:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (excerptMatch) excerpt = excerptMatch[1];\n    \n    const tagsMatch = fm.match(/tags:\\s*\\[(.+?)\\]/m);\n    if (tagsMatch) {\n      tags = tagsMatch[1].split(',').map(t => t.trim().replace(/[\"']/g, ''));\n    }\n  } else {\n    // Extract title from first markdown heading\n    const headingMatch = trimmed.match(/^#\\s+(.+)$/m);\n    if (headingMatch) {\n      title = headingMatch[1].trim();\n      bodyContent = trimmed.replace(/^#\\s+.+$/m, '').trim();\n    }\n    \n    // Try to extract title from metadata line\n    const metaTitleMatch = trimmed.match(/title:\\s*[\"']?(.+?)[\"']?\\s*$/m);\n    if (metaTitleMatch && !title) {\n      title = metaTitleMatch[1];\n    }\n  }\n  \n  // Skip pieces without a title (not a blog post)\n  if (!title) continue;\n  \n  // Generate excerpt from first paragraph if not found\n  if (!excerpt) {\n    const firstParagraph = bodyContent.split('\\n\\n').find(p => p.trim().length > 20 && !p.startsWith('#') && !p.startsWith('type:') && !p.startsWith('tags:'));\n    if (firstParagraph) {\n      excerpt = firstParagraph.trim().substring(0, 160).replace(/\\n/g, ' ');\n      if (excerpt.length >= 160) excerpt += '...';\n    } else {\n      excerpt = title;\n    }\n  }\n  \n  // Strip metadata lines from body content\n  bodyContent = bodyContent\n    .replace(/^type:\\s*.+$/gm, '')\n    .replace(/^tags:\\s*.+$/gm, '')\n    .replace(/^title:\\s*.+$/gm, '')\n    .replace(/^description:\\s*.+$/gm, '')\n    .replace(/^excerpt:\\s*.+$/gm, '')\n    .replace(/^author:\\s*.+$/gm, '')\n    .replace(/^date:\\s*.+$/gm, '')\n    .trim();\n  \n  // Generate URL-friendly slug from title\n  const slug = title\n    .toLowerCase()\n    .replace(/[^a-z0-9\\s-]/g, '')\n    .replace(/\\s+/g, '-')\n    .replace(/-+/g, '-')\n    .replace(/^-|-$/g, '')\n    .substring(0, 80);\n  \n  // Build proper gray-matter frontmatter\n  const tagsFormatted = JSON.stringify(tags);\n  const bizName = $('Split Into Businesses').first().json.businessName || 'BayFlow';\n  const fullContent = `---\\ntitle: \"${title.replace(/\"/g, '\\\\\"')}\"\\nexcerpt: \"${excerpt.replace(/\"/g, '\\\\\"')}\"\\ndate: \"${today}\"\\nauthor: \"${bizName} Team\"\\ntags: ${tagsFormatted}\\n---\\n\\n${bodyContent}`;\n  \n  blogPosts.push({\n    slug,\n    title,\n    content_with_frontmatter: fullContent\n  });\n}\n\nif (blogPosts.length === 0) {\n  return [{ json: { noPosts: true, message: 'No blog posts found in content report' } }];\n}\n\nreturn blogPosts.map(post => ({ json: post }));"
       },
       "id": "parse-content",
       "name": "Step 2 - Parse Blog Posts",
@@ -212,7 +212,7 @@
         }
       },
       "id": "commit-to-bayflow",
-      "name": "Step 3c - Commit Blog Post to BayFlow",
+      "name": "Step 3c - Commit Blog Post",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -223,7 +223,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const slug = $('Step 3b - Prepare Commit Payload').first().json.slug;\nconst siteUrl = $('Split Into Businesses').first().json.site_url || 'https://bayflow.app';\nconst blogUrl = `${siteUrl}/blog/${slug}`;\n\nreturn [{\n  json: {\n    slug,\n    blogUrl,\n    indexingPayload: JSON.stringify({\n      url: blogUrl,\n      type: 'URL_UPDATED'\n    })\n  }\n}];"
+        "jsCode": "const slug = $('Step 3b - Prepare Commit Payload').first().json.slug;\nconst siteUrl = $('Split Into Businesses').first().json.site_url || 'https://bayflow.com';\nconst blogUrl = `${siteUrl}/blog/${slug}`;\n\nreturn [{\n  json: {\n    slug,\n    blogUrl,\n    indexingPayload: JSON.stringify({\n      url: blogUrl,\n      type: 'URL_UPDATED'\n    })\n  }\n}];"
       },
       "id": "prepare-indexing",
       "name": "Step 4a - Prepare Indexing Request",
@@ -449,14 +449,14 @@
       "main": [
         [
           {
-            "node": "Step 3c - Commit Blog Post to BayFlow",
+            "node": "Step 3c - Commit Blog Post",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Step 3c - Commit Blog Post to BayFlow": {
+    "Step 3c - Commit Blog Post": {
       "main": [
         [
           {

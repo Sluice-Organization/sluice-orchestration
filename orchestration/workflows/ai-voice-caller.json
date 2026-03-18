@@ -321,7 +321,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"from\": \"BayFlow <hello@bayflow.com>\",\n  \"to\": [\"{{ $json.lead_email }}\"],\n  \"subject\": \"Your BayFlow Demo is Confirmed!\",\n  \"html\": \"<p>Hey {{ $json.first_name }},</p><p>Good talking to you! Your demo's getting scheduled now. You'll get a calendar invite at <strong>{{ $json.lead_email }}</strong> in a bit.</p><p>If you want to poke around before then, here's the site: <a href='https://bayflow.com'>bayflow.com</a>. We built it specifically for shops like {{ $json.business_name }}.</p><p>Talk soon,<br/>Shalin</p>\"\n}",
+        "jsonBody": "={\n  \"from\": \"{{ $json._business_display_name || $json.business_name || 'BayFlow' }} <hello@{{ ($json._business_site_url || 'bayflow.com').replace('https://', '').replace('http://', '').split('/')[0] }}>\",\n  \"to\": [\"{{ $json.lead_email }}\"],\n  \"subject\": \"Your {{ $json._business_display_name || $json.business_name || 'BayFlow' }} Demo is Confirmed!\",\n  \"html\": \"<p>Hey {{ $json.first_name }},</p><p>Good talking to you! Your demo's getting scheduled now. You'll get a calendar invite at <strong>{{ $json.lead_email }}</strong> in a bit.</p><p>If you want to poke around before then, here's the site: <a href='{{ $json._business_site_url || 'https://bayflow.com' }}'>{{ ($json._business_site_url || 'bayflow.com').replace('https://', '').replace('http://', '').split('/')[0] }}</a>. We built it specifically for shops like {{ $json.business_name }}.</p><p>Talk soon,<br/>Shalin</p>\"\n}",
         "options": {}
       },
       "id": "send-confirmation-email",
