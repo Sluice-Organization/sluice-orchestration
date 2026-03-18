@@ -352,7 +352,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Step 4.8a - Generate candidate sending domain names\nconst payloads = $('Prepare Payloads').first().json;\nconst businessId = payloads.businessId;\nconst prevData = $input.first().json;\n\n// Generate 2 natural-looking domain candidates\n// NOT salesy (no try/get prefixes). These look like legit business domains.\nconst candidates = [\n  businessId + '.co',\n  businessId + 'app.com'\n];\n\nreturn [{\n  json: {\n    ...prevData,\n    businessId,\n    domainCandidates: candidates,\n    currentDomainIndex: 0\n  }\n}];"
+        "jsCode": "// Step 4.8 - Prepare sending domain info for notification\n// Domains are bought via Smartlead SmartSenders (dashboard, not API)\n// This step generates recommended domain names and notifies the human\nconst payloads = $('Prepare Payloads').first().json;\nconst businessId = payloads.businessId;\nconst businessName = payloads.businessName;\nconst prevData = $input.first().json;\n\nconst recommendedDomains = [\n  businessId + '.co',\n  businessId + 'app.com',\n  businessId + '.io',\n  businessId + 'hq.com'\n];\n\nreturn [{\n  json: {\n    ...prevData,\n    businessId,\n    businessName,\n    recommendedDomains,\n    sendingDomains: [],\n    domainSetupNote: 'Buy sending domain in Smartlead SmartSenders for ' + businessName + '. Recommended: ' + recommendedDomains.slice(0,2).join(' or ') + '. SmartSenders handles DNS + warmup automatically.'\n  }\n}];"
       },
       "id": "generate-domain-names",
       "name": "Step 4.8a - Generate Domain Names",
@@ -493,15 +493,6 @@
       "main": [[{ "node": "Step 4.8a - Generate Domain Names", "type": "main", "index": 0 }]]
     },
     "Step 4.8a - Generate Domain Names": {
-      "main": [[{ "node": "Step 4.8b - Buy Domain via Cloudflare", "type": "main", "index": 0 }]]
-    },
-    "Step 4.8b - Buy Domain via Cloudflare": {
-      "main": [[{ "node": "Step 4.8c - Set Up DNS Records", "type": "main", "index": 0 }]]
-    },
-    "Step 4.8c - Set Up DNS Records": {
-      "main": [[{ "node": "Step 4.8d - Add Domain to Smartlead", "type": "main", "index": 0 }]]
-    },
-    "Step 4.8d - Add Domain to Smartlead": {
       "main": [[{ "node": "Step 5 - Register in Knowledge Graph", "type": "main", "index": 0 }]]
     },
     "Step 5 - Register in Knowledge Graph": {
