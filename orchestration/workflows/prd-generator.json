@@ -426,6 +426,28 @@
         ]
       ]
     },
+    "Opus (PRD Generation)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "CEO: Generate PRD",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sonnet (Comptroller Review)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Comptroller: Review PRD",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Extract PRD Content": {
       "main": [
         [

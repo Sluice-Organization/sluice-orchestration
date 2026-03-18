@@ -35,7 +35,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.all().map(i => i.json);\nconst businesses = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;\nconst results = [];\nfor (const biz of businesses) {\n  const id = biz.business_id || biz.name;\n  if (!id || id === '_template') continue;\n  results.push({ json: { businessId: id, businessName: biz.name || id, businessPath: 'memory-bank/businesses/' + id, site_url: biz.site_url || '', repo_name: biz.repo_name || id } });\n}\nif (results.length === 0) results.push({ json: { businessId: 'bayflow', businessName: 'BayFlow', businessPath: 'memory-bank/businesses/bayflow', site_url: '', repo_name: 'bayflow' } });\nreturn results;"
+        "jsCode": "const raw = $input.all().map(i => i.json);\nconst businesses = raw.length === 1 && Array.isArray(raw[0]) ? raw[0] : raw;\nconst results = [];\nfor (const biz of businesses) {\n  const id = biz.business_id || biz.name;\n  if (!id || id === '_template') continue;\n  results.push({ json: { businessId: id, businessName: biz.name || id, businessPath: 'memory-bank/businesses/' + id, site_url: biz.site_url || '', repo_name: biz.repo_name || id } });\n}\nif (results.length === 0) return [{ json: { _skip: true, _reason: 'No active businesses found' } }];\nreturn results;"
       },
       "id": "split-businesses",
       "name": "Split Into Businesses",
