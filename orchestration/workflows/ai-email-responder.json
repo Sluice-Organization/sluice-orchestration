@@ -545,11 +545,7 @@
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "id",
-          "value": "claude-haiku-4-5-20251001"
-        },
+        "model": "={{ \"claude-haiku-4-5-20251001\" }}",
         "options": {
           "maxTokensToSample": 300,
           "temperature": 0.7

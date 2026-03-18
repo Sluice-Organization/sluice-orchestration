@@ -146,11 +146,7 @@
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "id",
-          "value": "claude-sonnet-4-6"
-        },
+        "model": "={{ \"claude-sonnet-4-6\" }}",
         "options": {
           "temperature": 0.4,
           "maxTokensToSample": 3000
