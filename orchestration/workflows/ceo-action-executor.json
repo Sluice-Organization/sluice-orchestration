@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst businessId = body.businessId || 'unknown';\nconst actions = body.actions || [];\n\nconst validTypes = [\n  'EXPAND_LEAD_GEN', 'ACTIVATE_GOOGLE_ADS', 'SCALE_COLD_EMAIL',\n  'INCREASE_CONTENT', 'ADJUST_PRICING', 'LAUNCH_BUSINESS',\n  'KILL_BUSINESS', 'ACTIVATE_META_ADS', 'INCREASE_CALL_VOLUME',\n  'REQUEST_HUMAN_DECISION'\n];\n\nconst validatedActions = [];\nconst errors = [];\n\nfor (let i = 0; i < actions.length; i++) {\n  const action = actions[i];\n  if (!action.type || !validTypes.includes(action.type)) {\n    errors.push(`Action ${i}: invalid type '${action.type}'`);\n    continue;\n  }\n  if (!action.params || typeof action.params !== 'object') {\n    errors.push(`Action ${i}: missing or invalid params`);\n    continue;\n  }\n  validatedActions.push({\n    json: {\n      businessId,\n      actionIndex: i,\n      actionType: action.type,\n      params: action.params,\n      totalActions: actions.length\n    }\n  });\n}\n\nif (validatedActions.length === 0 && errors.length > 0) {\n  return [{ json: { businessId, error: true, errors, actionType: 'NONE', params: {} } }];\n}\n\nif (validatedActions.length === 0) {\n  return [{ json: { businessId, error: false, actionType: 'NONE', params: {}, message: 'No actions to execute' } }];\n}\n\nreturn validatedActions;"
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst businessId = body.businessId || 'unknown';\nconst actions = body.actions || [];\n\nconst validTypes = [\n  'EXPAND_LEAD_GEN', 'ACTIVATE_GOOGLE_ADS', 'SCALE_COLD_EMAIL',\n  'INCREASE_CONTENT', 'ADJUST_PRICING', 'LAUNCH_BUSINESS',\n  'KILL_BUSINESS', 'ACTIVATE_META_ADS', 'INCREASE_CALL_VOLUME',\n  'REQUEST_HUMAN_DECISION', 'SCALE_SENDING_DOMAINS'\n];\n\nconst validatedActions = [];\nconst errors = [];\n\nfor (let i = 0; i < actions.length; i++) {\n  const action = actions[i];\n  if (!action.type || !validTypes.includes(action.type)) {\n    errors.push(`Action ${i}: invalid type '${action.type}'`);\n    continue;\n  }\n  if (!action.params || typeof action.params !== 'object') {\n    errors.push(`Action ${i}: missing or invalid params`);\n    continue;\n  }\n  validatedActions.push({\n    json: {\n      businessId,\n      actionIndex: i,\n      actionType: action.type,\n      params: action.params,\n      totalActions: actions.length\n    }\n  });\n}\n\nif (validatedActions.length === 0 && errors.length > 0) {\n  return [{ json: { businessId, error: true, errors, actionType: 'NONE', params: {} } }];\n}\n\nif (validatedActions.length === 0) {\n  return [{ json: { businessId, error: false, actionType: 'NONE', params: {}, message: 'No actions to execute' } }];\n}\n\nreturn validatedActions;"
       },
       "id": "parse-actions",
       "name": "Parse & Validate Actions",
@@ -87,6 +87,12 @@
               "outputIndex": 9,
               "conditions": {
                 "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "REQUEST_HUMAN_DECISION", "operator": { "type": "string", "operation": "equals" } }]
+              }
+            },
+            {
+              "outputIndex": 10,
+              "conditions": {
+                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "SCALE_SENDING_DOMAINS", "operator": { "type": "string", "operation": "equals" } }]
               }
             }
           ]
@@ -556,6 +562,87 @@
     },
     {
       "parameters": {
+        "jsCode": "// SCALE_SENDING_DOMAINS - Buy additional sending domains via Cloudflare\n// params: { businessId, count: 2 }\nconst params = $json.params || {};\nconst businessId = $json.businessId || params.businessId || 'unknown';\nconst count = params.count || 2;\nconst accountId = $env.CLOUDFLARE_ACCOUNT_ID;\nconst apiToken = $env.CLOUDFLARE_API_TOKEN;\nconst smartleadApiKey = $env.SMARTLEAD_API_KEY;\n\nconst purchasedDomains = [];\nconst errors = [];\n\n// Generate candidate domain names\nconst suffixes = ['hq.com', '.io', 'app.com', '.co', 'tool.com', 'suite.com', 'pro.com', 'hub.com'];\nconst candidates = [];\nfor (const suffix of suffixes) {\n  if (suffix.startsWith('.')) {\n    candidates.push(businessId + suffix);\n  } else {\n    candidates.push(businessId + suffix);\n  }\n  if (candidates.length >= count * 3) break; // Try 3x candidates for each desired domain\n}\n\nfor (const domain of candidates) {\n  if (purchasedDomains.length >= count) break;\n\n  try {\n    // Check availability\n    const checkRes = await fetch(\n      `https://api.cloudflare.com/client/v4/accounts/${accountId}/registrar/domains/${domain}`,\n      {\n        method: 'GET',\n        headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' }\n      }\n    );\n    const checkData = await checkRes.json();\n\n    if (checkData.success && checkData.result && checkData.result.available) {\n      // Register domain\n      const regRes = await fetch(\n        `https://api.cloudflare.com/client/v4/accounts/${accountId}/registrar/domains`,\n        {\n          method: 'POST',\n          headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },\n          body: JSON.stringify({ name: domain })\n        }\n      );\n      const regData = await regRes.json();\n\n      if (regData.success) {\n        // Get zone ID for DNS\n        const zoneRes = await fetch(\n          `https://api.cloudflare.com/client/v4/zones?name=${domain}`,\n          {\n            method: 'GET',\n            headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' }\n          }\n        );\n        const zoneData = await zoneRes.json();\n        const zoneId = (zoneData.success && zoneData.result && zoneData.result.length > 0) ? zoneData.result[0].id : null;\n\n        // Set up DNS records\n        if (zoneId) {\n          const dnsRecords = [\n            { type: 'TXT', name: domain, content: 'v=spf1 include:_spf.google.com include:sendgrid.net include:smartlead.ai ~all', ttl: 3600 },\n            { type: 'TXT', name: `_dmarc.${domain}`, content: 'v=DMARC1; p=none; rua=mailto:dmarc@' + domain, ttl: 3600 },\n            { type: 'MX', name: domain, content: 'mx1.improvmx.com', priority: 10, ttl: 3600 },\n            { type: 'MX', name: domain, content: 'mx2.improvmx.com', priority: 20, ttl: 3600 }\n          ];\n          for (const record of dnsRecords) {\n            try {\n              await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`, {\n                method: 'POST',\n                headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },\n                body: JSON.stringify(record)\n              });\n            } catch (e) { /* DNS errors non-blocking */ }\n          }\n        }\n\n        // Add to Smartlead\n        if (smartleadApiKey) {\n          try {\n            await fetch(`https://server.smartlead.ai/api/v1/email-accounts/add?api_key=${smartleadApiKey}`, {\n              method: 'POST',\n              headers: { 'Content-Type': 'application/json' },\n              body: JSON.stringify({\n                email: `outreach@${domain}`,\n                from_name: businessId,\n                warmup_enabled: true,\n                total_warmup_per_day: 20,\n                daily_limit: 30,\n                track_settings: { open_tracking: true, link_tracking: true }\n              })\n            });\n          } catch (e) {\n            errors.push(`Smartlead add for ${domain}: ${e.message}`);\n          }\n        }\n\n        purchasedDomains.push(domain);\n      }\n    }\n  } catch (e) {\n    errors.push(`${domain}: ${e.message}`);\n  }\n}\n\nreturn [{\n  json: {\n    businessId,\n    actionType: 'SCALE_SENDING_DOMAINS',\n    success: purchasedDomains.length > 0,\n    purchasedDomains,\n    errors: errors.length > 0 ? errors : null,\n    message: purchasedDomains.length > 0\n      ? `Purchased ${purchasedDomains.length} new sending domain(s): ${purchasedDomains.join(', ')}. SMTP email setup may need manual configuration.`\n      : `Failed to purchase sending domains. Errors: ${errors.join('; ') || 'All candidates unavailable'}`\n  }\n}];"
+      },
+      "id": "scale-domains-execute",
+      "name": "Scale Sending Domains",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 1600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?id=eq.' + $json.businessId + '&select=sending_domains' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "scale-domains-get-existing",
+      "name": "Get Existing Domains",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1020, 1600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prevData = $('Scale Sending Domains').first().json;\nconst existingResult = $input.first().json;\n\n// Merge existing domains with newly purchased ones\nlet existingDomains = [];\nif (Array.isArray(existingResult)) {\n  existingDomains = existingResult[0]?.sending_domains || [];\n} else if (existingResult?.sending_domains) {\n  existingDomains = existingResult.sending_domains;\n}\nif (!Array.isArray(existingDomains)) existingDomains = [];\n\nconst allDomains = [...new Set([...existingDomains, ...prevData.purchasedDomains])];\n\nreturn [{\n  json: {\n    ...prevData,\n    allDomains\n  }\n}];"
+      },
+      "id": "scale-domains-merge",
+      "name": "Merge Domains",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, 1600]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?id=eq.' + $json.businessId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ sending_domains: $json.allDomains }) }}"
+      },
+      "id": "scale-domains-update-supabase",
+      "name": "Update Sending Domains in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 1600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-production-bb4b.up.railway.app/webhook/agent-notify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'ceo-action-executor', severity: 'info', businessId: $('Scale Sending Domains').first().json.businessId, message: $('Scale Sending Domains').first().json.message }) }}"
+      },
+      "id": "scale-domains-notify",
+      "name": "Notify Scale Domains",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1740, 1600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "jsCode": "// Collect all action results from all branches\nconst allItems = $input.all();\nconst results = allItems.map(item => ({\n  actionType: item.json.actionType || 'UNKNOWN',\n  success: item.json.success !== false,\n  message: item.json.message || 'No message'\n}));\n\nconst businessId = allItems[0]?.json?.businessId || 'unknown';\nconst today = new Date().toISOString().split('T')[0];\n\nconst logContent = `# CEO Action Execution Log - ${today}\\n\\n` +\n  `**Business:** ${businessId}\\n` +\n  `**Executed at:** ${new Date().toISOString()}\\n` +\n  `**Total actions:** ${results.length}\\n\\n` +\n  `## Actions Executed\\n\\n` +\n  results.map((r, i) => `### ${i + 1}. ${r.actionType}\\n- **Status:** ${r.success ? 'SUCCESS' : 'FAILED'}\\n- **Details:** ${r.message}\\n`).join('\\n') +\n  `\\n---\\n*Generated by CEO Action Executor*\\n`;\n\nconst summary = results.map(r => `${r.success ? 'OK' : 'FAIL'} ${r.actionType}: ${r.message}`).join('\\n');\n\nreturn [{\n  json: {\n    businessId,\n    today,\n    logContent,\n    summary,\n    totalActions: results.length,\n    successCount: results.filter(r => r.success).length,\n    results\n  }\n}];"
       },
       "id": "collect-results",
@@ -704,6 +791,13 @@
         [
           {
             "node": "Request Human Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Scale Sending Domains",
             "type": "main",
             "index": 0
           }
@@ -1030,6 +1124,61 @@
       ]
     },
     "Human Decision Result": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scale Sending Domains": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Domains": {
+      "main": [
+        [
+          {
+            "node": "Merge Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Domains": {
+      "main": [
+        [
+          {
+            "node": "Update Sending Domains in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sending Domains in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Notify Scale Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Scale Domains": {
       "main": [
         [
           {

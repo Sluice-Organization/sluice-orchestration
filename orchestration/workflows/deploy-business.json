@@ -352,6 +352,49 @@
     },
     {
       "parameters": {
+        "jsCode": "// Step 4.8a - Generate candidate sending domain names\nconst payloads = $('Prepare Payloads').first().json;\nconst businessId = payloads.businessId;\nconst prevData = $input.first().json;\n\n// Generate 2 natural-looking domain candidates\n// NOT salesy (no try/get prefixes). These look like legit business domains.\nconst candidates = [\n  businessId + '.co',\n  businessId + 'app.com'\n];\n\nreturn [{\n  json: {\n    ...prevData,\n    businessId,\n    domainCandidates: candidates,\n    currentDomainIndex: 0\n  }\n}];"
+      },
+      "id": "generate-domain-names",
+      "name": "Step 4.8a - Generate Domain Names",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4180, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 4.8b - Try to buy domains via Cloudflare Registrar API\n// Try each candidate domain; continueOnFail means business still launches if all fail\nconst data = $input.first().json;\nconst candidates = data.domainCandidates || [];\nconst accountId = $env.CLOUDFLARE_ACCOUNT_ID;\nconst apiToken = $env.CLOUDFLARE_API_TOKEN;\n\nlet purchasedDomain = null;\nlet purchaseError = null;\nlet zoneId = null;\n\nfor (const domain of candidates) {\n  try {\n    // 1. Check availability\n    const checkRes = await fetch(\n      `https://api.cloudflare.com/client/v4/accounts/${accountId}/registrar/domains/${domain}`,\n      {\n        method: 'GET',\n        headers: {\n          'Authorization': `Bearer ${apiToken}`,\n          'Content-Type': 'application/json'\n        }\n      }\n    );\n    const checkData = await checkRes.json();\n\n    // If domain is available or we can register it, try to register\n    if (checkData.success && checkData.result && checkData.result.available) {\n      const regRes = await fetch(\n        `https://api.cloudflare.com/client/v4/accounts/${accountId}/registrar/domains`,\n        {\n          method: 'POST',\n          headers: {\n            'Authorization': `Bearer ${apiToken}`,\n            'Content-Type': 'application/json'\n          },\n          body: JSON.stringify({ name: domain })\n        }\n      );\n      const regData = await regRes.json();\n\n      if (regData.success) {\n        purchasedDomain = domain;\n        // Get the zone ID for DNS setup\n        const zoneRes = await fetch(\n          `https://api.cloudflare.com/client/v4/zones?name=${domain}`,\n          {\n            method: 'GET',\n            headers: {\n              'Authorization': `Bearer ${apiToken}`,\n              'Content-Type': 'application/json'\n            }\n          }\n        );\n        const zoneData = await zoneRes.json();\n        if (zoneData.success && zoneData.result && zoneData.result.length > 0) {\n          zoneId = zoneData.result[0].id;\n        }\n        break; // Got a domain, stop trying\n      }\n    }\n  } catch (e) {\n    purchaseError = (purchaseError || '') + `${domain}: ${e.message}; `;\n  }\n}\n\nif (!purchasedDomain) {\n  purchaseError = purchaseError || 'All candidate domains unavailable or registration failed';\n}\n\nreturn [{\n  json: {\n    ...data,\n    purchasedDomain,\n    zoneId,\n    domainPurchased: !!purchasedDomain,\n    domainPurchaseError: purchaseError\n  }\n}];"
+      },
+      "id": "buy-domain-cloudflare",
+      "name": "Step 4.8b - Buy Domain via Cloudflare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4400, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 4.8c - Set up DNS records (SPF, DKIM, DMARC) for email sending\nconst data = $input.first().json;\nconst domain = data.purchasedDomain;\nconst zoneId = data.zoneId;\nconst apiToken = $env.CLOUDFLARE_API_TOKEN;\n\nlet dnsSetup = false;\nlet dnsError = null;\n\nif (domain && zoneId) {\n  const dnsRecords = [\n    // SPF record - allow Smartlead and common email providers\n    {\n      type: 'TXT',\n      name: domain,\n      content: 'v=spf1 include:_spf.google.com include:sendgrid.net include:smartlead.ai ~all',\n      ttl: 3600\n    },\n    // DMARC record\n    {\n      type: 'TXT',\n      name: `_dmarc.${domain}`,\n      content: 'v=DMARC1; p=none; rua=mailto:dmarc@' + domain,\n      ttl: 3600\n    },\n    // MX record (placeholder for email receiving)\n    {\n      type: 'MX',\n      name: domain,\n      content: 'mx1.improvmx.com',\n      priority: 10,\n      ttl: 3600\n    },\n    {\n      type: 'MX',\n      name: domain,\n      content: 'mx2.improvmx.com',\n      priority: 20,\n      ttl: 3600\n    }\n  ];\n\n  let allOk = true;\n  for (const record of dnsRecords) {\n    try {\n      const res = await fetch(\n        `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`,\n        {\n          method: 'POST',\n          headers: {\n            'Authorization': `Bearer ${apiToken}`,\n            'Content-Type': 'application/json'\n          },\n          body: JSON.stringify(record)\n        }\n      );\n      const result = await res.json();\n      if (!result.success) {\n        allOk = false;\n        dnsError = (dnsError || '') + `${record.name} ${record.type}: ${JSON.stringify(result.errors)}; `;\n      }\n    } catch (e) {\n      allOk = false;\n      dnsError = (dnsError || '') + `${record.name} ${record.type}: ${e.message}; `;\n    }\n  }\n  dnsSetup = allOk;\n} else {\n  dnsError = 'Skipped DNS setup - no domain purchased or no zone ID';\n}\n\nreturn [{\n  json: {\n    ...data,\n    dnsSetup,\n    dnsError\n  }\n}];"
+      },
+      "id": "setup-dns-records",
+      "name": "Step 4.8c - Set Up DNS Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4620, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 4.8d - Add domain to Smartlead for warmup tracking\n// NOTE: Full SMTP setup may need manual config or Smartlead's built-in email infra\nconst data = $input.first().json;\nconst domain = data.purchasedDomain;\nconst apiKey = $env.SMARTLEAD_API_KEY;\n\nlet smartleadAdded = false;\nlet smartleadError = null;\n\nif (domain && apiKey) {\n  try {\n    const email = `outreach@${domain}`;\n    const res = await fetch(\n      `https://server.smartlead.ai/api/v1/email-accounts/add?api_key=${apiKey}`,\n      {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({\n          email: email,\n          from_name: data.businessName || data.businessId,\n          // SMTP credentials need manual setup - log this\n          // Smartlead may provide built-in email infra for warmup\n          warmup_enabled: true,\n          total_warmup_per_day: 20,\n          daily_limit: 30,\n          track_settings: { open_tracking: true, link_tracking: true }\n        })\n      }\n    );\n    const result = await res.json();\n    if (result && (result.id || result.email_account_id)) {\n      smartleadAdded = true;\n    } else {\n      smartleadError = 'Smartlead did not return account ID. SMTP credentials may need manual setup. Response: ' + JSON.stringify(result).substring(0, 200);\n    }\n  } catch (e) {\n    smartleadError = `Smartlead API error: ${e.message}. SMTP email setup needs manual configuration.`;\n  }\n} else {\n  smartleadError = domain ? 'Missing SMARTLEAD_API_KEY' : 'No domain purchased - skipping Smartlead setup';\n}\n\n// Build sending_domains array for Supabase\nconst sendingDomains = domain ? [domain] : [];\n\nreturn [{\n  json: {\n    ...data,\n    smartleadAdded,\n    smartleadError,\n    sendingDomains,\n    domainSetupNote: domain \n      ? (smartleadAdded \n        ? `Domain ${domain} purchased and added to Smartlead for warmup` \n        : `Domain ${domain} purchased but SMTP email setup needs manual configuration`)\n      : 'No sending domain acquired - cold email will use existing infrastructure. CEO Agent can retry later.'\n  }\n}];"
+      },
+      "id": "add-domain-smartlead",
+      "name": "Step 4.8d - Add Domain to Smartlead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4840, 0],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "method": "PATCH",
         "url": "={{ 'https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/businesses?id=eq.' + $json.businessId }}",
         "sendHeaders": true,
@@ -368,27 +411,27 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ launched_at: new Date().toISOString(), repo_url: 'https://github.com/Sluice-Organization/' + $('Prepare Payloads').first().json.repoName, repo_name: $('Prepare Payloads').first().json.repoName, status: 'deploying', retell_agent_id: $json.retellAgentId || null, retell_voice: $json.voiceName || null, retell_phone_number: $json.retellPhoneNumber || null, site_url: $json.siteUrl || null, cal_booking_url: $json.bookingLink || 'https://cal.com/shalinp', stripe_price_solo: $json.stripe_price_solo || null, stripe_price_pro: $json.stripe_price_pro || null, stripe_price_shop: $json.stripe_price_shop || null }) }}",
+        "jsonBody": "={{ JSON.stringify({ launched_at: new Date().toISOString(), repo_url: 'https://github.com/Sluice-Organization/' + $('Prepare Payloads').first().json.repoName, repo_name: $('Prepare Payloads').first().json.repoName, status: 'deploying', retell_agent_id: $json.retellAgentId || null, retell_voice: $json.voiceName || null, retell_phone_number: $json.retellPhoneNumber || null, site_url: $json.siteUrl || null, cal_booking_url: $json.bookingLink || 'https://cal.com/shalinp', stripe_price_solo: $json.stripe_price_solo || null, stripe_price_pro: $json.stripe_price_pro || null, stripe_price_shop: $json.stripe_price_shop || null, sending_domains: $json.sendingDomains || [] }) }}",
         "options": { "timeout": 15000 }
       },
       "id": "update-knowledge-graph",
       "name": "Step 5 - Register in Knowledge Graph",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [4180, 0],
+      "position": [5060, 0],
       "continueOnFail": true
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ status: 'success', message: 'Birth Protocol complete for ' + $('Prepare Payloads').first().json.businessName, businessId: $('Prepare Payloads').first().json.businessId, repoUrl: 'https://github.com/Sluice-Organization/' + $('Prepare Payloads').first().json.repoName, issueUrl: $('Step 4 - Create Build Issue').first().json.html_url || 'created', hasPrd: $('Prepare Payloads').first().json.hasPrd, retellAgentCreated: $('Step 4.5c - Parse Retell Response').first().json.retellCreated || false, retellAgentId: $('Step 4.5c - Parse Retell Response').first().json.retellAgentId || null, retellError: $('Step 4.5c - Parse Retell Response').first().json.retellError || null, stripePrices: { solo: $('Step 4.7h - Collect Stripe Price IDs').first().json.stripe_price_solo || null, pro: $('Step 4.7h - Collect Stripe Price IDs').first().json.stripe_price_pro || null, shop: $('Step 4.7h - Collect Stripe Price IDs').first().json.stripe_price_shop || null }, steps: { repoCreated: true, claudeActionAdded: true, claudeMdAdded: true, buildIssueCreated: true, retellAgentCreated: $('Step 4.5c - Parse Retell Response').first().json.retellCreated || false, stripeProductsCreated: true, knowledgeGraphUpdated: true } }) }}",
+        "responseBody": "={{ JSON.stringify({ status: 'success', message: 'Birth Protocol complete for ' + $('Prepare Payloads').first().json.businessName, businessId: $('Prepare Payloads').first().json.businessId, repoUrl: 'https://github.com/Sluice-Organization/' + $('Prepare Payloads').first().json.repoName, issueUrl: $('Step 4 - Create Build Issue').first().json.html_url || 'created', hasPrd: $('Prepare Payloads').first().json.hasPrd, retellAgentCreated: $('Step 4.5c - Parse Retell Response').first().json.retellCreated || false, retellAgentId: $('Step 4.5c - Parse Retell Response').first().json.retellAgentId || null, retellError: $('Step 4.5c - Parse Retell Response').first().json.retellError || null, stripePrices: { solo: $('Step 4.7h - Collect Stripe Price IDs').first().json.stripe_price_solo || null, pro: $('Step 4.7h - Collect Stripe Price IDs').first().json.stripe_price_pro || null, shop: $('Step 4.7h - Collect Stripe Price IDs').first().json.stripe_price_shop || null }, sendingDomains: { domainPurchased: $('Step 4.8d - Add Domain to Smartlead').first().json.domainPurchased || false, domain: $('Step 4.8d - Add Domain to Smartlead').first().json.purchasedDomain || null, dnsSetup: $('Step 4.8d - Add Domain to Smartlead').first().json.dnsSetup || false, smartleadAdded: $('Step 4.8d - Add Domain to Smartlead').first().json.smartleadAdded || false, note: $('Step 4.8d - Add Domain to Smartlead').first().json.domainSetupNote || null }, steps: { repoCreated: true, claudeActionAdded: true, claudeMdAdded: true, buildIssueCreated: true, retellAgentCreated: $('Step 4.5c - Parse Retell Response').first().json.retellCreated || false, stripeProductsCreated: true, sendingDomainAcquired: $('Step 4.8d - Add Domain to Smartlead').first().json.domainPurchased || false, knowledgeGraphUpdated: true } }) }}",
         "options": { "responseCode": 201 }
       },
       "id": "respond-success",
       "name": "Step 6 - Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [4400, 0]
+      "position": [5280, 0]
     }
   ],
   "connections": {
@@ -447,6 +490,18 @@
       "main": [[{ "node": "Step 4.7h - Collect Stripe Price IDs", "type": "main", "index": 0 }]]
     },
     "Step 4.7h - Collect Stripe Price IDs": {
+      "main": [[{ "node": "Step 4.8a - Generate Domain Names", "type": "main", "index": 0 }]]
+    },
+    "Step 4.8a - Generate Domain Names": {
+      "main": [[{ "node": "Step 4.8b - Buy Domain via Cloudflare", "type": "main", "index": 0 }]]
+    },
+    "Step 4.8b - Buy Domain via Cloudflare": {
+      "main": [[{ "node": "Step 4.8c - Set Up DNS Records", "type": "main", "index": 0 }]]
+    },
+    "Step 4.8c - Set Up DNS Records": {
+      "main": [[{ "node": "Step 4.8d - Add Domain to Smartlead", "type": "main", "index": 0 }]]
+    },
+    "Step 4.8d - Add Domain to Smartlead": {
       "main": [[{ "node": "Step 5 - Register in Knowledge Graph", "type": "main", "index": 0 }]]
     },
     "Step 5 - Register in Knowledge Graph": {
