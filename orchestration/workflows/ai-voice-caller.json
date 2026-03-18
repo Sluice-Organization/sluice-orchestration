@@ -293,58 +293,21 @@
     },
     {
       "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.call_outcome }}",
         "rules": {
-          "values": [
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.booking_made }}",
-                    "rightValue": true,
-                    "operator": { "type": "boolean", "operation": "true" }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "Demo Booked"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.is_voicemail }}",
-                    "rightValue": true,
-                    "operator": { "type": "boolean", "operation": "true" }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "Voicemail"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.not_interested }}",
-                    "rightValue": true,
-                    "operator": { "type": "boolean", "operation": "true" }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "Not Interested"
-            }
-          ],
-          "fallbackOutput": {
-            "renameOutput": "Other"
-          }
+          "rules": [
+            { "value2": "interested_booking", "output": 0 },
+            { "value2": "voicemail", "output": 1 },
+            { "value2": "not_interested", "output": 2 }
+          ]
         },
-        "options": {}
+        "fallbackOutput": 3
       },
       "id": "route-call-outcome",
       "name": "Route by Outcome",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
+      "typeVersion": 2,
       "position": [700, 700]
     },
     {

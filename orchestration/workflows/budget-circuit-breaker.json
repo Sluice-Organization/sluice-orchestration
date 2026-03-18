@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "0 23 * * *" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 23 * * *"
+            }
+          ]
         }
       },
       "id": "daily-trigger",
       "name": "Daily 11 PM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 300]
+      "position": [
+        0,
+        300
+      ]
     },
     {
       "parameters": {
@@ -22,9 +30,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -33,7 +50,10 @@
       "name": "Fetch Active Businesses",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "continueOnFail": true
     },
     {
@@ -44,7 +64,10 @@
       "name": "Prepare Business Items",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 300]
+      "position": [
+        500,
+        300
+      ]
     },
     {
       "parameters": {
@@ -54,8 +77,11 @@
       "id": "split-batches",
       "name": "Loop Each Business",
       "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [750, 300]
+      "typeVersion": 1,
+      "position": [
+        750,
+        300
+      ]
     },
     {
       "parameters": {
@@ -66,9 +92,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -77,7 +112,10 @@
       "name": "Fetch Today Budget Entry",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1000, 200],
+      "position": [
+        1000,
+        200
+      ],
       "continueOnFail": true
     },
     {
@@ -89,9 +127,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -100,22 +147,33 @@
       "name": "Fetch 7-Day Metrics",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1000, 450],
+      "position": [
+        1000,
+        450
+      ],
       "continueOnFail": true
     },
     {
       "parameters": {
         "mode": "combineBySingleField",
         "mergeByFields": {
-          "values": [{ "field1": "business_id", "field2": "business_id" }]
+          "values": [
+            {
+              "field1": "business_id",
+              "field2": "business_id"
+            }
+          ]
         },
         "options": {}
       },
       "id": "merge-data",
       "name": "Merge Budget + Metrics",
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [1250, 300]
+      "typeVersion": 2.1,
+      "position": [
+        1250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -125,18 +183,29 @@
       "name": "Check Circuit Breakers",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1500, 300]
+      "position": [
+        1500,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "condition-1",
               "leftValue": "={{ $json.circuit_breaker_triggered }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals", "singleValue": true }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -146,7 +215,10 @@
       "name": "Breaker Triggered?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1750, 300]
+      "position": [
+        1750,
+        300
+      ]
     },
     {
       "parameters": {
@@ -157,10 +229,22 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
           ]
         },
         "sendBody": true,
@@ -172,7 +256,10 @@
       "name": "Update Budget Tracking",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2050, 150]
+      "position": [
+        2050,
+        150
+      ]
     },
     {
       "parameters": {
@@ -183,14 +270,20 @@
         "title": "=[CIRCUIT BREAKER] {{ $('Check Circuit Breakers').first().json.business_name }} - {{ $('Check Circuit Breakers').first().json.breaker_count }} breaker(s) triggered",
         "body": "=## Circuit Breaker Alert\n\n**Business:** {{ $('Check Circuit Breakers').first().json.business_name }} (`{{ $('Check Circuit Breakers').first().json.business_id }}`)\n**Stage:** {{ $('Check Circuit Breakers').first().json.status }}\n**Date:** {{ $('Check Circuit Breakers').first().json.today }}\n\n### Triggered Breakers\n\n{{ $('Check Circuit Breakers').first().json.circuit_breaker_reason }}\n\n### Key Metrics\n- Daily spend today: ${{ $('Check Circuit Breakers').first().json.today_spend }}\n- Daily max ({{ $('Check Circuit Breakers').first().json.status }} tier): ${{ $('Check Circuit Breakers').first().json.daily_max }}\n- 7-day total spend: ${{ $('Check Circuit Breakers').first().json.spend_7d }}\n- 7-day total revenue: ${{ $('Check Circuit Breakers').first().json.revenue_7d }}\n- Churn rate: {{ $('Check Circuit Breakers').first().json.churn_rate }}%\n- Current MRR: ${{ $('Check Circuit Breakers').first().json.current_mrr }}\n\n### Required Actions\n{{ $('Check Circuit Breakers').first().json.breakers.map(b => '- **' + b.rule + '**: ' + b.action).join('\\n') }}\n\n---\n*Auto-generated by Budget Circuit Breaker workflow*",
         "labels": {
-          "labels": ["circuit-breaker", "urgent"]
+          "labels": [
+            "circuit-breaker",
+            "urgent"
+          ]
         }
       },
       "id": "create-issue",
       "name": "Create GitHub Issue",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [2300, 150]
+      "position": [
+        2300,
+        150
+      ]
     },
     {
       "parameters": {
@@ -204,7 +297,10 @@
       "name": "Send Alert Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [2550, 150],
+      "position": [
+        2550,
+        150
+      ],
       "credentials": {
         "smtp": {
           "id": "smtp-cred",
@@ -220,7 +316,10 @@
       "name": "Collect Summary (No Trigger)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2050, 450]
+      "position": [
+        2050,
+        450
+      ]
     },
     {
       "parameters": {
@@ -229,10 +328,22 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
           ]
         },
         "sendBody": true,
@@ -244,7 +355,10 @@
       "name": "Pause Cold Email & Ads (system_config)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2800, 0],
+      "position": [
+        2800,
+        0
+      ],
       "continueOnFail": true,
       "notes": "Resilience gate: When circuit breaker fires, automatically disable cold email and ads for this business in system_config to prevent further spend."
     },
@@ -256,7 +370,10 @@
       "name": "Collect Summary (Triggered)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3050, 150]
+      "position": [
+        3050,
+        150
+      ]
     },
     {
       "parameters": {
@@ -266,8 +383,11 @@
       "id": "merge-back",
       "name": "Merge Back to Loop",
       "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [3300, 300]
+      "typeVersion": 2.1,
+      "position": [
+        3300,
+        300
+      ]
     },
     {
       "parameters": {
@@ -277,7 +397,10 @@
       "name": "Build Daily Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3550, 300]
+      "position": [
+        3550,
+        300
+      ]
     },
     {
       "parameters": {
@@ -293,71 +416,218 @@
       "name": "Write Report to GitHub",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [3800, 300]
+      "position": [
+        3800,
+        300
+      ]
     }
   ],
   "connections": {
     "Daily 11 PM Trigger": {
-      "main": [[{ "node": "Fetch Active Businesses", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch Active Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch Active Businesses": {
-      "main": [[{ "node": "Prepare Business Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Prepare Business Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Prepare Business Items": {
-      "main": [[{ "node": "Loop Each Business", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Each Business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Loop Each Business": {
       "main": [
         [
-          { "node": "Fetch Today Budget Entry", "type": "main", "index": 0 },
-          { "node": "Fetch 7-Day Metrics", "type": "main", "index": 0 }
+          {
+            "node": "Fetch Today Budget Entry",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch 7-Day Metrics",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "Build Daily Summary", "type": "main", "index": 0 }
+          {
+            "node": "Build Daily Summary",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Today Budget Entry": {
-      "main": [[{ "node": "Merge Budget + Metrics", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Merge Budget + Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch 7-Day Metrics": {
-      "main": [[{ "node": "Merge Budget + Metrics", "type": "main", "index": 1 }]]
+      "main": [
+        [
+          {
+            "node": "Merge Budget + Metrics",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
     },
     "Merge Budget + Metrics": {
-      "main": [[{ "node": "Check Circuit Breakers", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Check Circuit Breakers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Check Circuit Breakers": {
-      "main": [[{ "node": "Breaker Triggered?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Breaker Triggered?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Breaker Triggered?": {
       "main": [
-        [{ "node": "Update Budget Tracking", "type": "main", "index": 0 }],
-        [{ "node": "Collect Summary (No Trigger)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Update Budget Tracking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Collect Summary (No Trigger)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Update Budget Tracking": {
-      "main": [[{ "node": "Create GitHub Issue", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Create GitHub Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Create GitHub Issue": {
-      "main": [[{ "node": "Send Alert Email", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Send Alert Email": {
-      "main": [[{ "node": "Pause Cold Email & Ads (system_config)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Pause Cold Email & Ads (system_config)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Pause Cold Email & Ads (system_config)": {
-      "main": [[{ "node": "Collect Summary (Triggered)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Collect Summary (Triggered)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Collect Summary (No Trigger)": {
-      "main": [[{ "node": "Merge Back to Loop", "type": "main", "index": 1 }]]
+      "main": [
+        [
+          {
+            "node": "Merge Back to Loop",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
     },
     "Collect Summary (Triggered)": {
-      "main": [[{ "node": "Merge Back to Loop", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Merge Back to Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Merge Back to Loop": {
-      "main": [[{ "node": "Loop Each Business", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Each Business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Daily Summary": {
-      "main": [[{ "node": "Write Report to GitHub", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Write Report to GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

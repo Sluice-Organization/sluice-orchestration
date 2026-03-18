@@ -27,84 +27,30 @@
     },
     {
       "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.actionType }}",
         "rules": {
-          "values": [
-            {
-              "outputIndex": 0,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "EXPAND_LEAD_GEN", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 1,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "ACTIVATE_GOOGLE_ADS", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 2,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "SCALE_COLD_EMAIL", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 3,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "INCREASE_CONTENT", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 4,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "ADJUST_PRICING", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 5,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "LAUNCH_BUSINESS", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 6,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "KILL_BUSINESS", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 7,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "ACTIVATE_META_ADS", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 8,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "INCREASE_CALL_VOLUME", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 9,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "REQUEST_HUMAN_DECISION", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            },
-            {
-              "outputIndex": 10,
-              "conditions": {
-                "conditions": [{ "leftValue": "={{ $json.actionType }}", "rightValue": "SCALE_SENDING_DOMAINS", "operator": { "type": "string", "operation": "equals" } }]
-              }
-            }
+          "rules": [
+            { "value2": "EXPAND_LEAD_GEN", "output": 0 },
+            { "value2": "ACTIVATE_GOOGLE_ADS", "output": 1 },
+            { "value2": "SCALE_COLD_EMAIL", "output": 2 },
+            { "value2": "INCREASE_CONTENT", "output": 3 },
+            { "value2": "ADJUST_PRICING", "output": 4 },
+            { "value2": "LAUNCH_BUSINESS", "output": 5 },
+            { "value2": "KILL_BUSINESS", "output": 6 },
+            { "value2": "ACTIVATE_META_ADS", "output": 7 },
+            { "value2": "INCREASE_CALL_VOLUME", "output": 8 },
+            { "value2": "REQUEST_HUMAN_DECISION", "output": 9 },
+            { "value2": "SCALE_SENDING_DOMAINS", "output": 10 }
           ]
         },
-        "options": {
-          "fallbackOutput": "extra"
-        }
+        "fallbackOutput": 11,
+        "options": {}
       },
       "id": "route-action-type",
       "name": "Route by Action Type",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
+      "typeVersion": 2,
       "position": [500, 300]
     },
     {

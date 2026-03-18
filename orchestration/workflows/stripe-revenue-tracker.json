@@ -25,64 +25,25 @@
     },
     {
       "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.eventType }}",
         "rules": {
-          "values": [
-            {
-              "conditions": {
-                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.eventType }}", "rightValue": "checkout.session.completed", "operator": { "type": "string", "operation": "equals" } }],
-                "combinator": "and"
-              },
-              "renameOutput": "checkout"
-            },
-            {
-              "conditions": {
-                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.eventType }}", "rightValue": "customer.subscription.created", "operator": { "type": "string", "operation": "equals" } }],
-                "combinator": "and"
-              },
-              "renameOutput": "sub_created"
-            },
-            {
-              "conditions": {
-                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.eventType }}", "rightValue": "customer.subscription.updated", "operator": { "type": "string", "operation": "equals" } }],
-                "combinator": "and"
-              },
-              "renameOutput": "sub_updated"
-            },
-            {
-              "conditions": {
-                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.eventType }}", "rightValue": "customer.subscription.deleted", "operator": { "type": "string", "operation": "equals" } }],
-                "combinator": "and"
-              },
-              "renameOutput": "sub_deleted"
-            },
-            {
-              "conditions": {
-                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.eventType }}", "rightValue": "invoice.payment_succeeded", "operator": { "type": "string", "operation": "equals" } }],
-                "combinator": "and"
-              },
-              "renameOutput": "payment_succeeded"
-            },
-            {
-              "conditions": {
-                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.eventType }}", "rightValue": "invoice.payment_failed", "operator": { "type": "string", "operation": "equals" } }],
-                "combinator": "and"
-              },
-              "renameOutput": "payment_failed"
-            }
+          "rules": [
+            { "value2": "checkout.session.completed", "output": 0 },
+            { "value2": "customer.subscription.created", "output": 1 },
+            { "value2": "customer.subscription.updated", "output": 2 },
+            { "value2": "customer.subscription.deleted", "output": 3 },
+            { "value2": "invoice.payment_succeeded", "output": 4 },
+            { "value2": "invoice.payment_failed", "output": 5 }
           ]
         },
-        "options": { "fallbackOutput": "extra" }
+        "fallbackOutput": 6,
+        "options": {}
       },
       "id": "route-event",
       "name": "Route by Event Type",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
+      "typeVersion": 2,
       "position": [520, 0]
     },
     {

@@ -109,55 +109,22 @@
     },
     {
       "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.intent }}",
         "rules": {
-          "values": [
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.intent }}",
-                    "rightValue": "UNSUBSCRIBE",
-                    "operator": { "type": "string", "operation": "equals" }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "UNSUBSCRIBE"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.intent }}",
-                    "rightValue": "NEGATIVE",
-                    "operator": { "type": "string", "operation": "equals" }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "NEGATIVE"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.intent }}",
-                    "rightValue": "READY_FOR_DEMO",
-                    "operator": { "type": "string", "operation": "equals" }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "READY_FOR_DEMO"
-            }
+          "rules": [
+            { "value2": "UNSUBSCRIBE", "output": 0 },
+            { "value2": "NEGATIVE", "output": 1 },
+            { "value2": "READY_FOR_DEMO", "output": 2 }
           ]
         },
-        "options": { "fallbackOutput": "extra" }
+        "fallbackOutput": 3,
+        "options": {}
       },
       "id": "route-by-intent",
       "name": "Route by Intent",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
+      "typeVersion": 2,
       "position": [1500, 400]
     },
     {
@@ -406,7 +373,7 @@
     },
     {
       "parameters": {
-        "model": "claude-3-5-haiku-20241022",
+        "model": "claude-haiku-4-5-20251001",
         "options": {
           "maxTokensToSample": 300,
           "temperature": 0.7

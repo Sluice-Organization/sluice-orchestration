@@ -50,64 +50,23 @@
     },
     {
       "parameters": {
+        "dataType": "string",
+        "value1": "={{ $('Parse Demo Payload').first().json.outcome }}",
         "rules": {
-          "values": [
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $('Parse Demo Payload').first().json.outcome }}",
-                    "rightValue": "interested",
-                    "operator": { "type": "string", "operation": "equals" }
-                  }
-                ]
-              },
-              "renameOutput": "interested"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $('Parse Demo Payload').first().json.outcome }}",
-                    "rightValue": "needs_time",
-                    "operator": { "type": "string", "operation": "equals" }
-                  }
-                ]
-              },
-              "renameOutput": "needs_time"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $('Parse Demo Payload').first().json.outcome }}",
-                    "rightValue": "not_interested",
-                    "operator": { "type": "string", "operation": "equals" }
-                  }
-                ]
-              },
-              "renameOutput": "not_interested"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $('Parse Demo Payload').first().json.outcome }}",
-                    "rightValue": "no_show",
-                    "operator": { "type": "string", "operation": "equals" }
-                  }
-                ]
-              },
-              "renameOutput": "no_show"
-            }
+          "rules": [
+            { "value2": "interested", "output": 0 },
+            { "value2": "needs_time", "output": 1 },
+            { "value2": "not_interested", "output": 2 },
+            { "value2": "no_show", "output": 3 }
           ]
         },
+        "fallbackOutput": 4,
         "options": {}
       },
       "id": "route-by-outcome",
       "name": "Route by Outcome",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
+      "typeVersion": 2,
       "position": [660, 0]
     },
 

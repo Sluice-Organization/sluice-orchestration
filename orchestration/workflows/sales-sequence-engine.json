@@ -87,70 +87,22 @@
     },
     {
       "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.action }}",
         "rules": {
-          "values": [
-            {
-              "outputIndex": 0,
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "EMAIL",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "Email"
-            },
-            {
-              "outputIndex": 1,
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "CALL",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "Call"
-            },
-            {
-              "outputIndex": 2,
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.action }}",
-                    "rightValue": "COMPLETE",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "Complete"
-            }
-          ],
-          "fallbackOutput": "none"
+          "rules": [
+            { "value2": "EMAIL", "output": 0 },
+            { "value2": "CALL", "output": 1 },
+            { "value2": "COMPLETE", "output": 2 }
+          ]
         },
-        "options": {
-          "allMatchingOutputs": false
-        }
+        "fallbackOutput": 3,
+        "options": {}
       },
       "id": "route-by-action",
       "name": "Route: Email / Call / Complete",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
+      "typeVersion": 2,
       "position": [1000, 400]
     },
     {
