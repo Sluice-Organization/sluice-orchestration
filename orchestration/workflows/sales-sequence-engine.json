@@ -234,7 +234,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Pre-flight gating check for call\nconst lead = $input.first().json;\n\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_KEY;\n\ntry {\n  const response = await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?id=eq.${lead.id}&select=status,sequence_stage`,\n    {\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`\n      }\n    }\n  );\n  const current = await response.json();\n  if (current && current[0]) {\n    const currentStatus = current[0].status;\n    if (['converted', 'unsubscribed', 'rejected', 'demo_booked', 'paying', 'churned'].includes(currentStatus)) {\n      return [{ json: { ...lead, _gated: true, reason: 'Status changed to ' + currentStatus } }];\n    }\n  }\n} catch (e) {\n  // Continue if check fails\n}\n\n// Check phone number exists\nif (!lead.phone) {\n  return [{ json: { ...lead, _gated: true, reason: 'No phone number' } }];\n}\n\nreturn [{ json: { ...lead, _gated: false } }];"
+        "jsCode": "// Pre-flight gating check for call with TCPA compliance\nconst lead = $input.first().json;\n\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_KEY;\n\n// --- Step 1: Re-check lead status (may have changed since fetch) ---\ntry {\n  const response = await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?id=eq.${lead.id}&select=status,sequence_stage,dnc_checked,phone,timezone`,\n    {\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`\n      }\n    }\n  );\n  const current = await response.json();\n  if (current && current[0]) {\n    const currentStatus = current[0].status;\n    if (['converted', 'unsubscribed', 'rejected', 'demo_booked', 'paying', 'churned'].includes(currentStatus)) {\n      return [{ json: { ...lead, _gated: true, _fallback_to_email: false, reason: 'Status changed to ' + currentStatus } }];\n    }\n    // TCPA: Check DNC flag\n    if (current[0].dnc_checked === true) {\n      return [{ json: { ...lead, _gated: true, _fallback_to_email: false, reason: 'TCPA: Lead is on DNC list' } }];\n    }\n  }\n} catch (e) {\n  // Continue if check fails - better to gate than to skip\n}\n\n// --- Step 2: Check phone number exists - fall back to email if missing ---\nif (!lead.phone) {\n  return [{ json: { ...lead, _gated: true, _fallback_to_email: true, reason: 'No phone number - falling back to email' } }];\n}\n\n// --- Step 3: TCPA business hours check (8 AM - 9 PM in lead's timezone) ---\nconst leadTimezone = lead.timezone || 'America/New_York';\ntry {\n  const nowInLeadTz = new Date(new Date().toLocaleString('en-US', { timeZone: leadTimezone }));\n  const hour = nowInLeadTz.getHours();\n  if (hour < 8 || hour >= 21) {\n    return [{ json: { ...lead, _gated: true, _fallback_to_email: true, reason: `TCPA: Outside business hours (${hour}:00 in ${leadTimezone}). Allowed: 8AM-9PM.` } }];\n  }\n} catch (e) {\n  // If timezone parsing fails, use UTC check as fallback\n  const utcHour = new Date().getUTCHours();\n  // Assume US Eastern (UTC-5) as safe default\n  const estHour = (utcHour - 5 + 24) % 24;\n  if (estHour < 8 || estHour >= 21) {\n    return [{ json: { ...lead, _gated: true, _fallback_to_email: true, reason: `TCPA: Outside business hours (EST fallback: ${estHour}:00)` } }];\n  }\n}\n\n// --- Step 4: TCPA - check lead hasn't said \"don't call\" ---\nconst status = lead.status || '';\nif (['rejected', 'unsubscribed'].includes(status)) {\n  return [{ json: { ...lead, _gated: true, _fallback_to_email: false, reason: 'TCPA: Lead status is ' + status } }];\n}\n\nreturn [{ json: { ...lead, _gated: false, _fallback_to_email: false } }];"
       },
       "id": "gate-check-call",
       "name": "Gate Check for Call",
@@ -287,7 +287,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"leadId\": \"{{ $json.id }}\",\n  \"phone\": \"{{ $json.phone }}\",\n  \"firstName\": \"{{ $json.first_name || 'there' }}\",\n  \"businessName\": \"{{ $json.business_name }}\",\n  \"touchType\": \"{{ $json.type }}\",\n  \"touchNumber\": {{ $json.touchNumber }}\n}",
+        "jsonBody": "={\n  \"id\": \"{{ $json.id }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"phone\": \"{{ $json.phone }}\",\n  \"first_name\": \"{{ $json.first_name || 'there' }}\",\n  \"last_name\": \"{{ $json.last_name || '' }}\",\n  \"business_name\": \"{{ $json.business_name }}\",\n  \"business_id\": \"{{ $json.business_id || '' }}\",\n  \"touchType\": \"{{ $json.type }}\",\n  \"touchNumber\": {{ $json.touchNumber }},\n  \"source\": \"sales_sequence_engine\"\n}",
         "options": {
           "timeout": 60000
         }
@@ -331,6 +331,35 @@
       "typeVersion": 2,
       "position": [1300, 700],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "fallback-email",
+              "leftValue": "={{ $json._fallback_to_email }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-fallback-email",
+      "name": "Fallback to Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1800, 550]
     },
     {
       "parameters": {
@@ -687,6 +716,24 @@
         [
           {
             "node": "Trigger AI Voice Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fallback to Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fallback to Email?": {
+      "main": [
+        [
+          {
+            "node": "Gate Check + Build Email",
             "type": "main",
             "index": 0
           }

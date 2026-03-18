@@ -13,42 +13,41 @@
         }
       },
       "id": "schedule-daily-calls",
-      "name": "Daily 10:30AM Tue-Thu",
+      "name": "Daily 10:30AM Tue-Thu (VM Retries)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [-480, 0]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/rpc/get_warm_leads_for_calling",
+        "method": "GET",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/cold_email_leads?call_status=eq.voicemail_retry_scheduled&next_call_date=lte.{{ $now.toFormat('yyyy-MM-dd') }}&select=*&limit=50",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{}",
-        "options": {}
+        "options": {
+          "timeout": 30000
+        }
       },
-      "id": "fetch-warm-leads-rpc",
-      "name": "Fetch Warm Leads (RPC)",
+      "id": "fetch-vm-retry-leads",
+      "name": "Fetch Voicemail Retry Leads",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [200, 0],
       "continueOnFail": true,
-      "notes": "Fallback: If RPC doesn't exist, use the Code node below instead. RPC should run: SELECT * FROM cold_email_leads WHERE status = 'replied' AND reply_sentiment = 'positive' AND call_status IS NULL LIMIT 50"
+      "notes": "Fetches leads where call_status=voicemail_retry_scheduled AND next_call_date <= today. Fresh cold calls come from the sales sequence engine via /webhook/trigger-call. This scheduled path is ONLY for voicemail retries."
     },
     {
       "parameters": {
-        "jsCode": "// Fallback: Direct REST query if RPC not set up\n// This node fetches warm leads via Supabase REST API\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU';\n\n// Statuses that must never receive a call\nconst EXCLUDED_STATUSES = ['converted', 'unsubscribed', 'rejected', 'paying', 'demo_booked'];\n\nconst rpcResult = $input.first().json;\n\n// If RPC returned results, filter out excluded statuses before passing through\nif (Array.isArray(rpcResult) && rpcResult.length > 0) {\n  const filtered = rpcResult.filter(lead => !EXCLUDED_STATUSES.includes(lead.status));\n  if (filtered.length === 0) return [{ json: { _empty: true, reason: 'All warm leads already converted/excluded' } }];\n  return filtered.map(lead => ({ json: lead }));\n}\nif (rpcResult && !rpcResult.error && rpcResult.id) {\n  if (EXCLUDED_STATUSES.includes(rpcResult.status)) return [{ json: { _empty: true, reason: 'Lead already converted/excluded' } }];\n  return [{ json: rpcResult }];\n}\n\n// Otherwise, query directly via REST (with explicit exclusion)\ntry {\n  const response = await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?status=eq.replied&reply_sentiment=eq.positive&call_status=is.null&status=not.in.(converted,unsubscribed,rejected,paying,demo_booked)&limit=50&select=*`,\n    {\n      headers: {\n        'apikey': SUPABASE_ANON_KEY,\n        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,\n        'Content-Type': 'application/json'\n      }\n    }\n  );\n  const leads = await response.json();\n  if (!leads || leads.length === 0) {\n    return [{ json: { _empty: true, reason: 'No warm leads to call today' } }];\n  }\n  // Double-check: filter out excluded statuses in case of race condition\n  const safeLeads = leads.filter(lead => !EXCLUDED_STATUSES.includes(lead.status));\n  if (safeLeads.length === 0) return [{ json: { _empty: true, reason: 'All warm leads already converted/excluded' } }];\n  return safeLeads.slice(0, 50).map(lead => ({ json: lead }));\n} catch (err) {\n  return [{ json: { _empty: true, reason: 'Supabase query failed: ' + err.message } }];\n}"
+        "jsCode": "// Parse voicemail retry leads from Supabase REST query\n// Fresh cold calls come from the sales sequence engine via webhook.\n// This path handles ONLY voicemail retries from the scheduled trigger.\n\nconst EXCLUDED_STATUSES = ['converted', 'unsubscribed', 'rejected', 'paying', 'demo_booked', 'churned'];\n\nconst result = $input.first().json;\n\n// Handle array result from REST API\nif (Array.isArray(result) && result.length > 0) {\n  const filtered = result.filter(lead => !EXCLUDED_STATUSES.includes(lead.status) && lead.phone);\n  if (filtered.length === 0) return [{ json: { _empty: true, reason: 'No eligible voicemail retry leads today' } }];\n  return filtered.map(lead => ({ json: { ...lead, _call_source: 'voicemail_retry' } }));\n}\n\n// Handle single object result\nif (result && !result.error && result.id) {\n  if (EXCLUDED_STATUSES.includes(result.status) || !result.phone) {\n    return [{ json: { _empty: true, reason: 'Lead excluded or has no phone' } }];\n  }\n  return [{ json: { ...result, _call_source: 'voicemail_retry' } }];\n}\n\nreturn [{ json: { _empty: true, reason: 'No voicemail retry leads due today' } }];"
       },
-      "id": "parse-warm-leads",
-      "name": "Parse Warm Leads (50 max)",
+      "id": "parse-vm-retry-leads",
+      "name": "Parse VM Retry Leads (50 max)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [480, 0]
@@ -84,7 +83,72 @@
     },
     {
       "parameters": {
-        "jsCode": "// Look up the business's retell_agent_id from the businesses table\n// Falls back to $env.RETELL_AGENT_ID for BayFlow (manually configured)\n\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU';\n\nconst lead = $input.first().json;\nconst businessId = lead.business_id || lead.businessId || '';\n\nlet retellAgentId = '';\nlet businessSiteUrl = '';\nlet businessCalUrl = 'https://cal.com/shalinp';\nlet businessDisplayName = lead.business_name || 'your business';\n\n// Query the businesses table for this lead's business retell_agent_id\nif (businessId) {\n  try {\n    const response = await fetch(\n      `${SUPABASE_URL}/rest/v1/businesses?business_id=eq.${encodeURIComponent(businessId)}&select=retell_agent_id,name,site_url,cal_booking_url`,\n      {\n        headers: {\n          'apikey': SUPABASE_ANON_KEY,\n          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,\n          'Content-Type': 'application/json'\n        }\n      }\n    );\n    const businesses = await response.json();\n    if (businesses && businesses.length > 0) {\n      const biz = businesses[0];\n      if (biz.retell_agent_id) {\n        retellAgentId = biz.retell_agent_id;\n      }\n      if (biz.name) {\n        businessDisplayName = biz.name;\n      }\n      if (biz.site_url) {\n        businessSiteUrl = biz.site_url;\n      }\n      if (biz.cal_booking_url) {\n        businessCalUrl = biz.cal_booking_url;\n      }\n    }\n  } catch (err) {\n    // Silently fall back to env variable\n  }\n}\n\n// Fallback: use global RETELL_AGENT_ID env var (for BayFlow or manually configured agents)\n// Note: in n8n Code nodes, env vars are accessed via $env\n// but we pass it through as a flag so the HTTP node can use {{ $env.RETELL_AGENT_ID }}\nconst useEnvFallback = !retellAgentId;\n\nreturn [{\n  json: {\n    ...lead,\n    _retell_agent_id: retellAgentId,\n    _use_env_fallback: useEnvFallback,\n    _business_site_url: businessSiteUrl,\n    _business_cal_url: businessCalUrl,\n    _business_display_name: businessDisplayName\n  }\n}];"
+        "jsCode": "// TCPA Compliance Gate - runs before EVERY call attempt\n// Checks: phone exists, not DNC, business hours in lead's timezone, not rejected/unsubscribed\n\nconst lead = $input.first().json;\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_KEY;\n\n// --- Check 1: Phone number exists ---\nif (!lead.phone) {\n  return [{ json: { ...lead, _tcpa_blocked: true, _tcpa_reason: 'No phone number on lead' } }];\n}\n\n// --- Check 2: DNC flag ---\nlet dncChecked = lead.dnc_checked || false;\nlet currentStatus = lead.status || '';\n\n// Re-fetch from DB to get latest DNC + status\ntry {\n  const emailParam = encodeURIComponent(lead.email);\n  const resp = await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?email=eq.${emailParam}&select=dnc_checked,status`,\n    {\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`\n      }\n    }\n  );\n  const rows = await resp.json();\n  if (rows && rows[0]) {\n    dncChecked = rows[0].dnc_checked || false;\n    currentStatus = rows[0].status || currentStatus;\n  }\n} catch (e) {\n  // Use lead's existing data if fetch fails\n}\n\nif (dncChecked === true) {\n  return [{ json: { ...lead, _tcpa_blocked: true, _tcpa_reason: 'TCPA: Lead is on DNC list (dnc_checked=true)' } }];\n}\n\n// --- Check 3: Lead status not rejected/unsubscribed ---\nif (['rejected', 'unsubscribed'].includes(currentStatus)) {\n  return [{ json: { ...lead, _tcpa_blocked: true, _tcpa_reason: 'TCPA: Lead status is ' + currentStatus + ' - do not call' } }];\n}\n\n// --- Check 4: Business hours (8 AM - 9 PM in lead's timezone) ---\nconst leadTimezone = lead.timezone || 'America/New_York';\ntry {\n  const nowInLeadTz = new Date(new Date().toLocaleString('en-US', { timeZone: leadTimezone }));\n  const hour = nowInLeadTz.getHours();\n  if (hour < 8 || hour >= 21) {\n    return [{ json: { ...lead, _tcpa_blocked: true, _tcpa_reason: `TCPA: Outside calling hours (${hour}:00 in ${leadTimezone}). Allowed: 8AM-9PM.` } }];\n  }\n} catch (e) {\n  // Fallback: assume US Eastern\n  const utcHour = new Date().getUTCHours();\n  const estHour = (utcHour - 5 + 24) % 24;\n  if (estHour < 8 || estHour >= 21) {\n    return [{ json: { ...lead, _tcpa_blocked: true, _tcpa_reason: `TCPA: Outside calling hours (EST fallback: ${estHour}:00)` } }];\n  }\n}\n\n// All checks passed\nreturn [{ json: { ...lead, _tcpa_blocked: false, _tcpa_reason: 'All TCPA checks passed' } }];"
+      },
+      "id": "tcpa-compliance-gate",
+      "name": "TCPA Compliance Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [820, 150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "tcpa-passed",
+              "leftValue": "={{ $json._tcpa_blocked }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "tcpa-check-result",
+      "name": "TCPA Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [820, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/voice_call_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_email\": \"{{ $json.email }}\",\n  \"business_name\": \"{{ $json.business_name || '' }}\",\n  \"call_outcome\": \"tcpa_blocked\",\n  \"call_duration_seconds\": 0,\n  \"transcript\": {{ JSON.stringify('TCPA blocked: ' + ($json._tcpa_reason || 'unknown')) }},\n  \"booking_made\": false,\n  \"disconnect_reason\": \"tcpa_compliance\",\n  \"created_at\": \"{{ $now.toFormat('yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'') }}\"\n}",
+        "options": {}
+      },
+      "id": "log-tcpa-block",
+      "name": "Log TCPA Block",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1060, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Look up the business's retell_agent_id from the businesses table\n// Falls back to $env.RETELL_AGENT_ID for BayFlow (manually configured)\n\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SUPABASE_ANON_KEY = $env.SUPABASE_SERVICE_KEY;\n\nconst lead = $input.first().json;\nconst businessId = lead.business_id || lead.businessId || '';\n\nlet retellAgentId = '';\nlet businessSiteUrl = '';\nlet businessCalUrl = 'https://cal.com/shalinp';\nlet businessDisplayName = lead.business_name || 'your business';\n\n// Query the businesses table for this lead's business retell_agent_id\nif (businessId) {\n  try {\n    const response = await fetch(\n      `${SUPABASE_URL}/rest/v1/businesses?business_id=eq.${encodeURIComponent(businessId)}&select=retell_agent_id,name,site_url,cal_booking_url`,\n      {\n        headers: {\n          'apikey': SUPABASE_ANON_KEY,\n          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,\n          'Content-Type': 'application/json'\n        }\n      }\n    );\n    const businesses = await response.json();\n    if (businesses && businesses.length > 0) {\n      const biz = businesses[0];\n      if (biz.retell_agent_id) {\n        retellAgentId = biz.retell_agent_id;\n      }\n      if (biz.name) {\n        businessDisplayName = biz.name;\n      }\n      if (biz.site_url) {\n        businessSiteUrl = biz.site_url;\n      }\n      if (biz.cal_booking_url) {\n        businessCalUrl = biz.cal_booking_url;\n      }\n    }\n  } catch (err) {\n    // Silently fall back to env variable\n  }\n}\n\n// Fallback: use global RETELL_AGENT_ID env var (for BayFlow or manually configured agents)\n// Note: in n8n Code nodes, env vars are accessed via $env\n// but we pass it through as a flag so the HTTP node can use {{ $env.RETELL_AGENT_ID }}\nconst useEnvFallback = !retellAgentId;\n\nreturn [{\n  json: {\n    ...lead,\n    _retell_agent_id: retellAgentId,\n    _use_env_fallback: useEnvFallback,\n    _business_site_url: businessSiteUrl,\n    _business_cal_url: businessCalUrl,\n    _business_display_name: businessDisplayName\n  }\n}];"
       },
       "id": "lookup-business-agent",
       "name": "Lookup Business Agent ID",
@@ -124,7 +188,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Content-Type", "value": "application/json" },
             { "name": "Prefer", "value": "return=minimal" }
@@ -158,7 +222,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst { email, phone, business_name, first_name, business_id } = body;\n\nif (!phone || !email) {\n  return [{ json: { _error: true, message: 'Missing required fields: email and phone' } }];\n}\n\nreturn [{\n  json: {\n    email,\n    phone,\n    business_name: business_name || 'your shop',\n    first_name: first_name || 'there',\n    business_id: business_id || ''\n  }\n}];"
+        "jsCode": "// Parse trigger data from sales sequence engine or manual call\n// The sales sequence engine sends full lead data including id, email, phone,\n// first_name, last_name, business_name, business_id, touchType, touchNumber, source\nconst body = $input.first().json.body || $input.first().json;\n\nconst email = body.email || '';\nconst phone = body.phone || '';\nconst firstName = body.first_name || body.firstName || 'there';\nconst lastName = body.last_name || body.lastName || '';\nconst businessName = body.business_name || body.businessName || 'your shop';\nconst businessId = body.business_id || body.businessId || '';\nconst leadId = body.id || body.leadId || '';\nconst touchType = body.touchType || 'cold_call';\nconst touchNumber = body.touchNumber || 1;\nconst source = body.source || 'manual';\n\nif (!phone || !email) {\n  return [{ json: { _error: true, message: 'Missing required fields: email and phone' } }];\n}\n\nreturn [{\n  json: {\n    id: leadId,\n    email,\n    phone,\n    first_name: firstName,\n    last_name: lastName,\n    business_name: businessName,\n    business_id: businessId,\n    touchType,\n    touchNumber,\n    _call_source: source\n  }\n}];"
       },
       "id": "parse-manual-trigger",
       "name": "Parse Manual Trigger Data",
@@ -209,7 +273,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Content-Type", "value": "application/json" },
             { "name": "Prefer", "value": "return=minimal" }
@@ -290,7 +354,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Content-Type", "value": "application/json" },
             { "name": "Prefer", "value": "return=minimal" }
@@ -355,7 +419,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Handle voicemail: increment attempts, schedule retry if < 3 attempts\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU';\n\nconst leadEmail = $json.lead_email;\n\n// First, fetch current call_attempts\nlet currentAttempts = 0;\ntry {\n  const getResp = await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?email=eq.${encodeURIComponent(leadEmail)}&select=call_attempts`,\n    {\n      headers: {\n        'apikey': SUPABASE_ANON_KEY,\n        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`\n      }\n    }\n  );\n  const rows = await getResp.json();\n  if (rows && rows[0]) {\n    currentAttempts = rows[0].call_attempts || 0;\n  }\n} catch (e) {\n  // Default to 0\n}\n\nconst newAttempts = currentAttempts + 1;\nconst maxRetries = 3;\n\nlet updateBody = {\n  call_status: 'voicemail',\n  call_attempts: newAttempts\n};\n\nif (newAttempts < maxRetries) {\n  // Schedule retry in 2 days\n  const retryDate = new Date();\n  retryDate.setDate(retryDate.getDate() + 2);\n  updateBody.next_call_date = retryDate.toISOString().split('T')[0];\n  updateBody.call_status = 'voicemail_retry_scheduled';\n} else {\n  updateBody.call_status = 'voicemail_max_attempts';\n}\n\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?email=eq.${encodeURIComponent(leadEmail)}`,\n    {\n      method: 'PATCH',\n      headers: {\n        'apikey': SUPABASE_ANON_KEY,\n        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify(updateBody)\n    }\n  );\n} catch (e) {\n  // Log error but don't fail\n}\n\nreturn [{\n  json: {\n    ...updateBody,\n    lead_email: leadEmail,\n    business_name: $json.business_name,\n    first_name: $json.first_name,\n    retry_scheduled: newAttempts < maxRetries\n  }\n}];"
+        "jsCode": "// Handle voicemail: increment attempts, schedule retry if < 3 attempts\nconst SUPABASE_URL = 'https://wjukfdziomnejtlmegvv.supabase.co';\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_KEY;\n\nconst leadEmail = $json.lead_email;\n\n// First, fetch current call_attempts\nlet currentAttempts = 0;\ntry {\n  const getResp = await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?email=eq.${encodeURIComponent(leadEmail)}&select=call_attempts`,\n    {\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`\n      }\n    }\n  );\n  const rows = await getResp.json();\n  if (rows && rows[0]) {\n    currentAttempts = rows[0].call_attempts || 0;\n  }\n} catch (e) {\n  // Default to 0\n}\n\nconst newAttempts = currentAttempts + 1;\nconst maxRetries = 3;\n\nlet updateBody = {\n  call_status: 'voicemail',\n  call_attempts: newAttempts\n};\n\nif (newAttempts < maxRetries) {\n  // Schedule retry in 2 days\n  const retryDate = new Date();\n  retryDate.setDate(retryDate.getDate() + 2);\n  updateBody.next_call_date = retryDate.toISOString().split('T')[0];\n  updateBody.call_status = 'voicemail_retry_scheduled';\n} else {\n  updateBody.call_status = 'voicemail_max_attempts';\n}\n\ntry {\n  await fetch(\n    `${SUPABASE_URL}/rest/v1/cold_email_leads?email=eq.${encodeURIComponent(leadEmail)}`,\n    {\n      method: 'PATCH',\n      headers: {\n        'apikey': SERVICE_KEY,\n        'Authorization': `Bearer ${SERVICE_KEY}`,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=minimal'\n      },\n      body: JSON.stringify(updateBody)\n    }\n  );\n} catch (e) {\n  // Log error but don't fail\n}\n\nreturn [{\n  json: {\n    ...updateBody,\n    lead_email: leadEmail,\n    business_name: $json.business_name,\n    first_name: $json.first_name,\n    retry_scheduled: newAttempts < maxRetries\n  }\n}];"
       },
       "id": "handle-voicemail",
       "name": "Handle Voicemail + Schedule Retry",
@@ -370,7 +434,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Content-Type", "value": "application/json" },
             { "name": "Prefer", "value": "return=minimal" }
@@ -395,7 +459,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Content-Type", "value": "application/json" },
             { "name": "Prefer", "value": "return=minimal" }
@@ -428,7 +492,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Content-Type", "value": "application/json" },
             { "name": "Prefer", "value": "return=minimal" }
@@ -453,7 +517,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU" },
+            { "name": "apikey", "value": "{{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Authorization", "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
@@ -481,7 +545,7 @@
     }
   ],
   "connections": {
-    "Daily 10:30AM Tue-Thu": {
+    "Daily 10:30AM Tue-Thu (VM Retries)": {
       "main": [
         [{ "node": "Query Best Outreach Timing", "type": "main", "index": 0 }]
       ]
@@ -493,23 +557,34 @@
     },
     "Evaluate Timing Data": {
       "main": [
-        [{ "node": "Fetch Warm Leads (RPC)", "type": "main", "index": 0 }]
+        [{ "node": "Fetch Voicemail Retry Leads", "type": "main", "index": 0 }]
       ]
     },
-    "Fetch Warm Leads (RPC)": {
+    "Fetch Voicemail Retry Leads": {
       "main": [
-        [{ "node": "Parse Warm Leads (50 max)", "type": "main", "index": 0 }]
+        [{ "node": "Parse VM Retry Leads (50 max)", "type": "main", "index": 0 }]
       ]
     },
-    "Parse Warm Leads (50 max)": {
+    "Parse VM Retry Leads (50 max)": {
       "main": [
         [{ "node": "Has Leads?", "type": "main", "index": 0 }]
       ]
     },
     "Has Leads?": {
       "main": [
-        [{ "node": "Lookup Business Agent ID", "type": "main", "index": 0 }],
+        [{ "node": "TCPA Compliance Gate", "type": "main", "index": 0 }],
         [{ "node": "No Leads Today", "type": "main", "index": 0 }]
+      ]
+    },
+    "TCPA Compliance Gate": {
+      "main": [
+        [{ "node": "TCPA Passed?", "type": "main", "index": 0 }]
+      ]
+    },
+    "TCPA Passed?": {
+      "main": [
+        [{ "node": "Lookup Business Agent ID", "type": "main", "index": 0 }],
+        [{ "node": "Log TCPA Block", "type": "main", "index": 0 }]
       ]
     },
     "Lookup Business Agent ID": {
@@ -530,7 +605,7 @@
     "Parse Manual Trigger Data": {
       "main": [
         [
-          { "node": "Lookup Business Agent ID", "type": "main", "index": 0 },
+          { "node": "TCPA Compliance Gate", "type": "main", "index": 0 },
           { "node": "Respond: Call Queued", "type": "main", "index": 0 }
         ]
       ]
