@@ -190,6 +190,7 @@
     },
     {
       "parameters": {
+        "resource": "file",
         "operation": "create",
         "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
@@ -676,6 +677,7 @@
     },
     {
       "parameters": {
+        "resource": "file",
         "operation": "create",
         "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
