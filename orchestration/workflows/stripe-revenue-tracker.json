@@ -252,7 +252,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.filePath }}",
         "resource": "file",
@@ -278,7 +278,7 @@
     {
       "parameters": {
         "operation": "edit",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.filePath }}",
         "fileContent": "={{ $json.fileContent }}",

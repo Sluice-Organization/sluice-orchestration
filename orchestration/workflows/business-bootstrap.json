@@ -20,7 +20,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$json.body.businessId}/state.md` }}",
         "resource": "file",
@@ -101,7 +101,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$json.businessId}/state.md` }}",
         "fileContent": "={{ $json.stateContent }}",
@@ -121,7 +121,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/strategy.md` }}",
         "fileContent": "={{ $('Generate Seed Content').first().json.strategyContent }}",
@@ -141,7 +141,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/weekly-plan.md` }}",
         "fileContent": "={{ $('Generate Seed Content').first().json.weeklyPlanContent }}",
@@ -161,7 +161,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/content-strategy.md` }}",
         "fileContent": "={{ $('Generate Seed Content').first().json.contentStrategyContent }}",
@@ -181,7 +181,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/support-log.md` }}",
         "fileContent": "={{ $('Generate Seed Content').first().json.supportLogContent }}",
@@ -201,7 +201,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/reports/.gitkeep` }}",
         "fileContent": "",
@@ -221,7 +221,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/comptroller/.gitkeep` }}",
         "fileContent": "",

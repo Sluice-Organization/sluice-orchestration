@@ -77,7 +77,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Split Into Businesses').item.json.businessPath }}/prd.md",
         "resource": "file"
@@ -92,7 +92,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Split Into Businesses').item.json.businessPath }}/state.md",
         "resource": "file"
@@ -107,7 +107,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Split Into Businesses').item.json.businessPath }}/weekly-plan.md",
         "resource": "file"
@@ -122,7 +122,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Split Into Businesses').item.json.businessPath }}/reports/support-log.md",
         "resource": "file"
@@ -137,7 +137,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports",
+        "url": "=https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": { "timeout": 15000 }
@@ -168,7 +168,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports/{{ $json.latestAppTest }}",
+        "url": "=https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports/{{ $json.latestAppTest }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
@@ -195,7 +195,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports/{{ $('Find Latest Report Files').first().json.latestCompetitor }}",
+        "url": "=https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports/{{ $('Find Latest Report Files').first().json.latestCompetitor }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
@@ -222,7 +222,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports/{{ $('Find Latest Report Files').first().json.latestSeo }}",
+        "url": "=https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/{{ $('Split Into Businesses').item.json.businessPath }}/reports/{{ $('Find Latest Report Files').first().json.latestSeo }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
@@ -294,7 +294,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/reports/product-{{ $now.toFormat('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.report }}",
@@ -321,7 +321,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "={{ $json.repo_name }}",
         "title": "={{ $json.title }}",
         "body": "={{ $json.body }}",

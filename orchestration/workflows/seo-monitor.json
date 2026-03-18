@@ -164,7 +164,7 @@
       "parameters": {
         "resource": "file",
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ 'memory-bank/system/reports/seo-' + $json.date + '.md' }}",
         "fileContent": "={{ $json.report }}",

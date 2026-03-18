@@ -73,7 +73,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "=memory-bank/businesses/' + ($json.businessId || 'bayflow') + '/reports/content-{{ $now.toFormat('yyyy-MM-dd') }}.md",
         "resource": "file"
@@ -386,7 +386,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "=memory-bank/businesses/' + ($json.businessId || 'bayflow') + '/reports/social-publish-{{ $json.reportDate }}.md",
         "fileContent": "={{ $json.report }}",
@@ -503,7 +503,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "=memory-bank/businesses/' + ($json.businessId || 'bayflow') + '/reports/social-publish-{{ $json.reportDate }}.md",
         "fileContent": "={{ $json.report }}",

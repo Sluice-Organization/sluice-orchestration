@@ -284,7 +284,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/={{ $json.businessId }}/content-strategy.md",
+        "url": "https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/memory-bank/businesses/={{ $json.businessId }}/content-strategy.md",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -567,7 +567,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/={{ $json.businessId }}/reports/ceo-actions-={{ $json.today }}.md",
+        "url": "https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/memory-bank/businesses/={{ $json.businessId }}/reports/ceo-actions-={{ $json.today }}.md",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

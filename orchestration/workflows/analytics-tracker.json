@@ -190,7 +190,7 @@
       "parameters": {
         "resource": "file",
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ 'memory-bank/businesses/' + $json.businessId + '/reports/traffic-' + $json.date + '.md' }}",
         "fileContent": "={{ $json.report }}",

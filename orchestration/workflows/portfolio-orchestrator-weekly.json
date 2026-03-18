@@ -51,7 +51,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/state.md",
         "resource": "file"
@@ -65,7 +65,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Filter Active Businesses').first().json.businessPath }}/strategy.md",
         "resource": "file"
@@ -89,7 +89,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/reports/ceo-{{ $json.lastMonday }}.md",
         "resource": "file"
@@ -104,7 +104,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/system/discovery-opportunities-{{ $('Compute Report Dates').first().json.lastTuesday }}.md",
         "resource": "file"
@@ -119,7 +119,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/system/comptroller-review-{{ $('Compute Report Dates').first().json.lastMonday }}.md",
         "resource": "file"
@@ -134,7 +134,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Report Dates').first().json.businessPath }}/reports/product-{{ $('Compute Report Dates').first().json.lastMonday }}.md",
         "resource": "file"
@@ -194,7 +194,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/system/orchestrator-review-{{ $now.toFormat('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.report }}",
@@ -210,7 +210,7 @@
     {
       "parameters": {
         "operation": "edit",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/strategy.md",
         "fileContent": "={{ $json.strategyUpdate }}",

@@ -54,7 +54,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/content-strategy.md",
         "resource": "file"
@@ -69,7 +69,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Split Into Businesses').first().json.businessPath }}/weekly-plan.md",
         "resource": "file"
@@ -209,7 +209,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/reports/content-{{ $now.toFormat('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.content }}",
@@ -241,7 +241,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/reports/content-revision-{{ $now.toFormat('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.revisionNote }}",

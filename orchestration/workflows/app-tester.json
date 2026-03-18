@@ -333,7 +333,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/businesses/' + $json.businessId + '/reports/app-test-' + $json.today + '.md' }}",
+        "url": "={{ 'https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/memory-bank/businesses/' + $json.businessId + '/reports/app-test-' + $json.today + '.md' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -396,7 +396,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $json.repoName + '/issues' }}",
+        "url": "={{ 'https://api.github.com/repos/Sluice-Organization/' + $json.repoName + '/issues' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

@@ -17,7 +17,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$json.body.businessId}/state.md` }}",
         "resource": "file",
@@ -33,7 +33,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Kill Business Webhook').first().json.body.businessId}/strategy.md` }}",
         "resource": "file",
@@ -49,7 +49,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Kill Business Webhook').first().json.body.businessId}/weekly-plan.md` }}",
         "resource": "file",
@@ -65,7 +65,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Kill Business Webhook').first().json.body.businessId}/content-strategy.md` }}",
         "resource": "file",
@@ -81,7 +81,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Kill Business Webhook').first().json.body.businessId}/support-log.md` }}",
         "resource": "file",
@@ -142,7 +142,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$json.businessId}/post-mortem.md` }}",
         "fileContent": "={{ $json.postMortemMarkdown }}",
@@ -230,7 +230,7 @@
     {
       "parameters": {
         "operation": "edit",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Parse Post-Mortem').first().json.businessId}/state.md` }}",
         "fileContent": "={{ $('Parse Post-Mortem').first().json.killedStateContent }}",

@@ -167,7 +167,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.filePath }}",
         "fileContent": "={{ $json.fileContent }}",
@@ -789,7 +789,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.filePath }}",
         "fileContent": "={{ $json.fileContent }}",
@@ -812,7 +812,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.github.com/repos/ShalinPatel670/{{ $json.issueRepo }}/issues",
+        "url": "=https://api.github.com/repos/Sluice-Organization/{{ $json.issueRepo }}/issues",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

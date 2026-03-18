@@ -51,7 +51,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/state.md",
         "resource": "file"
@@ -65,7 +65,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Filter Active Businesses').first().json.businessPath }}/strategy.md",
         "resource": "file"
@@ -79,7 +79,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Filter Active Businesses').first().json.businessPath }}/content-strategy.md",
         "resource": "file"
@@ -93,7 +93,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Filter Active Businesses').first().json.businessPath }}/weekly-plan.md",
         "resource": "file"
@@ -117,7 +117,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.ceoReportPathToday }}",
         "resource": "file"
@@ -132,7 +132,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Report Dates').first().json.ceoReportPathYesterday }}",
         "resource": "file"
@@ -147,7 +147,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Report Dates').first().json.financeReportPathToday }}",
         "resource": "file"
@@ -162,7 +162,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Report Dates').first().json.financeReportPathYesterday }}",
         "resource": "file"
@@ -177,7 +177,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Report Dates').first().json.contentReportPathToday }}",
         "resource": "file"
@@ -192,7 +192,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Report Dates').first().json.contentReportPathYesterday }}",
         "resource": "file"
@@ -281,7 +281,7 @@
     {
       "parameters": {
         "operation": "edit",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/weekly-plan.md",
         "fileContent": "={{ $json.revisedPlan }}",
@@ -300,7 +300,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/comptroller/review-{{ $now.toFormat('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.reviewText }}",
@@ -316,7 +316,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/comptroller/review-{{ $now.toFormat('yyyy-MM-dd') }}.md",
         "fileContent": "={{ $json.reviewText }}",

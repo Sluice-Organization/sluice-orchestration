@@ -127,7 +127,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst failed = data.failed || [];\n\nconst body = `## Manual Directory Submission Required\\n\\n` +\n  `Business: **${data.businessName}**\\n\\n` +\n  `The following directories failed automated submission and need manual attention:\\n\\n` +\n  failed.map(f => `- **${f.directory}**: ${f.error}`).join('\\n') + '\\n\\n' +\n  `### Submission Details\\n` +\n  `Use the business info from the memory-bank to fill in directory forms.\\n\\n` +\n  `Generated: ${data.timestamp}`;\n\nreturn [{\n  json: {\n    owner: 'ShalinPatel670',\n    repo: 'sluice-orchestration',\n    title: '[Manual] Directory submissions needed for ' + data.businessName,\n    body,\n    labels: ['manual-submission', 'distribution']\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\nconst failed = data.failed || [];\n\nconst body = `## Manual Directory Submission Required\\n\\n` +\n  `Business: **${data.businessName}**\\n\\n` +\n  `The following directories failed automated submission and need manual attention:\\n\\n` +\n  failed.map(f => `- **${f.directory}**: ${f.error}`).join('\\n') + '\\n\\n' +\n  `### Submission Details\\n` +\n  `Use the business info from the memory-bank to fill in directory forms.\\n\\n` +\n  `Generated: ${data.timestamp}`;\n\nreturn [{\n  json: {\n    owner: 'Sluice-Organization',\n    repo: 'sluice-orchestration',\n    title: '[Manual] Directory submissions needed for ' + data.businessName,\n    body,\n    labels: ['manual-submission', 'distribution']\n  }\n}];"
       },
       "id": "build-github-issue",
       "name": "Build GitHub Issue",

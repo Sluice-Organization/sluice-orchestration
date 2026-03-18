@@ -62,7 +62,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $('Extract Parameters').first().json.repoName }}",
+        "url": "={{ 'https://api.github.com/repos/Sluice-Organization/' + $('Extract Parameters').first().json.repoName }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -83,7 +83,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $('Extract Parameters').first().json.repoName + '/contents/.github/workflows/claude.yml' }}",
+        "url": "={{ 'https://api.github.com/repos/Sluice-Organization/' + $('Extract Parameters').first().json.repoName + '/contents/.github/workflows/claude.yml' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -104,7 +104,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $('Extract Parameters').first().json.repoName + '/contents/CLAUDE.md' }}",
+        "url": "={{ 'https://api.github.com/repos/Sluice-Organization/' + $('Extract Parameters').first().json.repoName + '/contents/CLAUDE.md' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -154,7 +154,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const params = $('Extract Parameters').first().json;\nconst lighthouse = $('Parse Lighthouse').first().json.lighthouse;\nconst { slopChecks, seoChecks } = $('Parse HTML Checks').first().json;\nconst { githubChecks } = $('Parse GitHub Checks').first().json;\n\nconst today = new Date().toISOString().split('T')[0];\nconst allChecks = [];\nconst failures = [];\n\n// --- Lighthouse ---\nif (lighthouse.error) {\n  allChecks.push({ category: 'Lighthouse', check: 'Lighthouse Audit', pass: false, detail: lighthouse.error, critical: true });\n  failures.push({ category: 'Lighthouse', check: 'Lighthouse Audit', detail: lighthouse.error });\n} else {\n  const perfPass = lighthouse.performance >= 50;\n  const a11yPass = lighthouse.accessibility >= 80;\n  const seoPass = lighthouse.seo >= 80;\n\n  allChecks.push({ category: 'Lighthouse', check: 'Performance >= 50', pass: perfPass, detail: `Score: ${lighthouse.performance}`, critical: true });\n  allChecks.push({ category: 'Lighthouse', check: 'Accessibility >= 80', pass: a11yPass, detail: `Score: ${lighthouse.accessibility}`, critical: true });\n  allChecks.push({ category: 'Lighthouse', check: 'SEO >= 80', pass: seoPass, detail: `Score: ${lighthouse.seo}`, critical: true });\n\n  if (!perfPass) failures.push({ category: 'Lighthouse', check: 'Performance >= 50', detail: `Score: ${lighthouse.performance}` });\n  if (!a11yPass) failures.push({ category: 'Lighthouse', check: 'Accessibility >= 80', detail: `Score: ${lighthouse.accessibility}` });\n  if (!seoPass) failures.push({ category: 'Lighthouse', check: 'SEO >= 80', detail: `Score: ${lighthouse.seo}` });\n}\n\n// --- Slop checks ---\nfor (const c of slopChecks) {\n  allChecks.push({ category: 'Content Quality', ...c, critical: true });\n  if (!c.pass) failures.push({ category: 'Content Quality', check: c.check, detail: c.detail });\n}\n\n// --- SEO checks ---\nfor (const c of seoChecks) {\n  allChecks.push({ category: 'SEO', ...c });\n  if (!c.pass && c.critical) failures.push({ category: 'SEO', check: c.check, detail: c.detail });\n}\n\n// --- GitHub checks ---\nfor (const c of githubChecks) {\n  allChecks.push({ category: 'GitHub', ...c });\n  if (!c.pass && c.critical) failures.push({ category: 'GitHub', check: c.check, detail: c.detail });\n}\n\n// Score\nconst totalChecks = allChecks.length;\nconst passedChecks = allChecks.filter(c => c.pass).length;\nconst criticalFailures = failures.length;\nconst verdict = criticalFailures === 0 ? 'PASS' : 'FAIL';\n\n// Build report\nlet report = `# Quality Gate Report: ${params.businessName}\\n\\n`;\nreport += `**Date:** ${today}\\n`;\nreport += `**Site:** ${params.siteUrl}\\n`;\nreport += `**Repo:** ShalinPatel670/${params.repoName}\\n`;\nreport += `**Verdict:** ${verdict}\\n`;\nreport += `**Score:** ${passedChecks}/${totalChecks} checks passed\\n\\n`;\n\nif (lighthouse.performance !== null) {\n  report += `## Lighthouse Scores\\n`;\n  report += `- Performance: ${lighthouse.performance}/100\\n`;\n  report += `- Accessibility: ${lighthouse.accessibility}/100\\n`;\n  report += `- SEO: ${lighthouse.seo}/100\\n\\n`;\n}\n\nconst categories = ['Lighthouse', 'Content Quality', 'SEO', 'GitHub'];\nfor (const cat of categories) {\n  const catChecks = allChecks.filter(c => c.category === cat);\n  if (catChecks.length === 0) continue;\n  report += `## ${cat}\\n`;\n  for (const c of catChecks) {\n    report += `- ${c.pass ? 'PASS' : 'FAIL'} | ${c.check} | ${c.detail}\\n`;\n  }\n  report += `\\n`;\n}\n\nif (failures.length > 0) {\n  report += `## Failures Requiring Action\\n`;\n  for (const f of failures) {\n    report += `- [${f.category}] ${f.check}: ${f.detail}\\n`;\n  }\n}\n\nreturn [{\n  json: {\n    businessId: params.businessId,\n    businessName: params.businessName,\n    siteUrl: params.siteUrl,\n    repoName: params.repoName,\n    verdict,\n    passedChecks,\n    totalChecks,\n    criticalFailures,\n    failures,\n    report,\n    today\n  }\n}];"
+        "jsCode": "const params = $('Extract Parameters').first().json;\nconst lighthouse = $('Parse Lighthouse').first().json.lighthouse;\nconst { slopChecks, seoChecks } = $('Parse HTML Checks').first().json;\nconst { githubChecks } = $('Parse GitHub Checks').first().json;\n\nconst today = new Date().toISOString().split('T')[0];\nconst allChecks = [];\nconst failures = [];\n\n// --- Lighthouse ---\nif (lighthouse.error) {\n  allChecks.push({ category: 'Lighthouse', check: 'Lighthouse Audit', pass: false, detail: lighthouse.error, critical: true });\n  failures.push({ category: 'Lighthouse', check: 'Lighthouse Audit', detail: lighthouse.error });\n} else {\n  const perfPass = lighthouse.performance >= 50;\n  const a11yPass = lighthouse.accessibility >= 80;\n  const seoPass = lighthouse.seo >= 80;\n\n  allChecks.push({ category: 'Lighthouse', check: 'Performance >= 50', pass: perfPass, detail: `Score: ${lighthouse.performance}`, critical: true });\n  allChecks.push({ category: 'Lighthouse', check: 'Accessibility >= 80', pass: a11yPass, detail: `Score: ${lighthouse.accessibility}`, critical: true });\n  allChecks.push({ category: 'Lighthouse', check: 'SEO >= 80', pass: seoPass, detail: `Score: ${lighthouse.seo}`, critical: true });\n\n  if (!perfPass) failures.push({ category: 'Lighthouse', check: 'Performance >= 50', detail: `Score: ${lighthouse.performance}` });\n  if (!a11yPass) failures.push({ category: 'Lighthouse', check: 'Accessibility >= 80', detail: `Score: ${lighthouse.accessibility}` });\n  if (!seoPass) failures.push({ category: 'Lighthouse', check: 'SEO >= 80', detail: `Score: ${lighthouse.seo}` });\n}\n\n// --- Slop checks ---\nfor (const c of slopChecks) {\n  allChecks.push({ category: 'Content Quality', ...c, critical: true });\n  if (!c.pass) failures.push({ category: 'Content Quality', check: c.check, detail: c.detail });\n}\n\n// --- SEO checks ---\nfor (const c of seoChecks) {\n  allChecks.push({ category: 'SEO', ...c });\n  if (!c.pass && c.critical) failures.push({ category: 'SEO', check: c.check, detail: c.detail });\n}\n\n// --- GitHub checks ---\nfor (const c of githubChecks) {\n  allChecks.push({ category: 'GitHub', ...c });\n  if (!c.pass && c.critical) failures.push({ category: 'GitHub', check: c.check, detail: c.detail });\n}\n\n// Score\nconst totalChecks = allChecks.length;\nconst passedChecks = allChecks.filter(c => c.pass).length;\nconst criticalFailures = failures.length;\nconst verdict = criticalFailures === 0 ? 'PASS' : 'FAIL';\n\n// Build report\nlet report = `# Quality Gate Report: ${params.businessName}\\n\\n`;\nreport += `**Date:** ${today}\\n`;\nreport += `**Site:** ${params.siteUrl}\\n`;\nreport += `**Repo:** Sluice-Organization/${params.repoName}\\n`;\nreport += `**Verdict:** ${verdict}\\n`;\nreport += `**Score:** ${passedChecks}/${totalChecks} checks passed\\n\\n`;\n\nif (lighthouse.performance !== null) {\n  report += `## Lighthouse Scores\\n`;\n  report += `- Performance: ${lighthouse.performance}/100\\n`;\n  report += `- Accessibility: ${lighthouse.accessibility}/100\\n`;\n  report += `- SEO: ${lighthouse.seo}/100\\n\\n`;\n}\n\nconst categories = ['Lighthouse', 'Content Quality', 'SEO', 'GitHub'];\nfor (const cat of categories) {\n  const catChecks = allChecks.filter(c => c.category === cat);\n  if (catChecks.length === 0) continue;\n  report += `## ${cat}\\n`;\n  for (const c of catChecks) {\n    report += `- ${c.pass ? 'PASS' : 'FAIL'} | ${c.check} | ${c.detail}\\n`;\n  }\n  report += `\\n`;\n}\n\nif (failures.length > 0) {\n  report += `## Failures Requiring Action\\n`;\n  for (const f of failures) {\n    report += `- [${f.category}] ${f.check}: ${f.detail}\\n`;\n  }\n}\n\nreturn [{\n  json: {\n    businessId: params.businessId,\n    businessName: params.businessName,\n    siteUrl: params.siteUrl,\n    repoName: params.repoName,\n    verdict,\n    passedChecks,\n    totalChecks,\n    criticalFailures,\n    failures,\n    report,\n    today\n  }\n}];"
       },
       "id": "aggregate-results",
       "name": "Aggregate Results",
@@ -194,7 +194,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Aggregate Results').first().json.businessId}/quality-gate-passed.md` }}",
         "fileContent": "={{ $('Aggregate Results').first().json.report }}",
@@ -216,7 +216,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Aggregate Results').first().json.businessId}/state.md` }}",
         "fileContent": "={{ $('Aggregate Results').first().json.report + '\\n\\n---\\n\\n**Quality Gate Status: PASSED** on ' + $('Aggregate Results').first().json.today + '\\nReady for launch.' }}",
@@ -253,7 +253,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Aggregate Results').first().json.businessId}/quality-gate-failed.md` }}",
         "fileContent": "={{ $('Aggregate Results').first().json.report }}",
@@ -285,7 +285,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/' + $json.repoName + '/issues' }}",
+        "url": "={{ 'https://api.github.com/repos/Sluice-Organization/' + $json.repoName + '/issues' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -312,7 +312,7 @@
         "toEmail": "25shapatel@gmail.com",
         "subject": "={{ `Quality Gate FAILED: ${$('Aggregate Results').first().json.businessName} (${$('Aggregate Results').first().json.criticalFailures} failures)` }}",
         "emailType": "text",
-        "message": "={{ $('Aggregate Results').first().json.report + '\\n\\nGitHub issues have been created for each failure in repo: ShalinPatel670/' + $('Aggregate Results').first().json.repoName }}"
+        "message": "={{ $('Aggregate Results').first().json.report + '\\n\\nGitHub issues have been created for each failure in repo: Sluice-Organization/' + $('Aggregate Results').first().json.repoName }}"
       },
       "id": "send-fail-email",
       "name": "Send Failure Email",

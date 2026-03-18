@@ -44,7 +44,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/system/operating-bible-v9.md",
         "resource": "file"
@@ -198,7 +198,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/system/discovery/opportunities-{{ $json.timestamp.split('T')[0] }}.md",
         "fileContent": "={{ $json.report }}",

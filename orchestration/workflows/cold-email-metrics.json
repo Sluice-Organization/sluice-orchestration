@@ -175,7 +175,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/reports/cold-email-metrics-latest.json",
+        "url": "https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/reports/cold-email-metrics-latest.json",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendBody": true,

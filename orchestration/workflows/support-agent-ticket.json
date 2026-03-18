@@ -143,7 +143,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Process AI Response').first().json.businessId}/reports/support-log.md` }}",
         "resource": "file",
@@ -175,7 +175,7 @@
     {
       "parameters": {
         "operation": "edit",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$json.businessId}/reports/support-log.md` }}",
         "fileContent": "={{ $json.fileContent }}",

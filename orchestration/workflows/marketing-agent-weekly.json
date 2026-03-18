@@ -54,7 +54,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/state.md",
         "resource": "file"
@@ -69,7 +69,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Split Into Businesses').first().json.businessPath }}/content-strategy.md",
         "resource": "file"
@@ -84,7 +84,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Split Into Businesses').first().json.businessPath }}/weekly-plan.md",
         "resource": "file"
@@ -156,7 +156,7 @@
     {
       "parameters": {
         "operation": "create",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Split Into Businesses').first().json.businessPath }}/reports/marketing-{{ $json.reportDate }}.md",
         "fileContent": "={{ $json.marketingReport }}",
@@ -175,7 +175,7 @@
     {
       "parameters": {
         "operation": "edit",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Split Into Businesses').first().json.businessPath }}/content-strategy.md",
         "fileContent": "={{ $json.contentStrategyUpdate }}",

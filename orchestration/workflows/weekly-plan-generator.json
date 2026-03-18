@@ -61,7 +61,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/state.md",
         "resource": "file"
@@ -75,7 +75,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Dates').first().json.businessPath }}/strategy.md",
         "resource": "file"
@@ -89,7 +89,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Dates').first().json.businessPath }}/content-strategy.md",
         "resource": "file"
@@ -103,7 +103,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Dates').first().json.businessPath }}/reports/ceo-{{ $('Compute Dates').first().json.lastFriday }}.md",
         "resource": "file"
@@ -118,7 +118,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Dates').first().json.businessPath }}/reports/finance-{{ $('Compute Dates').first().json.lastFriday }}.md",
         "resource": "file"
@@ -133,7 +133,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Dates').first().json.businessPath }}/comptroller/review-{{ $('Compute Dates').first().json.lastMonday }}.md",
         "resource": "file"
@@ -148,7 +148,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Dates').first().json.businessPath }}/reports/marketing-{{ $('Compute Dates').first().json.lastMonday }}.md",
         "resource": "file"
@@ -163,7 +163,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Dates').first().json.businessPath }}/reports/product-{{ $('Compute Dates').first().json.lastTuesday }}.md",
         "resource": "file"
@@ -178,7 +178,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/system/orchestrator-review-{{ $('Compute Dates').first().json.lastFriday }}.md",
         "resource": "file"
@@ -193,7 +193,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "memory-bank/system/discovery/opportunities-{{ $('Compute Dates').first().json.lastFriday }}.md",
         "resource": "file"
@@ -208,7 +208,7 @@
     {
       "parameters": {
         "operation": "get",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $('Compute Dates').first().json.businessPath }}/weekly-plan.md",
         "resource": "file"
@@ -267,7 +267,7 @@
     {
       "parameters": {
         "operation": "edit",
-        "owner": "ShalinPatel670",
+        "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ $json.businessPath }}/weekly-plan.md",
         "fileContent": "={{ $json.planContent }}",

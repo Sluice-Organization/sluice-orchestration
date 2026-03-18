@@ -333,7 +333,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/memory-bank/system/reports/lead-gen-' + $json.dateStr + '.md' }}",
+        "url": "={{ 'https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/memory-bank/system/reports/lead-gen-' + $json.dateStr + '.md' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

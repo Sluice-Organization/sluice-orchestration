@@ -54,7 +54,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ `https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/${$json.businessPath}/reports/content-${$now.toFormat('yyyy-MM-dd')}.md` }}",
+        "url": "={{ `https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/${$json.businessPath}/reports/content-${$now.toFormat('yyyy-MM-dd')}.md` }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -146,7 +146,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ `https://api.github.com/repos/ShalinPatel670/${$('Split Into Businesses').first().json.repo_name}/contents/src/content/blog/${$json.slug}.md` }}",
+        "url": "={{ `https://api.github.com/repos/Sluice-Organization/${$('Split Into Businesses').first().json.repo_name}/contents/src/content/blog/${$json.slug}.md` }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -190,7 +190,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ `https://api.github.com/repos/ShalinPatel670/${$('Split Into Businesses').first().json.repo_name}/contents/src/content/blog/${$json.slug}.md` }}",
+        "url": "={{ `https://api.github.com/repos/Sluice-Organization/${$('Split Into Businesses').first().json.repo_name}/contents/src/content/blog/${$json.slug}.md` }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -270,7 +270,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Collect results from all processed blog posts\nconst items = $input.all();\nconst today = $now.toFormat('yyyy-MM-dd');\n\nconst publishedPosts = [];\nfor (const item of items) {\n  publishedPosts.push({\n    slug: item.json.slug || 'unknown',\n    url: item.json.blogUrl || 'unknown',\n    indexingSubmitted: !item.json.error\n  });\n}\n\nconst report = `# Content Publisher Report - ${today}\\n\\n## Status: SUCCESS\\n\\n## Published Blog Posts\\n\\n${publishedPosts.map((p, i) => `### ${i + 1}. ${p.slug}\\n- **URL**: ${p.url}\\n- **Committed to**: src/content/blog/${p.slug}.md\\n- **Google Indexing**: ${p.indexingSubmitted ? 'Submitted' : 'Skipped (API not configured)'}\\n`).join('\\n')}\\n\\n## Summary\\n- **Total posts published**: ${publishedPosts.length}\\n- **Target repo**: ShalinPatel670/${$('Split Into Businesses').first().json.repo_name}\\n- **Vercel auto-deploy**: Triggered by commit\\n- **Timestamp**: ${new Date().toISOString()}\\n`;\n\nconst reportB64 = Buffer.from(report, 'utf-8').toString('base64');\n\nreturn [{\n  json: {\n    report,\n    reportPayload: JSON.stringify({\n      message: `Content Publisher report - ${today}`,\n      content: reportB64\n    })\n  }\n}];"
+        "jsCode": "// Collect results from all processed blog posts\nconst items = $input.all();\nconst today = $now.toFormat('yyyy-MM-dd');\n\nconst publishedPosts = [];\nfor (const item of items) {\n  publishedPosts.push({\n    slug: item.json.slug || 'unknown',\n    url: item.json.blogUrl || 'unknown',\n    indexingSubmitted: !item.json.error\n  });\n}\n\nconst report = `# Content Publisher Report - ${today}\\n\\n## Status: SUCCESS\\n\\n## Published Blog Posts\\n\\n${publishedPosts.map((p, i) => `### ${i + 1}. ${p.slug}\\n- **URL**: ${p.url}\\n- **Committed to**: src/content/blog/${p.slug}.md\\n- **Google Indexing**: ${p.indexingSubmitted ? 'Submitted' : 'Skipped (API not configured)'}\\n`).join('\\n')}\\n\\n## Summary\\n- **Total posts published**: ${publishedPosts.length}\\n- **Target repo**: Sluice-Organization/${$('Split Into Businesses').first().json.repo_name}\\n- **Vercel auto-deploy**: Triggered by commit\\n- **Timestamp**: ${new Date().toISOString()}\\n`;\n\nconst reportB64 = Buffer.from(report, 'utf-8').toString('base64');\n\nreturn [{\n  json: {\n    report,\n    reportPayload: JSON.stringify({\n      message: `Content Publisher report - ${today}`,\n      content: reportB64\n    })\n  }\n}];"
       },
       "id": "build-report",
       "name": "Step 5a - Build Publish Report",
@@ -284,7 +284,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ `https://api.github.com/repos/ShalinPatel670/sluice-orchestration/contents/${$('Split Into Businesses').first().json.businessPath}/reports/publish-${$now.toFormat('yyyy-MM-dd')}.md` }}",
+        "url": "={{ `https://api.github.com/repos/Sluice-Organization/sluice-orchestration/contents/${$('Split Into Businesses').first().json.businessPath}/reports/publish-${$now.toFormat('yyyy-MM-dd')}.md` }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

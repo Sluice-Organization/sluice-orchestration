@@ -240,7 +240,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ 'https://api.github.com/repos/ShalinPatel670/sluice/contents/memory-bank/businesses/' + $json.businessId + '/prd.md' }}",
+        "url": "={{ 'https://api.github.com/repos/Sluice-Organization/sluice/contents/memory-bank/businesses/' + $json.businessId + '/prd.md' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
