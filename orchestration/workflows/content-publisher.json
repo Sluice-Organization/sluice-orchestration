@@ -211,7 +211,7 @@
           "timeout": 30000
         }
       },
-      "id": "commit-to-bayflow",
+      "id": "commit-to-business-repo",
       "name": "Step 3c - Commit Blog Post",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
