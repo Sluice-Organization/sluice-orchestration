@@ -194,7 +194,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Step 4.7 - Create Stripe Products and Prices\n// Parse PRD pricing tiers or use defaults ($99/$149/$199)\nconst payloads = $('Prepare Payloads').first().json;\nconst businessName = payloads.businessName;\nconst businessId = payloads.businessId;\nconst pricingTiers = payloads.pricingTiers || '';\n\n// Default tier config\nlet tiers = [\n  { name: businessName + ' Solo', amount: 9900, interval: 'month' },\n  { name: businessName + ' Pro', amount: 14900, interval: 'month' },\n  { name: businessName + ' Shop', amount: 19900, interval: 'month' }\n];\n\n// Try to parse pricing from PRD\nif (pricingTiers) {\n  const priceMatches = pricingTiers.match(/\\$(\\d+)\\/month|\\$(\\d+)\\/mo/g);\n  if (priceMatches && priceMatches.length >= 3) {\n    const amounts = priceMatches.map(p => {\n      const num = p.match(/\\$(\\d+)/);\n      return num ? parseInt(num[1]) * 100 : null;\n    }).filter(Boolean);\n    if (amounts.length >= 3) {\n      tiers[0].amount = amounts[0];\n      tiers[1].amount = amounts[1];\n      tiers[2].amount = amounts[2];\n    }\n  }\n\n  // Try to extract tier names\n  const tierNames = pricingTiers.match(/(?:###?\\s*|\\*\\*)(Solo|Starter|Basic|Pro|Professional|Growth|Shop|Business|Enterprise|Team|Premium)[^\\n]*/gi);\n  if (tierNames && tierNames.length >= 3) {\n    const cleanNames = tierNames.map(t => t.replace(/^[#*\\s]+/, '').replace(/[*]+$/, '').trim());\n    tiers[0].name = businessName + ' ' + cleanNames[0];\n    tiers[1].name = businessName + ' ' + cleanNames[1];\n    tiers[2].name = businessName + ' ' + cleanNames[2];\n  }\n}\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    tiers,\n    currentTierIndex: 0\n  }\n}];"
+        "jsCode": "// Step 4.7 - Create Stripe Products and Prices\n// Parse PRD pricing tiers or use defaults ($99/$149/$199)\nconst payloads = $('Prepare Payloads').first().json;\nconst businessName = payloads.businessName;\nconst businessId = payloads.businessId;\nconst pricingTiers = payloads.pricingTiers || '';\nconst prdContent = payloads.prdContent || '';\n\n// Detect if this is an AI SaaS business\nconst prdLower = prdContent.toLowerCase();\nconst categoryLower = (payloads.category || '').toLowerCase();\nconst isAiSaas = categoryLower.startsWith('ai_') || prdLower.includes('usage-based') || prdLower.includes('ai saas') || prdLower.includes('metered') || prdLower.includes('ai model architecture') || prdLower.includes('usage charges');\n\n// Default tier config\nlet tiers = [\n  { name: businessName + ' Solo', amount: 9900, interval: 'month' },\n  { name: businessName + ' Pro', amount: 14900, interval: 'month' },\n  { name: businessName + ' Shop', amount: 19900, interval: 'month' }\n];\n\n// Try to parse pricing from PRD\nif (pricingTiers) {\n  const priceMatches = pricingTiers.match(/\\$(\\d+)\\/month|\\$(\\d+)\\/mo/g);\n  if (priceMatches && priceMatches.length >= 3) {\n    const amounts = priceMatches.map(p => {\n      const num = p.match(/\\$(\\d+)/);\n      return num ? parseInt(num[1]) * 100 : null;\n    }).filter(Boolean);\n    if (amounts.length >= 3) {\n      tiers[0].amount = amounts[0];\n      tiers[1].amount = amounts[1];\n      tiers[2].amount = amounts[2];\n    }\n  }\n\n  // Try to extract tier names\n  const tierNames = pricingTiers.match(/(?:###?\\s*|\\*\\*)(Solo|Starter|Basic|Pro|Professional|Growth|Shop|Business|Enterprise|Team|Premium)[^\\n]*/gi);\n  if (tierNames && tierNames.length >= 3) {\n    const cleanNames = tierNames.map(t => t.replace(/^[#*\\s]+/, '').replace(/[*]+$/, '').trim());\n    tiers[0].name = businessName + ' ' + cleanNames[0];\n    tiers[1].name = businessName + ' ' + cleanNames[1];\n    tiers[2].name = businessName + ' ' + cleanNames[2];\n  }\n}\n\n// Parse metered unit amount from PRD for AI SaaS (default $0.50 = 50 cents)\nlet meteredUnitAmount = 50;\nif (isAiSaas && prdContent) {\n  const usageMatch = prdContent.match(/\\$([\\d.]+)\\s*per\\s/i);\n  if (usageMatch) {\n    meteredUnitAmount = Math.round(parseFloat(usageMatch[1]) * 100);\n  }\n}\n\nreturn [{\n  json: {\n    businessId,\n    businessName,\n    tiers,\n    isAiSaas,\n    meteredUnitAmount,\n    currentTierIndex: 0\n  }\n}];"
       },
       "id": "prepare-stripe-tiers",
       "name": "Step 4.7a - Prepare Stripe Tiers",
@@ -342,7 +342,30 @@
     },
     {
       "parameters": {
-        "jsCode": "// Collect all Stripe price IDs from the 3 tier creation chains\nconst prevData = $('Step 4.6b - Parse Phone Result').first().json;\nconst payloads = $('Prepare Payloads').first().json;\n\nlet soloPriceId = '';\nlet proPriceId = '';\nlet shopPriceId = '';\n\ntry { soloPriceId = $('Step 4.7c - Create Solo Price').first().json.id || ''; } catch(e) {}\ntry { proPriceId = $('Step 4.7e - Create Pro Price').first().json.id || ''; } catch(e) {}\ntry { shopPriceId = $('Step 4.7g - Create Shop Price').first().json.id || ''; } catch(e) {}\n\nreturn [{\n  json: {\n    ...prevData,\n    stripe_price_solo: soloPriceId,\n    stripe_price_pro: proPriceId,\n    stripe_price_shop: shopPriceId,\n    businessId: payloads.businessId\n  }\n}];"
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/prices",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.STRIPE_SECRET_KEY }}" },
+            { "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ 'product=' + $('Step 4.7b - Create Solo Product').first().json.id + '&currency=usd&recurring[interval]=month&recurring[usage_type]=metered&billing_scheme=per_unit&unit_amount=' + $('Step 4.7a - Prepare Stripe Tiers').first().json.meteredUnitAmount }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "create-stripe-price-metered",
+      "name": "Step 4.7i - Create Metered Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3740, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all Stripe price IDs from the 3 tier creation chains + optional metered price\nconst prevData = $('Step 4.6b - Parse Phone Result').first().json;\nconst payloads = $('Prepare Payloads').first().json;\nconst tierData = $('Step 4.7a - Prepare Stripe Tiers').first().json;\n\nlet soloPriceId = '';\nlet proPriceId = '';\nlet shopPriceId = '';\nlet meteredPriceId = '';\n\ntry { soloPriceId = $('Step 4.7c - Create Solo Price').first().json.id || ''; } catch(e) {}\ntry { proPriceId = $('Step 4.7e - Create Pro Price').first().json.id || ''; } catch(e) {}\ntry { shopPriceId = $('Step 4.7g - Create Shop Price').first().json.id || ''; } catch(e) {}\ntry { meteredPriceId = $('Step 4.7i - Create Metered Price').first().json.id || ''; } catch(e) {}\n\nreturn [{\n  json: {\n    ...prevData,\n    stripe_price_solo: soloPriceId,\n    stripe_price_pro: proPriceId,\n    stripe_price_shop: shopPriceId,\n    stripe_price_metered: meteredPriceId,\n    isAiSaas: tierData.isAiSaas || false,\n    businessId: payloads.businessId\n  }\n}];"
       },
       "id": "collect-stripe-prices",
       "name": "Step 4.7h - Collect Stripe Price IDs",
@@ -411,7 +434,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ launched_at: new Date().toISOString(), repo_url: 'https://github.com/Sluice-Organization/' + $('Prepare Payloads').first().json.repoName, repo_name: $('Prepare Payloads').first().json.repoName, status: 'deploying', retell_agent_id: $json.retellAgentId || null, retell_voice: $json.voiceName || null, retell_phone_number: $json.retellPhoneNumber || null, site_url: $json.siteUrl || null, cal_booking_url: $json.bookingLink || 'https://cal.com/shalinp', stripe_price_solo: $json.stripe_price_solo || null, stripe_price_pro: $json.stripe_price_pro || null, stripe_price_shop: $json.stripe_price_shop || null, sending_domains: $json.sendingDomains || [] }) }}",
+        "jsonBody": "={{ JSON.stringify({ launched_at: new Date().toISOString(), repo_url: 'https://github.com/Sluice-Organization/' + $('Prepare Payloads').first().json.repoName, repo_name: $('Prepare Payloads').first().json.repoName, status: 'deploying', retell_agent_id: $json.retellAgentId || null, retell_voice: $json.voiceName || null, retell_phone_number: $json.retellPhoneNumber || null, site_url: $json.siteUrl || null, cal_booking_url: $json.bookingLink || 'https://cal.com/shalinp', stripe_price_solo: $json.stripe_price_solo || null, stripe_price_pro: $json.stripe_price_pro || null, stripe_price_shop: $json.stripe_price_shop || null, stripe_price_metered: $json.stripe_price_metered || null, is_ai_saas: $json.isAiSaas || false, sending_domains: $json.sendingDomains || [] }) }}",
         "options": { "timeout": 15000 }
       },
       "id": "update-knowledge-graph",
@@ -487,6 +510,9 @@
       "main": [[{ "node": "Step 4.7g - Create Shop Price", "type": "main", "index": 0 }]]
     },
     "Step 4.7g - Create Shop Price": {
+      "main": [[{ "node": "Step 4.7i - Create Metered Price", "type": "main", "index": 0 }]]
+    },
+    "Step 4.7i - Create Metered Price": {
       "main": [[{ "node": "Step 4.7h - Collect Stripe Price IDs", "type": "main", "index": 0 }]]
     },
     "Step 4.7h - Collect Stripe Price IDs": {
