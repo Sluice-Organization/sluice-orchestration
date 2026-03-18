@@ -303,11 +303,6 @@
     },
     {
       "parameters": {
-        "updates": ["message"],
-        "additionalFields": {}
-      },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": false,
