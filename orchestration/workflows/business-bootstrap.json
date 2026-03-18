@@ -204,7 +204,7 @@
         "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/reports/.gitkeep` }}",
-        "fileContent": "",
+        "fileContent": ".gitkeep",
         "commitMessage": "={{ `Bootstrap ${$('Generate Seed Content').first().json.businessName}: create reports directory` }}",
         "resource": "file"
       },
@@ -224,7 +224,7 @@
         "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
         "filePath": "={{ `memory-bank/businesses/${$('Generate Seed Content').first().json.businessId}/comptroller/.gitkeep` }}",
-        "fileContent": "",
+        "fileContent": ".gitkeep",
         "commitMessage": "={{ `Bootstrap ${$('Generate Seed Content').first().json.businessName}: create comptroller directory` }}",
         "resource": "file"
       },
