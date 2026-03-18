@@ -139,11 +139,11 @@
     },
     {
       "parameters": {
-        "updates": ["callback_query"],
+        "updates": ["*"],
         "additionalFields": {}
       },
       "id": "telegram-callback-trigger",
-      "name": "Telegram Callback Trigger",
+      "name": "Telegram All Updates Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
       "position": [250, 700],
@@ -153,6 +153,30 @@
           "name": "Telegram Bot"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nif (data.callback_query) {\n  return [{ json: { ...data, _updateType: 'callback' } }];\n} else if (data.message?.text) {\n  return [{ json: { ...data, _updateType: 'message' } }];\n} else {\n  return [{ json: { ...data, _updateType: 'unknown' } }];\n}"
+      },
+      "id": "route-update-type",
+      "name": "Route Update Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 700]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "is-callback", "leftValue": "={{ $json._updateType }}", "rightValue": "callback", "operator": { "type": "string", "operation": "equals" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "is-callback-or-message",
+      "name": "Is Callback?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [650, 700]
     },
     {
       "parameters": {
@@ -282,18 +306,6 @@
         "updates": ["message"],
         "additionalFields": {}
       },
-      "id": "telegram-message-trigger",
-      "name": "Telegram Message Trigger",
-      "type": "n8n-nodes-base.telegramTrigger",
-      "typeVersion": 1.1,
-      "position": [250, 1200],
-      "credentials": {
-        "telegramApi": {
-          "id": "telegram-cred",
-          "name": "Telegram Bot"
-        }
-      }
-    },
     {
       "parameters": {
         "conditions": {
@@ -870,11 +882,40 @@
         ]
       ]
     },
-    "Telegram Callback Trigger": {
+    "Telegram All Updates Trigger": {
+      "main": [
+        [
+          {
+            "node": "Route Update Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Update Type": {
+      "main": [
+        [
+          {
+            "node": "Is Callback?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Callback?": {
       "main": [
         [
           {
             "node": "Parse Callback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Security: Check Chat ID",
             "type": "main",
             "index": 0
           }
@@ -931,17 +972,6 @@
         [
           {
             "node": "Notify: Pipeline Triggered",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Telegram Message Trigger": {
-      "main": [
-        [
-          {
-            "node": "Security: Check Chat ID",
             "type": "main",
             "index": 0
           }
