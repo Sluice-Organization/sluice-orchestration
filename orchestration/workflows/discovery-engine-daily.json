@@ -46,7 +46,7 @@
         "operation": "get",
         "owner": "Sluice-Organization",
         "repository": "sluice-orchestration",
-        "filePath": "memory-bank/system/operating-bible-v9.md",
+        "filePath": "memory-bank/system/operating-bible-v10.md",
         "resource": "file"
       },
       "id": "read-bible-schedule",
