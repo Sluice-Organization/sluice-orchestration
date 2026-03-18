@@ -489,6 +489,162 @@
     },
     {
       "parameters": {
+        "jsCode": "// Generate a LinkedIn text post from the reel content\n// LinkedIn algorithm favors native text posts - no video\nconst reel = $input.first().json;\n\nconst bannedWords = ['delve', 'leverage', 'utilize', 'harness', 'elevate', 'empower', 'streamline', 'robust', 'seamless', 'cutting-edge', 'game-changer', 'innovative', 'revolutionize', 'best-in-class', 'holistic', 'synergy', 'paradigm', 'transform', 'world-class', 'state-of-the-art'];\n\nconst linkedinPrompt = `You are a content writer for a SaaS business. Write a LinkedIn text post about a tip or insight related to auto repair shop management.\n\nContext from this week's content:\n- Topic: ${reel.title || 'auto repair shop tips'}\n- Hook: ${reel.hook || ''}\n- Key point: ${reel.body ? reel.body.substring(0, 200) : reel.fullScript.substring(0, 200)}\n\nRules:\n- Professional but personal tone. Write like a real shop owner sharing what they learned.\n- First 2 lines MUST be a compelling hook (this is what shows before \"see more\")\n- 150-300 words total\n- End with a soft CTA - mention the product naturally, don't hard sell\n- Use 3-5 relevant hashtags at the end\n- NEVER use these words: ${bannedWords.join(', ')}\n- No em dashes. Use regular dashes or commas instead.\n- No corporate speak. Write like you're talking to a friend who owns a shop.\n- Include a specific, actionable insight (not generic advice)\n\nOutput ONLY the LinkedIn post text. No explanations, no markdown formatting.`;\n\nreturn [{\n  json: {\n    ...reel,\n    linkedinPrompt\n  }\n}];"
+      },
+      "id": "generate-linkedin-prompt",
+      "name": "Generate LinkedIn Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.linkedinPrompt }}"
+      },
+      "id": "linkedin-llm-chain",
+      "name": "Haiku: LinkedIn Post",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        3080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-haiku-20241022",
+        "options": {
+          "maxTokensToSample": 1000,
+          "temperature": 0.6
+        }
+      },
+      "id": "haiku-model-linkedin",
+      "name": "Haiku (LinkedIn Generation)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        3080,
+        500
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic-cred",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract LinkedIn post content and prepare for posting\nconst llmOutput = $('Haiku: LinkedIn Post').first().json;\nconst reelData = $('Generate LinkedIn Prompt').first().json;\nconst postContent = llmOutput.response || llmOutput.text || '';\n\n// Anti-AI post-processing: scrub any banned words that slipped through\nconst bannedReplacements = {\n  'delve': 'dig into', 'leverage': 'use', 'utilize': 'use', 'harness': 'use',\n  'elevate': 'improve', 'empower': 'help', 'streamline': 'simplify', 'robust': 'solid',\n  'seamless': 'smooth', 'cutting-edge': 'modern', 'game-changer': 'big deal',\n  'innovative': 'smart', 'revolutionize': 'change', 'best-in-class': 'top-notch',\n  'holistic': 'complete', 'synergy': 'teamwork', 'paradigm': 'approach',\n  'transform': 'change', 'world-class': 'top-notch', 'state-of-the-art': 'modern'\n};\nlet cleanedPost = postContent;\nfor (const [banned, replacement] of Object.entries(bannedReplacements)) {\n  const regex = new RegExp(banned, 'gi');\n  cleanedPost = cleanedPost.replace(regex, replacement);\n}\n// Replace em dashes\ncleanedPost = cleanedPost.replace(/\\u2014/g, '--').replace(/\\u2013/g, '--');\n\nconst personId = $env.LINKEDIN_PERSON_ID || '{PERSON_ID}';\n\nconst linkedinBody = {\n  author: 'urn:li:person:' + personId,\n  lifecycleState: 'PUBLISHED',\n  specificContent: {\n    'com.linkedin.ugc.ShareContent': {\n      shareCommentary: { text: cleanedPost },\n      shareMediaCategory: 'NONE'\n    }\n  },\n  visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' }\n};\n\nreturn [{\n  json: {\n    ...reelData,\n    linkedinPostContent: cleanedPost,\n    linkedinBody\n  }\n}];"
+      },
+      "id": "prepare-linkedin-body",
+      "name": "Prepare LinkedIn Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/v2/ugcPosts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.LINKEDIN_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.linkedinBody) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "post-to-linkedin",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3520,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log LinkedIn post to outreach_intelligence\nconst input = $input.first().json;\nconst linkedinData = $('Prepare LinkedIn Body').first().json;\nconst linkedinResult = input;\n\nconst linkedinOk = !(linkedinResult.error || linkedinResult.statusCode >= 400);\nconst now = new Date();\n\nconst outreachRow = {\n  business_id: 'bayflow',\n  channel: 'linkedin',\n  outreach_type: 'social_post',\n  audience_type: 'auto_repair',\n  tone: 'professional_casual',\n  angle: linkedinData.angle || 'tip',\n  intent: 'build_awareness',\n  content_preview: (linkedinData.linkedinPostContent || '').substring(0, 200),\n  personalization_depth: 0,\n  day_of_week: now.getDay(),\n  hour_of_day: now.getHours(),\n  outcome: linkedinOk ? 'posted' : 'failed',\n  lead_email: null,\n  notes: linkedinOk ? 'Posted to LinkedIn successfully' : ('LinkedIn post failed: ' + (linkedinResult.error || linkedinResult.message || 'Not configured'))\n};\n\nreturn [{\n  json: {\n    outreachRow,\n    linkedinPosted: linkedinOk,\n    linkedinError: linkedinOk ? null : (linkedinResult.error || linkedinResult.message || 'Not configured')\n  }\n}];"
+      },
+      "id": "linkedin-log-result",
+      "name": "LinkedIn Log Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wjukfdziomnejtlmegvv.supabase.co/rest/v1/outreach_intelligence",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWtmZHppb21uZWp0bG1lZ3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mjk1ODIsImV4cCI6MjA4OTEwNTU4Mn0.12Vszqd1Lhp0M6FIB_pSF1l7T_SscB0X4AxwFTRrTVU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify([$json.outreachRow]) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "log-linkedin-outreach",
+      "name": "Log LinkedIn to Outreach Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3960,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "jsCode": "// No reels found - log a skip report\nconst now = new Date().toISOString().split('T')[0];\nreturn [{\n  json: {\n    report: `# Social Media Publisher Report - ${now}\\n\\nNo reel scripts found in today's content report.\\nCheck that Content Agent has run and produced reel scripts in the content report.\\n`,\n    reportDate: now\n  }\n}];"
       },
       "id": "no-reels-log",
@@ -696,6 +852,66 @@
             "node": "Post to TikTok (Direct)",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Generate LinkedIn Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate LinkedIn Prompt": {
+      "main": [
+        [
+          {
+            "node": "Haiku: LinkedIn Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Haiku: LinkedIn Post": {
+      "main": [
+        [
+          {
+            "node": "Prepare LinkedIn Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare LinkedIn Body": {
+      "main": [
+        [
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn Log Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Log Result": {
+      "main": [
+        [
+          {
+            "node": "Log LinkedIn to Outreach Intelligence",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -760,6 +976,17 @@
           {
             "node": "Save Skip Report",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Haiku (LinkedIn Generation)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Haiku: LinkedIn Post",
+            "type": "ai_languageModel",
             "index": 0
           }
         ]
